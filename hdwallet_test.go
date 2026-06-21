@@ -154,7 +154,6 @@ func TestFromMnemonicBytesWipesInput(t *testing.T) {
 	for i, b := range in {
 		if b != 0 {
 			t.Fatalf("input mnemonic not wiped at index %d (=%d)", i, b)
-			break
 		}
 	}
 }

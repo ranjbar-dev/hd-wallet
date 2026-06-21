@@ -17,7 +17,7 @@ Only the latest release on the `v0.x` line receives security fixes. Please updat
 
 Please report vulnerabilities through **GitHub private security advisories**:
 
-> [https://github.com/amirranjbar/hd-wallet/security/advisories/new](https://github.com/amirranjbar/hd-wallet/security/advisories/new)
+> [https://github.com/ranjbar-dev/hd-wallet/security/advisories/new](https://github.com/ranjbar-dev/hd-wallet/security/advisories/new)
 
 Include as much detail as you can: a description of the issue, reproduction steps, the affected version(s), and any proof-of-concept code. The more context you provide, the faster a fix can be prepared.
 

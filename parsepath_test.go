@@ -52,7 +52,7 @@ func FuzzParsePath(f *testing.F) {
 	} {
 		f.Add(seed)
 	}
-	f.Fuzz(func(t *testing.T, path string) {
+	f.Fuzz(func(_ *testing.T, path string) {
 		_, _ = parsePath(path) // must not panic
 	})
 }

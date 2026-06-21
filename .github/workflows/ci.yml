@@ -63,9 +63,9 @@ jobs:
           go-version: 'stable'
 
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v6
+        uses: golangci/golangci-lint-action@v8
         with:
-          version: v1.64.8
+          version: v2.12
 
   # Automatically publish a new module version on every push to main, once the
   # test and security gates pass. "Publishing" a Go module means pushing a semver
@@ -151,7 +151,7 @@ jobs:
         run: |
           set -euo pipefail
           v="${{ steps.version.outputs.version }}"
-          mod="github.com/amirranjbar/hd-wallet"
+          mod="github.com/ranjbar-dev/hd-wallet"
           # Requesting the version from the proxy makes it fetch the new tag,
           # which publishes the module and triggers pkg.go.dev indexing.
           for i in 1 2 3 4 5 6; do

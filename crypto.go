@@ -6,6 +6,7 @@ import (
 
 	"github.com/awnumar/memguard"
 	"golang.org/x/crypto/blake2b"
+
 	// RIPEMD-160 is consensus-mandated for Bitcoin/Cosmos address hashing
 	// (hash160); its use here is required for correctness, not a security choice.
 	"golang.org/x/crypto/ripemd160" // #nosec G507 -- consensus-mandated for Bitcoin/Cosmos hash160 //nolint:staticcheck

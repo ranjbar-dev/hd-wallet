@@ -15,7 +15,7 @@ import (
 
 	"github.com/awnumar/memguard"
 
-	hdwallet "github.com/amirranjbar/hd-wallet"
+	hdwallet "github.com/ranjbar-dev/hd-wallet"
 )
 
 func main() {

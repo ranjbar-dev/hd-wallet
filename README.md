@@ -1,8 +1,8 @@
 # hd-wallet
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/amirranjbar/hd-wallet.svg)](https://pkg.go.dev/github.com/amirranjbar/hd-wallet)
-[![Go Report Card](https://goreportcard.com/badge/github.com/amirranjbar/hd-wallet)](https://goreportcard.com/report/github.com/amirranjbar/hd-wallet)
-[![CI](https://github.com/amirranjbar/hd-wallet/actions/workflows/ci.yml/badge.svg)](https://github.com/amirranjbar/hd-wallet/actions/workflows/ci.yml)
+[![Go Reference](https://pkg.go.dev/badge/github.com/ranjbar-dev/hd-wallet.svg)](https://pkg.go.dev/github.com/ranjbar-dev/hd-wallet)
+[![Go Report Card](https://goreportcard.com/badge/github.com/ranjbar-dev/hd-wallet)](https://goreportcard.com/report/github.com/ranjbar-dev/hd-wallet)
+[![CI](https://github.com/ranjbar-dev/hd-wallet/actions/workflows/ci.yml/badge.svg)](https://github.com/ranjbar-dev/hd-wallet/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 A **Trust Wallet–compatible**, security-focused **hierarchical-deterministic (HD) wallet** library for Go.
@@ -26,11 +26,11 @@ Sensitive material (the mnemonic and derived seed) is **never** held as a plain 
 ## Install
 
 ```bash
-go get github.com/amirranjbar/hd-wallet
+go get github.com/ranjbar-dev/hd-wallet
 ```
 
 ```go
-import hdwallet "github.com/amirranjbar/hd-wallet"
+import hdwallet "github.com/ranjbar-dev/hd-wallet"
 ```
 
 Requires Go 1.23+.
@@ -47,7 +47,7 @@ import (
 	"log"
 
 	"github.com/awnumar/memguard"
-	hdwallet "github.com/amirranjbar/hd-wallet"
+	hdwallet "github.com/ranjbar-dev/hd-wallet"
 )
 
 func main() {
@@ -130,7 +130,7 @@ import (
 	"os"
 
 	"github.com/awnumar/memguard"
-	hdwallet "github.com/amirranjbar/hd-wallet"
+	hdwallet "github.com/ranjbar-dev/hd-wallet"
 )
 
 func loadWallet() (*hdwallet.HDWallet, error) {
@@ -316,7 +316,7 @@ security gates is tagged and published by CI (`.github/workflows/ci.yml`):
 1. CI runs build, tests (`-race`), `govulncheck`, and `gosec`.
 2. A new semver tag is created and pushed.
 3. The Go module proxy is warmed (`proxy.golang.org`), which publishes the
-   version and triggers [pkg.go.dev](https://pkg.go.dev/github.com/amirranjbar/hd-wallet) indexing.
+   version and triggers [pkg.go.dev](https://pkg.go.dev/github.com/ranjbar-dev/hd-wallet) indexing.
 4. A GitHub Release with auto-generated notes is created.
 
 Control the version bump from the **commit message**:

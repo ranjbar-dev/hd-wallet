@@ -1,4 +1,4 @@
-module github.com/amirranjbar/hd-wallet
+module github.com/ranjbar-dev/hd-wallet
 
 go 1.23.1
 

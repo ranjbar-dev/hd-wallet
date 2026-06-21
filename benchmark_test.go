@@ -3,7 +3,7 @@ package hdwallet_test
 import (
 	"testing"
 
-	hdwallet "github.com/amirranjbar/hd-wallet"
+	hdwallet "github.com/ranjbar-dev/hd-wallet"
 )
 
 // benchMnemonic is the standard BIP-39 test vector mnemonic (holds no funds).

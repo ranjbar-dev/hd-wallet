@@ -7,7 +7,7 @@ import (
 
 	"github.com/awnumar/memguard"
 
-	hdwallet "github.com/amirranjbar/hd-wallet"
+	hdwallet "github.com/ranjbar-dev/hd-wallet"
 )
 
 // exampleMnemonic is the standard BIP-39 test vector mnemonic. Never hard-code a
