@@ -13,9 +13,36 @@ const (
 	Ed25519
 	// Nist256p1 (NIST P-256) covers NEO.
 	Nist256p1
+	// Ed25519Blake2bNano is the ed25519 EdDSA variant Nano uses: identical to
+	// ed25519 except the internal 512-bit hash is BLAKE2b-512 instead of SHA-512
+	// (both for key expansion and the R/challenge hashes). SLIP-0010 ed25519
+	// derivation is used for the leaf private key. Matches Trust Wallet Core's
+	// TWCurveED25519Blake2bNano.
+	Ed25519Blake2bNano
+	// Curve25519 is the public-key/signing scheme Waves uses: the leaf private
+	// key is derived via SLIP-0010 ed25519, the public key is the X25519
+	// (Montgomery) point, and signing is ed25519 with the public-key sign bit
+	// folded into S[63] (the "curve25519_sign" construction). Matches Trust
+	// Wallet Core's TWCurveCurve25519.
+	Curve25519
+	// Ed25519ExtendedCardano is BIP32-Ed25519 (CIP-1852) with 64-byte extended
+	// private keys, as used by Cardano. The master secret comes from the Icarus
+	// (PBKDF2-HMAC-SHA512 over the BIP-39 entropy) scheme. Matches Trust Wallet
+	// Core's TWCurveED25519ExtendedCardano.
+	Ed25519ExtendedCardano
+	// Starkex is the STARK curve (StarkNet/StarkEx), EIP-2645 key derivation with
+	// grinding, RFC-6979 deterministic ECDSA. Matches Trust Wallet Core's
+	// TWCurveStarkex.
+	Starkex
+	// Sr25519 is schnorrkel/ristretto255, the native key scheme for
+	// Polkadot/Kusama. NOTE: this is NOT part of Trust Wallet Core's curve set
+	// (TWC uses plain ed25519 for Polkadot); it is provided here as an additional
+	// curve for native substrate signing.
+	Sr25519
 )
 
-// String returns the SLIP-0010/BIP-32 name of the curve for diagnostics.
+// String returns the SLIP-0010/BIP-32 name of the curve for diagnostics. The
+// strings for the Trust Wallet Core curves match TWCurve.h exactly.
 func (c Curve) String() string {
 	switch c {
 	case Secp256k1:
@@ -24,6 +51,16 @@ func (c Curve) String() string {
 		return "ed25519"
 	case Nist256p1:
 		return "nist256p1"
+	case Ed25519Blake2bNano:
+		return "ed25519-blake2b-nano"
+	case Curve25519:
+		return "curve25519"
+	case Ed25519ExtendedCardano:
+		return "ed25519-cardano-seed"
+	case Starkex:
+		return "starkex"
+	case Sr25519:
+		return "sr25519"
 	default:
 		return "unknown(" + strconv.Itoa(int(c)) + ")"
 	}

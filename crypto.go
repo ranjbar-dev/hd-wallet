@@ -43,7 +43,7 @@ func sha512Sum256(b []byte) []byte {
 
 // sha3Sum256 is finalized SHA3-256 (not Keccak), used for Aptos addresses.
 func sha3Sum256(b []byte) []byte {
-	h := sha3.Sum256(b)
+	h := sha3.Sum256(b) //nolint:govet // govet's inline suggestion; the value form is clearest here
 	return h[:]
 }
 

@@ -74,6 +74,16 @@ func signDigest(curve Curve, priv, data []byte) (*Signature, error) {
 		return signDigestSecp256k1(priv, data)
 	case Ed25519:
 		return signMessageEd25519(priv, data)
+	case Ed25519Blake2bNano:
+		return signMessageEd25519Blake2b(priv, data)
+	case Curve25519:
+		return signMessageCurve25519(priv, data)
+	case Sr25519:
+		return signMessageSr25519(priv, data)
+	case Ed25519ExtendedCardano:
+		return signMessageCardano(priv, data)
+	case Starkex:
+		return signDigestStarkex(priv, data)
 	case Nist256p1:
 		return signDigestNist256p1(priv, data)
 	default:
@@ -170,6 +180,16 @@ func verifySignature(curve Curve, pub, data []byte, sig *Signature) bool {
 			return false
 		}
 		return ed25519.Verify(ed25519.PublicKey(pub), data, sig.raw)
+	case Ed25519Blake2bNano:
+		return verifyEd25519Blake2b(pub, data, sig.raw)
+	case Curve25519:
+		return verifyCurve25519(pub, data, sig.raw)
+	case Sr25519:
+		return verifySr25519(pub, data, sig.raw)
+	case Ed25519ExtendedCardano:
+		return verifyCardano(pub, data, sig.raw)
+	case Starkex:
+		return verifyStarkex(pub, data, sig)
 	case Nist256p1:
 		x, y := elliptic.UnmarshalCompressed(elliptic.P256(), pub)
 		if x == nil {
