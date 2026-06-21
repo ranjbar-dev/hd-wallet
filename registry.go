@@ -1,5 +1,7 @@
 package hdwallet
 
+import "strconv"
+
 // Curve identifies the elliptic curve a coin derives keys on. Each curve has a
 // distinct derivation scheme (BIP-32 for secp256k1, SLIP-0010 for the others).
 type Curve int
@@ -13,12 +15,87 @@ const (
 	Nist256p1
 )
 
+// String returns the SLIP-0010/BIP-32 name of the curve for diagnostics.
+func (c Curve) String() string {
+	switch c {
+	case Secp256k1:
+		return "secp256k1"
+	case Ed25519:
+		return "ed25519"
+	case Nist256p1:
+		return "nist256p1"
+	default:
+		return "unknown(" + strconv.Itoa(int(c)) + ")"
+	}
+}
+
+// Symbol is a typed network identifier used to look up a registry entry. Use the
+// exported constants below (hdwallet.BTC, hdwallet.ETH, …) when calling methods
+// such as (*HDWallet).Address and AddressIndex; the typed enum gives
+// compile-time checking and editor autocomplete instead of bare strings.
+type Symbol string
+
+// String implements fmt.Stringer.
+func (s Symbol) String() string { return string(s) }
+
+// IsValid reports whether the symbol is a registered network.
+func (s Symbol) IsValid() bool { _, ok := coins[s]; return ok }
+
+// Supported network symbols. These mirror the registry below and match Trust
+// Wallet's tickers.
+const (
+	// secp256k1 — Bitcoin-style UTXO chains.
+	BTC  Symbol = "BTC"
+	LTC  Symbol = "LTC"
+	DOGE Symbol = "DOGE"
+	BCH  Symbol = "BCH"
+	DASH Symbol = "DASH"
+	ZEC  Symbol = "ZEC"
+
+	// secp256k1 — account-based / keccak.
+	ETH Symbol = "ETH"
+	TRX Symbol = "TRX"
+	XRP Symbol = "XRP"
+
+	// secp256k1 — EVM chains (same key & address format as Ethereum).
+	BNB   Symbol = "BNB"
+	MATIC Symbol = "MATIC"
+	AVAX  Symbol = "AVAX"
+	ARB   Symbol = "ARB"
+	OP    Symbol = "OP"
+	FTM   Symbol = "FTM"
+	BASE  Symbol = "BASE"
+	CRO   Symbol = "CRO"
+	GNO   Symbol = "GNO"
+	CELO  Symbol = "CELO"
+
+	// secp256k1 — Cosmos SDK chains.
+	ATOM Symbol = "ATOM"
+	OSMO Symbol = "OSMO"
+	JUNO Symbol = "JUNO"
+	TIA  Symbol = "TIA"
+
+	// ed25519 (SLIP-0010).
+	SOL   Symbol = "SOL"
+	XLM   Symbol = "XLM"
+	DOT   Symbol = "DOT"
+	KSM   Symbol = "KSM"
+	NEAR  Symbol = "NEAR"
+	ALGO  Symbol = "ALGO"
+	SUI   Symbol = "SUI"
+	APTOS Symbol = "APTOS"
+	XTZ   Symbol = "XTZ"
+
+	// nist256p1 (SLIP-0010).
+	NEO Symbol = "NEO"
+)
+
 // Coin describes a supported network: its curve, BIP-32 derivation path, and the
 // function that turns a derived public key into an address string. Adding a
 // network is a single entry in the registry below.
 type Coin struct {
 	Name   string
-	Symbol string
+	Symbol Symbol
 	Curve  Curve
 	Path   string
 	Encode func(pub []byte) (string, error)
@@ -27,7 +104,7 @@ type Coin struct {
 // coins is the address registry. Paths and address formats match Trust Wallet's
 // defaults so seeds are interchangeable. Encoders verified against Trust Wallet
 // Core's CoinAddressDerivation test vectors are marked accordingly in the tests.
-var coins = map[string]Coin{
+var coins = map[Symbol]Coin{
 	// ---- secp256k1 : Bitcoin-style UTXO chains ----
 	"BTC":  {"Bitcoin", "BTC", Secp256k1, "m/84'/0'/0'/0/0", encodeBTC},
 	"LTC":  {"Litecoin", "LTC", Secp256k1, "m/84'/2'/0'/0/0", encodeLTC},

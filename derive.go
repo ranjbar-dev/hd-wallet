@@ -41,6 +41,29 @@ func parsePath(path string) ([]uint32, error) {
 	return out, nil
 }
 
+// withIndex returns path with its final element's numeric value replaced by
+// index, preserving that element's hardened flag (a trailing "'"). For BIP-44/
+// BIP-84 paths ending in "/0/0" this varies the receive address index (the
+// non-hardened last element); for account-based paths ending in a hardened
+// element such as "/0'" it varies that final hardened element. index must be
+// below hardenedOffset (2^31); a hardened element's offset is re-applied here.
+func withIndex(path string, index uint32) (string, error) {
+	if index >= hardenedOffset {
+		return "", fmt.Errorf("address index out of range: %d (must be < %d)", index, hardenedOffset)
+	}
+	parts := strings.Split(path, "/")
+	if len(parts) < 2 || parts[0] != "m" {
+		return "", fmt.Errorf("invalid derivation path: %q", path)
+	}
+	last := parts[len(parts)-1]
+	hardened := ""
+	if strings.HasSuffix(last, "'") || strings.HasSuffix(last, "h") || strings.HasSuffix(last, "H") {
+		hardened = "'"
+	}
+	parts[len(parts)-1] = strconv.FormatUint(uint64(index), 10) + hardened
+	return strings.Join(parts, "/"), nil
+}
+
 // derivePublicKey walks the coin's path on its curve and returns the public key
 // bytes the encoder expects (compressed for secp256k1/nist256p1, the raw 32-byte
 // key for ed25519). Private key material is wiped before returning.
@@ -74,18 +97,23 @@ func derivePublicKey(seed []byte, c Coin) ([]byte, error) {
 
 // deriveSecp256k1Pub derives a BIP-32 leaf key and returns its compressed
 // public key. BIP-32 EC math is network-independent, so MainNetParams works for
-// every secp256k1 coin. The leaf private key is zeroed before returning.
+// every secp256k1 coin. The leaf private key and every intermediate extended key
+// are zeroed before returning.
 func deriveSecp256k1Pub(seed []byte, path []uint32) ([]byte, error) {
 	key, err := hdkeychain.NewMaster(seed, &chaincfg.MainNetParams)
 	if err != nil {
 		return nil, err
 	}
 	for _, childNum := range path {
-		key, err = key.Derive(childNum)
+		child, err := key.Derive(childNum)
 		if err != nil {
+			key.Zero()
 			return nil, err
 		}
+		key.Zero() // parent no longer needed; wipe before moving to the child
+		key = child
 	}
+	defer key.Zero() // wipe the leaf extended key on return
 	priv, err := key.ECPrivKey()
 	if err != nil {
 		return nil, err

@@ -19,8 +19,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.23'
-          check-latest: true
+          go-version: 'stable'
 
       - name: Verify modules
         run: go mod verify
@@ -40,8 +39,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.23'
-          check-latest: true
+          go-version: 'stable'
 
       - name: govulncheck
         run: |
@@ -52,3 +50,126 @@ jobs:
         uses: securego/gosec@master
         with:
           args: ./...
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 'stable'
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: v1.64.8
+
+  # Automatically publish a new module version on every push to main, once the
+  # test and security gates pass. "Publishing" a Go module means pushing a semver
+  # git tag; pkg.go.dev is populated by warming the module proxy below.
+  #
+  # Version bump is controlled by the latest commit message:
+  #   [major]         -> x+1.0.0
+  #   [minor]         -> x.y+1.0
+  #   (default)       -> x.y.z+1   (patch)
+  #   [skip release]  -> no release this push
+  release:
+    name: Tag & publish
+    needs: [test, security]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # push tags and create releases
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history + tags for version computation
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 'stable'
+
+      - name: Compute next version
+        id: version
+        run: |
+          set -euo pipefail
+          git fetch --tags --force
+          msg="$(git log -1 --pretty=%B)"
+
+          if printf '%s' "$msg" | grep -qiE '\[skip release\]|\[release skip\]'; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "Commit requests skip; no release."
+            exit 0
+          fi
+
+          if git describe --tags --exact-match HEAD >/dev/null 2>&1; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "HEAD is already tagged; no release."
+            exit 0
+          fi
+
+          latest="$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -n1 || true)"
+          if [ -z "$latest" ]; then
+            next="v0.1.0"
+          else
+            ver="${latest#v}"
+            major="${ver%%.*}"; rest="${ver#*.}"
+            minor="${rest%%.*}"; patch="${rest##*.}"
+            if printf '%s' "$msg" | grep -qiE '\[major\]'; then
+              major=$((major + 1)); minor=0; patch=0
+            elif printf '%s' "$msg" | grep -qiE '\[minor\]'; then
+              minor=$((minor + 1)); patch=0
+            else
+              patch=$((patch + 1))
+            fi
+            next="v${major}.${minor}.${patch}"
+          fi
+
+          echo "version=$next" >> "$GITHUB_OUTPUT"
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+          echo "Next version: $next"
+
+      - name: Create and push tag
+        if: steps.version.outputs.skip == 'false'
+        run: |
+          set -euo pipefail
+          v="${{ steps.version.outputs.version }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$v" -m "Release $v"
+          git push origin "$v"
+
+      - name: Publish to Go proxy & pkg.go.dev
+        if: steps.version.outputs.skip == 'false'
+        env:
+          GOPROXY: proxy.golang.org
+          GOSUMDB: sum.golang.org
+        run: |
+          set -euo pipefail
+          v="${{ steps.version.outputs.version }}"
+          mod="github.com/amirranjbar/hd-wallet"
+          # Requesting the version from the proxy makes it fetch the new tag,
+          # which publishes the module and triggers pkg.go.dev indexing.
+          for i in 1 2 3 4 5 6; do
+            if curl -fsS "https://proxy.golang.org/${mod}/@v/${v}.info"; then
+              echo "Published ${mod}@${v} to the Go module proxy."
+              break
+            fi
+            echo "Proxy not ready yet (attempt $i); retrying in 20s..."
+            sleep 20
+          done
+          # Nudge pkg.go.dev to render the docs page (best effort).
+          curl -fsS "https://pkg.go.dev/${mod}@${v}" -o /dev/null || true
+
+      - name: Create GitHub Release
+        if: steps.version.outputs.skip == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          v="${{ steps.version.outputs.version }}"
+          gh release create "$v" --title "$v" --generate-notes

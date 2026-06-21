@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"crypto/sha512"
 
+	"github.com/awnumar/memguard"
 	"golang.org/x/crypto/blake2b"
 	// RIPEMD-160 is consensus-mandated for Bitcoin/Cosmos address hashing
 	// (hash160); its use here is required for correctness, not a security choice.
@@ -69,9 +70,8 @@ func blake2b160(b []byte) []byte {
 }
 
 // wipe overwrites a byte slice with zeros. Used for ephemeral key material;
-// long-lived secrets are protected by memguard (see secret.go).
+// long-lived secrets are protected by memguard (see secret.go). It delegates to
+// memguard.WipeBytes, whose zeroing the compiler is not free to elide.
 func wipe(b []byte) {
-	for i := range b {
-		b[i] = 0
-	}
+	memguard.WipeBytes(b)
 }

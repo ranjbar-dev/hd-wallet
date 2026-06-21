@@ -63,13 +63,15 @@ func main() {
 	// ...or import one:
 	// w, _ := hdwallet.FromMnemonic("abandon abandon ... about")
 
-	btc, _ := w.Address("BTC")
-	eth, _ := w.Address("ETH")
-	sol, _ := w.Address("SOL")
+	// Symbols are a typed enum (hdwallet.Symbol) — use the exported constants
+	// for compile-time checking and autocomplete.
+	btc, _ := w.Address(hdwallet.BTC)
+	eth, _ := w.Address(hdwallet.ETH)
+	sol, _ := w.Address(hdwallet.SOL)
 	fmt.Println(btc, eth, sol)
 
-	all, _ := w.AllAddresses() // map[symbol]address for every network
-	fmt.Println(all["ATOM"])
+	all, _ := w.AllAddresses() // map[hdwallet.Symbol]string for every network
+	fmt.Println(all[hdwallet.ATOM])
 }
 ```
 
@@ -84,6 +86,92 @@ err := w.WithMnemonic(func(mnemonic []byte) error {
 	return nil
 })
 ```
+
+### Multiple addresses per chain
+
+`Address` returns the first receive address; `AddressIndex` derives any index by
+replacing the final element of the chain's path (preserving its hardened flag):
+
+```go
+a0, _ := w.AddressIndex(hdwallet.BTC, 0) // bc1q...306fyu (same as w.Address(hdwallet.BTC))
+a1, _ := w.AddressIndex(hdwallet.BTC, 1) // bc1q...rkf9g — second receive address
+sol1, _ := w.AddressIndex(hdwallet.SOL, 1) // account-based chains vary the hardened element
+```
+
+### Error handling
+
+The package exports sentinel errors for use with `errors.Is`:
+`ErrInvalidMnemonic`, `ErrUnsupportedCoin`, and `ErrDestroyed`.
+
+```go
+if _, err := w.Address("NOPE"); errors.Is(err, hdwallet.ErrUnsupportedCoin) {
+	// unknown symbol
+}
+```
+
+---
+
+## Passing a mnemonic in securely
+
+The golden rule: **never let the mnemonic become a Go `string`** in your code — strings are immutable and can never be wiped from memory. Choose the entry point that matches how securely you can hold the secret:
+
+| Entry point | Security | When |
+|---|---|---|
+| `FromMnemonicBuffer(*memguard.LockedBuffer)` | 🟢 Strongest | Mnemonic stays in page-locked, encrypted memory end-to-end; sealed zero-copy into the wallet. |
+| `FromMnemonicBytes([]byte)` | 🟡 Good | You have a mutable `[]byte`; it is wiped inside the call. |
+| `FromMnemonic(string)` | 🔴 Weakest | Convenience only; the string cannot be wiped. Avoid for real funds. |
+
+### Most secure: hand off a memguard buffer (zero-copy)
+
+The wallet takes ownership of the buffer and destroys it — there is no extra unprotected copy anywhere in your process.
+
+```go
+import (
+	"os"
+
+	"github.com/awnumar/memguard"
+	hdwallet "github.com/amirranjbar/hd-wallet"
+)
+
+func loadWallet() (*hdwallet.HDWallet, error) {
+	defer memguard.Purge()
+
+	// Read one line straight into locked, encrypted memory — never a string.
+	buf, err := memguard.NewBufferFromReaderUntil(os.Stdin, '\n')
+	if err != nil {
+		return nil, err
+	}
+	// Ownership transfers to the wallet; buf is destroyed for you.
+	return hdwallet.FromMnemonicBuffer(buf)
+}
+```
+
+From a secrets manager / KMS that returns raw bytes:
+
+```go
+raw := fetchFromVault()                    // []byte from your secret store
+buf := memguard.NewBufferFromBytes(raw)    // copies into protected memory, wipes raw
+w, err := hdwallet.FromMnemonicBuffer(buf) // takes ownership of buf
+```
+
+### Good: a mutable byte slice
+
+```go
+raw, _ := os.ReadFile("mnemonic.txt") // []byte, never a string
+mn := bytes.TrimSpace(raw)
+w, err := hdwallet.FromMnemonicBytes(mn) // mn is zeroed inside the call
+for i := range raw {                     // wipe any trimmed remainder
+	raw[i] = 0
+}
+```
+
+> **Avoid `os.Getenv`** for the mnemonic: environment variables are already
+> immutable strings and cannot be wiped.
+
+> **Residual exposure:** the underlying `tyler-smith/go-bip39` API only accepts
+> `string`, so the library makes a single short-lived `string` copy for
+> validation and seed derivation. It is GC-bounded, and every durable copy of
+> the mnemonic and seed is sealed in a memguard enclave.
 
 ---
 
@@ -159,16 +247,23 @@ go test -race -cover ./...
 | Function / method | Purpose |
 |---|---|
 | `NewHDWallet() (*HDWallet, error)` | New wallet with a fresh 12-word mnemonic. |
-| `FromMnemonic(string) (*HDWallet, error)` | Import from a mnemonic string. |
+| `FromMnemonic(string) (*HDWallet, error)` | Import from a mnemonic string (least secure). |
 | `FromMnemonicBytes([]byte) (*HDWallet, error)` | Import from a byte slice (wiped on use). |
+| `FromMnemonicBuffer(*memguard.LockedBuffer) (*HDWallet, error)` | Import from a memguard buffer (most secure; zero-copy). |
 | `GenerateMnemonic() (string, error)` | Generate a mnemonic without building a wallet. |
-| `(*HDWallet) Address(symbol string) (string, error)` | Address for one network. |
-| `(*HDWallet) AllAddresses() (map[string]string, error)` | Addresses for all networks. |
+| `(*HDWallet) Address(symbol Symbol) (string, error)` | First receive address for one network. |
+| `(*HDWallet) AddressIndex(symbol Symbol, index uint32) (string, error)` | Nth address/account for one network. |
+| `(*HDWallet) AllAddresses() (map[Symbol]string, error)` | Addresses for all networks. |
 | `(*HDWallet) WithMnemonic(func([]byte) error) error` | Use the mnemonic, auto-wiped. |
 | `(*HDWallet) Mnemonic() (*memguard.LockedBuffer, error)` | Mnemonic buffer (caller `Destroy`s). |
 | `(*HDWallet) Destroy()` | Wipe the wallet's secrets. |
-| `SupportedCoins() []string` | Sorted list of symbols. |
-| `CoinInfo(symbol string) (Coin, bool)` | Registry entry for a symbol. |
+| `SupportedCoins() []Symbol` | Sorted list of symbols. |
+| `CoinInfo(symbol Symbol) (Coin, bool)` | Registry entry for a symbol. |
+
+`Symbol` is a typed string enum; the package exports a constant for every
+supported network (`hdwallet.BTC`, `hdwallet.ETH`, `hdwallet.SOL`, …). Pass these
+constants instead of raw strings for compile-time safety. `Symbol` also has
+`String() string` and `IsValid() bool` helpers.
 
 ---
 
@@ -215,15 +310,30 @@ public issue.
 
 ## Publishing & releasing
 
-This repo is `go get`-ready. To cut a release:
+Releases are **fully automated**. Every push to `main` that passes the test and
+security gates is tagged and published by CI (`.github/workflows/ci.yml`):
 
-```bash
-git tag v0.1.0
-git push origin v0.1.0
-```
+1. CI runs build, tests (`-race`), `govulncheck`, and `gosec`.
+2. A new semver tag is created and pushed.
+3. The Go module proxy is warmed (`proxy.golang.org`), which publishes the
+   version and triggers [pkg.go.dev](https://pkg.go.dev/github.com/amirranjbar/hd-wallet) indexing.
+4. A GitHub Release with auto-generated notes is created.
 
-pkg.go.dev indexes the module automatically once any client fetches the tag.
-See the project notes for the full release checklist.
+Control the version bump from the **commit message**:
+
+| Marker in commit message | Result |
+|---|---|
+| `[major]` | `x+1.0.0` |
+| `[minor]` | `x.y+1.0` |
+| _(none)_ | `x.y.z+1` (patch) |
+| `[skip release]` | no release for that push |
+
+The first release is `v0.1.0`. Requires the repo to be **public** and the
+default `GITHUB_TOKEN` to have write access (Settings → Actions → General →
+Workflow permissions → "Read and write permissions"). If tag protection rules
+block the bot, supply a Personal Access Token instead.
+
+To release manually instead, just push a tag (`git tag v1.2.3 && git push origin v1.2.3`).
 
 ---
 

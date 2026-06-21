@@ -51,7 +51,7 @@ func TestEncodersAgainstTrustWalletVectors(t *testing.T) {
 	priv := dummyKey()
 	for symbol, want := range trustWalletVectors {
 		t.Run(symbol, func(t *testing.T) {
-			coin, ok := coins[symbol]
+			coin, ok := coins[Symbol(symbol)]
 			if !ok {
 				t.Fatalf("coin %s not in registry", symbol)
 			}
@@ -75,7 +75,7 @@ func TestEncodersAgainstTrustWalletVectors(t *testing.T) {
 func TestEVMChainsMatchEthereum(t *testing.T) {
 	priv := dummyKey()
 	const wantETH = "0x9d8A62f656a8d1615C1294fd71e9CFb3E4855A4F"
-	for _, symbol := range []string{"BNB", "MATIC", "AVAX", "ARB", "OP", "FTM", "BASE", "CRO", "GNO", "CELO"} {
+	for _, symbol := range []Symbol{BNB, MATIC, AVAX, ARB, OP, FTM, BASE, CRO, GNO, CELO} {
 		coin := coins[symbol]
 		pub, err := publicKeyFromPriv(coin.Curve, priv)
 		if err != nil {
@@ -100,7 +100,7 @@ func TestCosmosFamilyHRP(t *testing.T) {
 		"TIA":  "celestia1",
 	}
 	for symbol, wantPrefix := range prefixes {
-		coin := coins[symbol]
+		coin := coins[Symbol(symbol)]
 		pub, err := publicKeyFromPriv(coin.Curve, priv)
 		if err != nil {
 			t.Fatal(err)

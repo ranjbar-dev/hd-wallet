@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/awnumar/memguard"
 	bip39 "github.com/tyler-smith/go-bip39"
 )
 
@@ -22,9 +23,9 @@ func TestEndToEndKnownAddresses(t *testing.T) {
 	}
 	defer w.Destroy()
 
-	cases := map[string]string{
-		"BTC": "bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu",
-		"ETH": "0x9858EfFD232B4033E47d90003D41EC34EcaEda94",
+	cases := map[Symbol]string{
+		BTC: "bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu",
+		ETH: "0x9858EfFD232B4033E47d90003D41EC34EcaEda94",
 	}
 	for symbol, want := range cases {
 		got, err := w.Address(symbol)
@@ -158,6 +159,65 @@ func TestFromMnemonicBytesWipesInput(t *testing.T) {
 	}
 }
 
+func TestFromMnemonicBuffer(t *testing.T) {
+	const wantETH = "0x9858EfFD232B4033E47d90003D41EC34EcaEda94"
+
+	t.Run("exact", func(t *testing.T) {
+		buf := memguard.NewBufferFromBytes([]byte(canonicalMnemonic))
+		w, err := FromMnemonicBuffer(buf)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer w.Destroy()
+		if buf.IsAlive() {
+			t.Error("buffer should be destroyed (ownership transferred)")
+		}
+		if got, _ := w.Address("ETH"); got != wantETH {
+			t.Errorf("ETH = %s, want %s", got, wantETH)
+		}
+	})
+
+	t.Run("trimmed", func(t *testing.T) {
+		buf := memguard.NewBufferFromBytes([]byte("  " + canonicalMnemonic + "\n"))
+		w, err := FromMnemonicBuffer(buf)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer w.Destroy()
+		if buf.IsAlive() {
+			t.Error("buffer should be destroyed")
+		}
+		if got, _ := w.Address("ETH"); got != wantETH {
+			t.Errorf("ETH = %s, want %s", got, wantETH)
+		}
+		// The stored mnemonic must be the trimmed phrase.
+		if err := w.WithMnemonic(func(m []byte) error {
+			if !bytes.Equal(m, []byte(canonicalMnemonic)) {
+				t.Errorf("stored mnemonic = %q, want trimmed %q", m, canonicalMnemonic)
+			}
+			return nil
+		}); err != nil {
+			t.Fatal(err)
+		}
+	})
+
+	t.Run("invalid destroys buffer", func(t *testing.T) {
+		buf := memguard.NewBufferFromBytes([]byte("totally not a mnemonic"))
+		if _, err := FromMnemonicBuffer(buf); err == nil {
+			t.Fatal("expected error for invalid mnemonic")
+		}
+		if buf.IsAlive() {
+			t.Error("buffer should be destroyed even on error")
+		}
+	})
+
+	t.Run("nil buffer", func(t *testing.T) {
+		if _, err := FromMnemonicBuffer(nil); err == nil {
+			t.Fatal("expected error for nil buffer")
+		}
+	})
+}
+
 func TestWithMnemonicReturnsCorrectPhrase(t *testing.T) {
 	w, err := FromMnemonic(canonicalMnemonic)
 	if err != nil {
@@ -183,14 +243,14 @@ func TestDestroyDisablesWallet(t *testing.T) {
 	w.Destroy()
 	w.Destroy() // idempotent
 
-	if _, err := w.Address("BTC"); err != errDestroyed {
-		t.Errorf("Address after Destroy = %v, want errDestroyed", err)
+	if _, err := w.Address("BTC"); err != ErrDestroyed {
+		t.Errorf("Address after Destroy = %v, want ErrDestroyed", err)
 	}
-	if _, err := w.AllAddresses(); err != errDestroyed {
-		t.Errorf("AllAddresses after Destroy = %v, want errDestroyed", err)
+	if _, err := w.AllAddresses(); err != ErrDestroyed {
+		t.Errorf("AllAddresses after Destroy = %v, want ErrDestroyed", err)
 	}
-	if err := w.WithMnemonic(func([]byte) error { return nil }); err != errDestroyed {
-		t.Errorf("WithMnemonic after Destroy = %v, want errDestroyed", err)
+	if err := w.WithMnemonic(func([]byte) error { return nil }); err != ErrDestroyed {
+		t.Errorf("WithMnemonic after Destroy = %v, want ErrDestroyed", err)
 	}
 }
 

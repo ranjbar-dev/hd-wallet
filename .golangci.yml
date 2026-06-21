@@ -1,0 +1,32 @@
+linters:
+  enable:
+    - govet
+    - staticcheck
+    - errcheck
+    - ineffassign
+    - unused
+    - gosimple
+    - gofmt
+    - goimports
+    - misspell
+    - revive
+    - unconvert
+    - prealloc
+
+linters-settings:
+  goimports:
+    local-prefixes: github.com/amirranjbar/hd-wallet
+
+issues:
+  exclude-rules:
+    # crypto.go intentionally imports golang.org/x/crypto/ripemd160 (deprecated)
+    # because RIPEMD-160 is consensus-mandated for Bitcoin/Cosmos address hashing.
+    - path: crypto\.go
+      linters:
+        - staticcheck
+      text: "SA1019.*ripemd160"
+
+    # prealloc in test files generates noise; skip it there.
+    - path: _test\.go
+      linters:
+        - prealloc

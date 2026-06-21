@@ -11,7 +11,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
-	"sort"
+	"slices"
 
 	"github.com/awnumar/memguard"
 
@@ -48,11 +48,11 @@ func main() {
 		log.Fatal(err)
 	}
 
-	symbols := make([]string, 0, len(addrs))
+	symbols := make([]hdwallet.Symbol, 0, len(addrs))
 	for s := range addrs {
 		symbols = append(symbols, s)
 	}
-	sort.Strings(symbols)
+	slices.Sort(symbols)
 
 	fmt.Println("Addresses:")
 	for _, s := range symbols {

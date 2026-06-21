@@ -33,13 +33,17 @@ func deriveEd25519(seed []byte, path []uint32) (*slipNode, error) {
 	node := &slipNode{key: i[:32], chain: i[32:]}
 	for _, idx := range path {
 		if idx < hardenedOffset {
+			wipe(i) // discard the unreturned node before erroring out
 			return nil, errors.New("ed25519 derivation requires hardened path elements")
 		}
 		data := make([]byte, 1+32+4)
 		data[0] = 0x00
 		copy(data[1:33], node.key)
 		binary.BigEndian.PutUint32(data[33:], idx)
-		i = hmacSHA512(node.chain, data)
+		next := hmacSHA512(node.chain, data)
+		wipe(data) // copy of the parent key; no longer needed
+		wipe(i)    // parent node (key+chain) superseded by next; wipe before reuse
+		i = next
 		node = &slipNode{key: i[:32], chain: i[32:]}
 	}
 	return node, nil
@@ -56,7 +60,9 @@ func deriveNist256p1(seed []byte, path []uint32) (*slipNode, error) {
 		if il.Sign() != 0 && il.Cmp(n) < 0 {
 			break
 		}
+		prev := i
 		i = hmacSHA512([]byte("Nist256p1 seed"), i) // invalid master key: retry with I as data
+		wipe(prev)                                  // discarded master candidate
 	}
 	node := &slipNode{key: i[:32], chain: i[32:]}
 
@@ -74,13 +80,15 @@ func deriveNist256p1(seed []byte, path []uint32) (*slipNode, error) {
 			binary.BigEndian.PutUint32(data[len(pub):], idx)
 		}
 
+		parent := node // keep the parent node so we can wipe it once superseded
 		for {
-			i = hmacSHA512(node.chain, data)
+			i = hmacSHA512(parent.chain, data)
 			il := new(big.Int).SetBytes(i[:32])
-			ki := new(big.Int).Add(il, new(big.Int).SetBytes(node.key))
+			ki := new(big.Int).Add(il, new(big.Int).SetBytes(parent.key))
 			ki.Mod(ki, n)
 			if il.Cmp(n) < 0 && ki.Sign() != 0 {
 				node = &slipNode{key: leftPad(ki.Bytes(), 32), chain: i[32:]}
+				wipe(i[:32]) // IL is spent; node.chain aliases i[32:], so leave it
 				break
 			}
 			// Invalid child: retry with Data = 0x01 || IR || ser32(i), key unchanged.
@@ -88,8 +96,12 @@ func deriveNist256p1(seed []byte, path []uint32) (*slipNode, error) {
 			retry[0] = 0x01
 			copy(retry[1:33], i[32:])
 			copy(retry[33:], data[len(data)-4:])
+			wipe(i)    // whole HMAC output copied into retry; safe to wipe
+			wipe(data) // superseded by retry
 			data = retry
 		}
+		wipe(data)       // child-link data: holds parent key (hardened) or its pubkey
+		wipe(parent.key) // parent private key is no longer referenced by node
 	}
 	return node, nil
 }

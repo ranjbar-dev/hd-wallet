@@ -15,18 +15,29 @@ package hdwallet
 import (
 	"errors"
 	"fmt"
-	"sort"
+	"slices"
+	"sync"
 
 	"github.com/awnumar/memguard"
 	bip39 "github.com/tyler-smith/go-bip39"
 )
 
-// errDestroyed is returned by operations on a wallet whose secrets were wiped.
-var errDestroyed = errors.New("hdwallet: wallet has been destroyed")
+// Exported sentinel errors. Consumers can match them with errors.Is; errors that
+// add context (e.g. the offending symbol) wrap these with %w.
+var (
+	// ErrInvalidMnemonic is returned when a mnemonic fails BIP-39 validation.
+	ErrInvalidMnemonic = errors.New("hdwallet: invalid mnemonic")
+	// ErrUnsupportedCoin is returned for a symbol not in the registry.
+	ErrUnsupportedCoin = errors.New("hdwallet: unsupported coin")
+	// ErrDestroyed is returned by operations on a wallet whose secrets were wiped.
+	ErrDestroyed = errors.New("hdwallet: wallet has been destroyed")
+)
 
 // HDWallet is an HD wallet derived from a BIP-39 mnemonic. Its sensitive
-// material is protected in memory; see the package documentation.
+// material is protected in memory; see the package documentation. All methods
+// are safe for concurrent use.
 type HDWallet struct {
+	mu     sync.RWMutex
 	secret *secret
 }
 
@@ -51,6 +62,21 @@ func FromMnemonic(mnemonic string) (*HDWallet, error) {
 // slice is wiped before the function returns; callers must not reuse it.
 func FromMnemonicBytes(mnemonic []byte) (*HDWallet, error) {
 	s, err := newSecret(mnemonic)
+	if err != nil {
+		return nil, err
+	}
+	return &HDWallet{secret: s}, nil
+}
+
+// FromMnemonicBuffer builds a wallet from a mnemonic held in a memguard
+// LockedBuffer. This is the most secure entry point: the mnemonic stays in
+// page-locked, encrypted-at-rest memory from your code all the way into the
+// wallet's sealed enclave, with no intermediate plaintext copy on the Go heap.
+//
+// The wallet takes ownership of buf and destroys it; do not use buf afterwards.
+// Surrounding whitespace in the buffer is trimmed before use.
+func FromMnemonicBuffer(buf *memguard.LockedBuffer) (*HDWallet, error) {
+	s, err := newSecretFromBuffer(buf)
 	if err != nil {
 		return nil, err
 	}
@@ -86,51 +112,104 @@ func generateMnemonicBytes() ([]byte, error) {
 
 // Address returns the first receive address (index 0) for a coin symbol,
 // e.g. "BTC", "ETH", "SOL", "ATOM". Use SupportedCoins to list every symbol.
-func (w *HDWallet) Address(symbol string) (string, error) {
+//
+// It is exactly equivalent to AddressIndex(symbol, 0).
+func (w *HDWallet) Address(symbol Symbol) (string, error) {
+	return w.AddressIndex(symbol, 0)
+}
+
+// AddressIndex returns the address for a coin symbol derived with the final
+// element of the coin's BIP-32 path replaced by index, preserving that
+// element's hardened flag (a trailing "'").
+//
+// For BIP-44/BIP-84 chains whose path ends in "/0/0" (change/address_index),
+// this varies the non-hardened receive address index — e.g. for BTC
+// (m/84'/0'/0'/0/0), index 1 derives m/84'/0'/0'/0/1. For account-based chains
+// whose path ends in a hardened element such as "/0'" (e.g. SOL,
+// m/44'/501'/0'), this varies that final hardened element — index 1 derives
+// m/44'/501'/1'.
+//
+// index must be below 2^31 (0x80000000); a larger value returns an error, as
+// does an unknown symbol (wrapping ErrUnsupportedCoin) or a destroyed wallet.
+func (w *HDWallet) AddressIndex(symbol Symbol, index uint32) (string, error) {
+	w.mu.RLock()
+	defer w.mu.RUnlock()
 	if w.secret == nil {
-		return "", errDestroyed
+		return "", ErrDestroyed
 	}
 	coin, ok := coins[symbol]
 	if !ok {
-		return "", fmt.Errorf("hdwallet: unsupported coin: %s", symbol)
+		return "", fmt.Errorf("%w: %s", ErrUnsupportedCoin, symbol)
 	}
+	path, err := withIndex(coin.Path, index)
+	if err != nil {
+		return "", fmt.Errorf("hdwallet: %s: %w", symbol, err)
+	}
+	coin.Path = path // local copy; the registry entry is unchanged
 
 	var addr string
-	err := w.secret.withSeed(func(seed []byte) error {
-		pub, err := derivePublicKey(seed, coin)
-		if err != nil {
-			return err
-		}
-		addr, err = coin.Encode(pub)
+	err = w.secret.withSeed(func(seed []byte) error {
+		a, err := addressFromSeed(seed, symbol, coin)
+		addr = a
 		return err
 	})
+	if err != nil {
+		return "", err
+	}
+	return addr, nil
+}
+
+// AllAddresses derives the first address for every supported coin. The seed
+// enclave is opened exactly once and every coin is derived inside that single
+// decryption window.
+func (w *HDWallet) AllAddresses() (map[Symbol]string, error) {
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+	if w.secret == nil {
+		return nil, ErrDestroyed
+	}
+	out := make(map[Symbol]string, len(coins))
+	err := w.secret.withSeed(func(seed []byte) error {
+		for _, symbol := range SupportedCoins() {
+			addr, err := addressFromSeed(seed, symbol, coins[symbol])
+			if err != nil {
+				return err
+			}
+			out[symbol] = addr
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// addressFromSeed derives and encodes a single coin's address from an already
+// open seed. Errors are wrapped with the symbol for context. It performs no
+// locking and assumes the caller holds w.mu and the seed buffer is live.
+func addressFromSeed(seed []byte, symbol Symbol, coin Coin) (string, error) {
+	pub, err := derivePublicKey(seed, coin)
+	if err != nil {
+		return "", fmt.Errorf("hdwallet: %s: %w", symbol, err)
+	}
+	addr, err := coin.Encode(pub)
 	if err != nil {
 		return "", fmt.Errorf("hdwallet: %s: %w", symbol, err)
 	}
 	return addr, nil
 }
 
-// AllAddresses derives the first address for every supported coin.
-func (w *HDWallet) AllAddresses() (map[string]string, error) {
-	if w.secret == nil {
-		return nil, errDestroyed
-	}
-	out := make(map[string]string, len(coins))
-	for _, symbol := range SupportedCoins() {
-		addr, err := w.Address(symbol)
-		if err != nil {
-			return nil, err
-		}
-		out[symbol] = addr
-	}
-	return out, nil
-}
-
-// Mnemonic returns the wallet's mnemonic in a page-locked buffer. The caller
-// MUST call Destroy on the returned buffer when finished with it.
+// Mnemonic returns the wallet's mnemonic in a page-locked buffer. This is a
+// lower-level accessor: the caller MUST call Destroy on the returned buffer when
+// finished with it, or the decrypted phrase lingers in memory. Prefer
+// WithMnemonic, which wipes the decrypted copy automatically when its callback
+// returns.
 func (w *HDWallet) Mnemonic() (*memguard.LockedBuffer, error) {
+	w.mu.RLock()
+	defer w.mu.RUnlock()
 	if w.secret == nil {
-		return nil, errDestroyed
+		return nil, ErrDestroyed
 	}
 	return w.secret.openMnemonic()
 }
@@ -138,8 +217,10 @@ func (w *HDWallet) Mnemonic() (*memguard.LockedBuffer, error) {
 // WithMnemonic runs fn with the plaintext mnemonic bytes and wipes the decrypted
 // copy as soon as fn returns. The slice passed to fn must not escape fn.
 func (w *HDWallet) WithMnemonic(fn func(mnemonic []byte) error) error {
+	w.mu.RLock()
+	defer w.mu.RUnlock()
 	if w.secret == nil {
-		return errDestroyed
+		return ErrDestroyed
 	}
 	buf, err := w.secret.openMnemonic()
 	if err != nil {
@@ -152,6 +233,8 @@ func (w *HDWallet) WithMnemonic(fn func(mnemonic []byte) error) error {
 // Destroy wipes the wallet's secret material from memory. The wallet is unusable
 // afterwards. It is safe to call multiple times.
 func (w *HDWallet) Destroy() {
+	w.mu.Lock()
+	defer w.mu.Unlock()
 	if w.secret != nil {
 		w.secret.destroy()
 		w.secret = nil
@@ -159,17 +242,17 @@ func (w *HDWallet) Destroy() {
 }
 
 // SupportedCoins lists the registered coin symbols in sorted order.
-func SupportedCoins() []string {
-	out := make([]string, 0, len(coins))
+func SupportedCoins() []Symbol {
+	out := make([]Symbol, 0, len(coins))
 	for s := range coins {
 		out = append(out, s)
 	}
-	sort.Strings(out)
+	slices.Sort(out)
 	return out
 }
 
 // CoinInfo returns the static registry entry for a symbol.
-func CoinInfo(symbol string) (Coin, bool) {
+func CoinInfo(symbol Symbol) (Coin, bool) {
 	c, ok := coins[symbol]
 	return c, ok
 }
