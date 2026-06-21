@@ -64,51 +64,53 @@ func withIndex(path string, index uint32) (string, error) {
 	return strings.Join(parts, "/"), nil
 }
 
-// derivePublicKey walks the coin's path on its curve and returns the public key
-// bytes the encoder expects (compressed for secp256k1/nist256p1, the raw 32-byte
-// key for ed25519). Private key material is wiped before returning.
-func derivePublicKey(seed []byte, c Coin) ([]byte, error) {
+// withPrivateKey derives the leaf private key for the coin's curve and path,
+// passes the raw 32-byte key to fn, and wipes it before returning. It is the
+// single place that materialises a private key in this package; both public-key
+// derivation and signing go through it. It is unexported on purpose — private
+// keys must never escape the package (see the security model in the docs).
+func withPrivateKey(seed []byte, c Coin, fn func(priv []byte) error) error {
 	path, err := parsePath(c.Path)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	switch c.Curve {
 	case Secp256k1:
-		return deriveSecp256k1Pub(seed, path)
+		return withSecp256k1PrivateKey(seed, path, fn)
 	case Ed25519:
 		node, err := deriveEd25519(seed, path)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		defer wipe(node.key)
-		return ed25519PubFromSeed(node.key), nil
+		return fn(node.key)
 	case Nist256p1:
 		node, err := deriveNist256p1(seed, path)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		defer wipe(node.key)
-		return compressP256(node.key), nil
+		return fn(node.key)
 	default:
-		return nil, fmt.Errorf("unsupported curve: %d", c.Curve)
+		return fmt.Errorf("unsupported curve: %d", c.Curve)
 	}
 }
 
-// deriveSecp256k1Pub derives a BIP-32 leaf key and returns its compressed
-// public key. BIP-32 EC math is network-independent, so MainNetParams works for
-// every secp256k1 coin. The leaf private key and every intermediate extended key
-// are zeroed before returning.
-func deriveSecp256k1Pub(seed []byte, path []uint32) ([]byte, error) {
+// withSecp256k1PrivateKey walks the BIP-32 path and hands the leaf private key's
+// 32-byte serialization to fn. BIP-32 EC math is network-independent, so
+// MainNetParams works for every secp256k1 coin. The raw key, the btcec key, and
+// every intermediate extended key are zeroed before returning.
+func withSecp256k1PrivateKey(seed []byte, path []uint32, fn func(priv []byte) error) error {
 	key, err := hdkeychain.NewMaster(seed, &chaincfg.MainNetParams)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	for _, childNum := range path {
 		child, err := key.Derive(childNum)
 		if err != nil {
 			key.Zero()
-			return nil, err
+			return err
 		}
 		key.Zero() // parent no longer needed; wipe before moving to the child
 		key = child
@@ -116,10 +118,30 @@ func deriveSecp256k1Pub(seed []byte, path []uint32) ([]byte, error) {
 	defer key.Zero() // wipe the leaf extended key on return
 	priv, err := key.ECPrivKey()
 	if err != nil {
+		return err
+	}
+	raw := priv.Serialize()
+	priv.Zero()
+	defer wipe(raw)
+	return fn(raw)
+}
+
+// derivePublicKey walks the coin's path on its curve and returns the public key
+// bytes the encoder expects (compressed for secp256k1/nist256p1, the raw 32-byte
+// key for ed25519). Private key material is wiped before returning.
+func derivePublicKey(seed []byte, c Coin) ([]byte, error) {
+	var pub []byte
+	err := withPrivateKey(seed, c, func(priv []byte) error {
+		p, err := publicKeyFromPriv(c.Curve, priv)
+		if err != nil {
+			return err
+		}
+		pub = p
+		return nil
+	})
+	if err != nil {
 		return nil, err
 	}
-	pub := priv.PubKey().SerializeCompressed()
-	priv.Zero()
 	return pub, nil
 }
 

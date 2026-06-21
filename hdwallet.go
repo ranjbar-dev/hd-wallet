@@ -31,6 +31,8 @@ var (
 	ErrUnsupportedCoin = errors.New("hdwallet: unsupported coin")
 	// ErrDestroyed is returned by operations on a wallet whose secrets were wiped.
 	ErrDestroyed = errors.New("hdwallet: wallet has been destroyed")
+	// ErrInvalidDigest is returned when an ECDSA signing input is not 32 bytes.
+	ErrInvalidDigest = errors.New("hdwallet: digest must be 32 bytes")
 )
 
 // HDWallet is an HD wallet derived from a BIP-39 mnemonic. Its sensitive
@@ -198,6 +200,87 @@ func addressFromSeed(seed []byte, symbol Symbol, coin Coin) (string, error) {
 		return "", fmt.Errorf("hdwallet: %s: %w", symbol, err)
 	}
 	return addr, nil
+}
+
+// withCoin resolves symbol at the given address index to a Coin (with its Path
+// set to the indexed path) and runs fn with the wallet's seed opened exactly
+// once. It holds the read lock and guards against a destroyed wallet, mirroring
+// AddressIndex. The registry entry is never mutated (coin is a copy).
+func (w *HDWallet) withCoin(symbol Symbol, index uint32, fn func(seed []byte, coin Coin) error) error {
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+	if w.secret == nil {
+		return ErrDestroyed
+	}
+	coin, ok := coins[symbol]
+	if !ok {
+		return fmt.Errorf("%w: %s", ErrUnsupportedCoin, symbol)
+	}
+	path, err := withIndex(coin.Path, index)
+	if err != nil {
+		return fmt.Errorf("hdwallet: %s: %w", symbol, err)
+	}
+	coin.Path = path
+	return w.secret.withSeed(func(seed []byte) error { return fn(seed, coin) })
+}
+
+// Sign signs data with the key for symbol at address index 0. See SignIndex.
+func (w *HDWallet) Sign(symbol Symbol, data []byte) (*Signature, error) {
+	return w.SignIndex(symbol, 0, data)
+}
+
+// SignIndex signs data with the private key derived for symbol at the given
+// address index and returns the signature.
+//
+// For ECDSA chains (secp256k1, nist256p1 — e.g. BTC, ETH, ATOM, NEO) data must
+// be the 32-byte digest the chain signs; pre-hash the message with the chain's
+// hash function (keccak256 for Ethereum/Tron, double-SHA256 for Bitcoin, SHA-256
+// for Cosmos, …). For ed25519 chains (e.g. SOL, XLM, DOT) data is the message
+// itself; the EdDSA scheme hashes internally.
+//
+// The derived private key is wiped immediately after signing and never leaves
+// the package.
+func (w *HDWallet) SignIndex(symbol Symbol, index uint32, data []byte) (*Signature, error) {
+	var sig *Signature
+	err := w.withCoin(symbol, index, func(seed []byte, coin Coin) error {
+		return withPrivateKey(seed, coin, func(priv []byte) error {
+			s, err := signDigest(coin.Curve, priv, data)
+			if err != nil {
+				return fmt.Errorf("hdwallet: %s: %w", symbol, err)
+			}
+			sig = s
+			return nil
+		})
+	})
+	if err != nil {
+		return nil, err
+	}
+	return sig, nil
+}
+
+// PublicKey returns the public key for symbol at address index 0. See
+// PublicKeyIndex.
+func (w *HDWallet) PublicKey(symbol Symbol) ([]byte, error) {
+	return w.PublicKeyIndex(symbol, 0)
+}
+
+// PublicKeyIndex returns the public key derived for symbol at the given address
+// index: the 33-byte compressed key for secp256k1/nist256p1, or the 32-byte key
+// for ed25519. Signing callers need this to build or verify transactions.
+func (w *HDWallet) PublicKeyIndex(symbol Symbol, index uint32) ([]byte, error) {
+	var pub []byte
+	err := w.withCoin(symbol, index, func(seed []byte, coin Coin) error {
+		p, err := derivePublicKey(seed, coin)
+		if err != nil {
+			return fmt.Errorf("hdwallet: %s: %w", symbol, err)
+		}
+		pub = p
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return pub, nil
 }
 
 // Mnemonic returns the wallet's mnemonic in a page-locked buffer. This is a

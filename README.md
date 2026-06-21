@@ -18,6 +18,7 @@ Sensitive material (the mnemonic and derived seed) is **never** held as a plain 
 - 🔐 **Secrets isolated in RAM.** Encrypted enclaves, memory locked against swap (`mlock`/`VirtualLock`), guard pages, and automatic wiping. No mnemonic-as-`string`, no exported secret fields.
 - ✅ **Provably Trust Wallet–compatible.** Every address encoder is tested against Trust Wallet Core's own vectors; key derivation is tested against the SLIP-0010 specification. See [Verification](#verification).
 - 🌐 **33 networks, 3 curves.** secp256k1 (Bitcoin-style, EVM, Cosmos, XRP, Tron), ed25519 (Solana, Stellar, Polkadot, …), and NIST P-256 (NEO).
+- ✍️ **Raw signing** for every network (ECDSA + EdDSA). Derived keys are wiped after each signature and are never exported.
 - 🧩 **Extensible.** Add a network with a single registry row.
 - 📦 **Small dependency surface.** btcd (secp256k1/bech32/base58), go-bip39, x/crypto, and memguard.
 
@@ -108,6 +109,42 @@ if _, err := w.Address("NOPE"); errors.Is(err, hdwallet.ErrUnsupportedCoin) {
 	// unknown symbol
 }
 ```
+
+### Signing (raw)
+
+`Sign`/`SignIndex` produce a signature with the derived private key for any
+supported chain. The key is wiped immediately after signing and **never leaves
+the package** — there is no way to extract a private key.
+
+There is one inherent rule, driven by the cryptography:
+
+- **ECDSA chains** (secp256k1, nist256p1 — BTC, ETH, ATOM, NEO, …): pass the
+  **32-byte digest** your chain signs. Pre-hash the message yourself with the
+  chain's hash (keccak256 for Ethereum/Tron, double-SHA256 for Bitcoin, SHA-256
+  for Cosmos, …).
+- **ed25519 chains** (SOL, XLM, DOT, …): pass the **message**; the EdDSA scheme
+  hashes internally.
+
+```go
+digest := sha256.Sum256(txBytes)         // chain-specific pre-hash for ECDSA
+sig, _ := w.Sign(hdwallet.BTC, digest[:])
+
+sig.Bytes()        // 64-byte R||S (ECDSA) or 64-byte ed25519 signature  → Cosmos, Solana
+sig.Recoverable()  // 65-byte R||S||V (secp256k1 only)                   → Ethereum/EVM, Tron
+sig.DER()          // ASN.1 DER (ECDSA)                                  → Bitcoin family
+
+pub, _ := w.PublicKey(hdwallet.BTC)
+ok := hdwallet.Verify(hdwallet.Secp256k1, pub, digest[:], sig)
+```
+
+`SignIndex(symbol, index, data)` and `PublicKeyIndex(symbol, index)` work with
+non-zero address indices. ECDSA inputs that are not 32 bytes return
+`ErrInvalidDigest`.
+
+> This is **raw signing** only — you build and serialize the transaction (with a
+> chain SDK or your own encoder) and hand the digest/message here. The signing
+> primitives and `Signature` encodings are designed to be reused as the core for
+> full per-chain transaction builders later.
 
 ---
 
@@ -254,6 +291,11 @@ go test -race -cover ./...
 | `(*HDWallet) Address(symbol Symbol) (string, error)` | First receive address for one network. |
 | `(*HDWallet) AddressIndex(symbol Symbol, index uint32) (string, error)` | Nth address/account for one network. |
 | `(*HDWallet) AllAddresses() (map[Symbol]string, error)` | Addresses for all networks. |
+| `(*HDWallet) Sign(symbol Symbol, data []byte) (*Signature, error)` | Sign a digest (ECDSA) / message (ed25519) at index 0. |
+| `(*HDWallet) SignIndex(symbol Symbol, index uint32, data []byte) (*Signature, error)` | Sign with the key at a given index. |
+| `(*HDWallet) PublicKey(symbol Symbol) ([]byte, error)` | Public key at index 0. |
+| `(*HDWallet) PublicKeyIndex(symbol Symbol, index uint32) ([]byte, error)` | Public key at a given index. |
+| `Verify(curve Curve, pub, data []byte, sig *Signature) bool` | Verify a signature. |
 | `(*HDWallet) WithMnemonic(func([]byte) error) error` | Use the mnemonic, auto-wiped. |
 | `(*HDWallet) Mnemonic() (*memguard.LockedBuffer, error)` | Mnemonic buffer (caller `Destroy`s). |
 | `(*HDWallet) Destroy()` | Wipe the wallet's secrets. |

@@ -1,6 +1,7 @@
 package hdwallet_test
 
 import (
+	"crypto/sha256"
 	"fmt"
 	"log"
 	"strings"
@@ -107,4 +108,25 @@ func ExampleHDWallet_WithMnemonic() {
 		log.Fatal(err)
 	}
 	// Output: 12 words
+}
+
+// ExampleHDWallet_Sign signs a digest and verifies it with the derived public
+// key. For ECDSA chains (BTC/ETH/…) pass the 32-byte digest your chain hashes;
+// for ed25519 chains pass the message itself.
+func ExampleHDWallet_Sign() {
+	w, err := hdwallet.FromMnemonic(exampleMnemonic)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer w.Destroy()
+
+	digest := sha256.Sum256([]byte("transaction bytes to sign"))
+	sig, err := w.Sign(hdwallet.BTC, digest[:])
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	pub, _ := w.PublicKey(hdwallet.BTC)
+	fmt.Println(hdwallet.Verify(hdwallet.Secp256k1, pub, digest[:], sig))
+	// Output: true
 }
