@@ -18,11 +18,12 @@ func encodeLTC(pub []byte) (string, error) { return segwitAddress("ltc", pub) }
 
 // Additional native-SegWit (P2WPKH, bech32) chains. The witness program is the
 // standard hash160(pub), so these reuse segwitAddress with a per-chain HRP.
-func encodeGRS(pub []byte) (string, error) { return segwitAddress("grs", pub) }
-func encodeDGB(pub []byte) (string, error) { return segwitAddress("dgb", pub) }
-func encodeBTG(pub []byte) (string, error) { return segwitAddress("btg", pub) }
-func encodeSYS(pub []byte) (string, error) { return segwitAddress("sys", pub) }
-func encodeVIA(pub []byte) (string, error) { return segwitAddress("via", pub) }
+func encodeGRS(pub []byte) (string, error)     { return segwitAddress("grs", pub) }
+func encodeDGB(pub []byte) (string, error)     { return segwitAddress("dgb", pub) }
+func encodeBTG(pub []byte) (string, error)     { return segwitAddress("btg", pub) }
+func encodeSYS(pub []byte) (string, error)     { return segwitAddress("sys", pub) }
+func encodeVIA(pub []byte) (string, error)     { return segwitAddress("via", pub) }
+func encodeStratis(pub []byte) (string, error) { return segwitAddress("strax", pub) }
 
 func segwitAddress(hrp string, pubCompressed []byte) (string, error) {
 	conv, err := bech32.ConvertBits(hash160(pubCompressed), 8, 5, true)
@@ -47,6 +48,18 @@ func encodeMONA(pub []byte) (string, error) { return base58.CheckEncode(hash160(
 func encodeXVG(pub []byte) (string, error)  { return base58.CheckEncode(hash160(pub), 0x1e), nil }
 func encodePIVX(pub []byte) (string, error) { return base58.CheckEncode(hash160(pub), 0x1e), nil }
 func encodeNEBL(pub []byte) (string, error) { return base58.CheckEncode(hash160(pub), 0x35), nil }
+func encodeBCD(pub []byte) (string, error)  { return base58.CheckEncode(hash160(pub), 0x00), nil }
+
+// Multi-byte-version base58check chains.
+// Horizen (Zen) transparent address uses the 2-byte prefix 0x2089.
+func encodeZEN(pub []byte) (string, error) {
+	return base58CheckEncode(base58BTC, []byte{0x20, 0x89}, hash160(pub)), nil
+}
+
+// Flux (Zelcash) transparent t-addr uses the same 2-byte prefix as Zcash.
+func encodeFLUX(pub []byte) (string, error) {
+	return base58CheckEncode(base58BTC, []byte{0x1c, 0xb8}, hash160(pub)), nil
+}
 
 // Zcash transparent t-addr uses a two-byte version prefix (0x1c, 0xb8).
 func encodeZEC(pub []byte) (string, error) {
@@ -163,8 +176,15 @@ func cosmosEvmEncoder(hrp string) func([]byte) (string, error) {
 
 const cashCharset = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
 
-func encodeBCH(pub []byte) (string, error) {
-	const prefix = "bitcoincash"
+func encodeBCH(pub []byte) (string, error) { return cashAddress("bitcoincash", pub) }
+
+// encodeECash is the eCash (XEC) CashAddr, identical to Bitcoin Cash but with
+// the "ecash" prefix.
+func encodeECash(pub []byte) (string, error) { return cashAddress("ecash", pub) }
+
+// cashAddress builds a CashAddr P2KH address (version 0x00 = P2KH + 160-bit
+// hash) under the given prefix. Shared by Bitcoin Cash and eCash.
+func cashAddress(prefix string, pub []byte) (string, error) {
 	// version byte 0x00 = type P2KH + 160-bit hash size.
 	payload := append([]byte{0x00}, hash160(pub)...)
 	conv, err := bech32.ConvertBits(payload, 8, 5, true)

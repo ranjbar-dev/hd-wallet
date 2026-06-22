@@ -90,19 +90,24 @@ const (
 	ZEC  Symbol = "ZEC"
 
 	// secp256k1 — additional UTXO chains.
-	GRS  Symbol = "GRS"  // Groestlcoin (segwit)
-	DGB  Symbol = "DGB"  // DigiByte (segwit)
-	BTG  Symbol = "BTG"  // Bitcoin Gold (segwit)
-	SYS  Symbol = "SYS"  // Syscoin (segwit)
-	VIA  Symbol = "VIA"  // Viacoin (segwit)
-	QTUM Symbol = "QTUM" // Qtum (base58check P2PKH)
-	RVN  Symbol = "RVN"  // Ravencoin (base58check P2PKH)
-	KMD  Symbol = "KMD"  // Komodo (base58check P2PKH)
-	FIRO Symbol = "FIRO" // Firo (base58check P2PKH)
-	MONA Symbol = "MONA" // MonaCoin (base58check P2PKH)
-	XVG  Symbol = "XVG"  // Verge (base58check P2PKH)
-	PIVX Symbol = "PIVX" // PIVX (base58check P2PKH)
-	NEBL Symbol = "NEBL" // Neblio (base58check P2PKH)
+	GRS   Symbol = "GRS"   // Groestlcoin (segwit)
+	DGB   Symbol = "DGB"   // DigiByte (segwit)
+	BTG   Symbol = "BTG"   // Bitcoin Gold (segwit)
+	SYS   Symbol = "SYS"   // Syscoin (segwit)
+	VIA   Symbol = "VIA"   // Viacoin (segwit)
+	QTUM  Symbol = "QTUM"  // Qtum (base58check P2PKH)
+	RVN   Symbol = "RVN"   // Ravencoin (base58check P2PKH)
+	KMD   Symbol = "KMD"   // Komodo (base58check P2PKH)
+	FIRO  Symbol = "FIRO"  // Firo (base58check P2PKH)
+	MONA  Symbol = "MONA"  // MonaCoin (base58check P2PKH)
+	XVG   Symbol = "XVG"   // Verge (base58check P2PKH)
+	PIVX  Symbol = "PIVX"  // PIVX (base58check P2PKH)
+	NEBL  Symbol = "NEBL"  // Neblio (base58check P2PKH)
+	STRAX Symbol = "STRAX" // Stratis (segwit)
+	ZEN   Symbol = "ZEN"   // Horizen (base58check 2-byte)
+	BCD   Symbol = "BCD"   // Bitcoin Diamond (base58check P2PKH)
+	XEC   Symbol = "XEC"   // eCash (CashAddr)
+	FLUX  Symbol = "FLUX"  // Flux/Zelcash (base58check 2-byte)
 
 	// secp256k1 — account-based / keccak.
 	ETH Symbol = "ETH"
@@ -257,14 +262,19 @@ var coins = map[Symbol]Coin{
 	"SYS": {"Syscoin", "SYS", Secp256k1, "m/84'/57'/0'/0/0", encodeSYS},
 	"VIA": {"Viacoin", "VIA", Secp256k1, "m/84'/14'/0'/0/0", encodeVIA},
 	// Legacy P2PKH (base58check, single version byte).
-	"QTUM": {"Qtum", "QTUM", Secp256k1, "m/44'/2301'/0'/0/0", encodeQTUM},
-	"RVN":  {"Ravencoin", "RVN", Secp256k1, "m/44'/175'/0'/0/0", encodeRVN},
-	"KMD":  {"Komodo", "KMD", Secp256k1, "m/44'/141'/0'/0/0", encodeKMD},
-	"FIRO": {"Firo", "FIRO", Secp256k1, "m/44'/136'/0'/0/0", encodeFIRO},
-	"MONA": {"MonaCoin", "MONA", Secp256k1, "m/44'/22'/0'/0/0", encodeMONA},
-	"XVG":  {"Verge", "XVG", Secp256k1, "m/44'/77'/0'/0/0", encodeXVG},
-	"PIVX": {"PIVX", "PIVX", Secp256k1, "m/44'/119'/0'/0/0", encodePIVX},
-	"NEBL": {"Neblio", "NEBL", Secp256k1, "m/44'/146'/0'/0/0", encodeNEBL},
+	"QTUM":  {"Qtum", "QTUM", Secp256k1, "m/44'/2301'/0'/0/0", encodeQTUM},
+	"RVN":   {"Ravencoin", "RVN", Secp256k1, "m/44'/175'/0'/0/0", encodeRVN},
+	"KMD":   {"Komodo", "KMD", Secp256k1, "m/44'/141'/0'/0/0", encodeKMD},
+	"FIRO":  {"Firo", "FIRO", Secp256k1, "m/44'/136'/0'/0/0", encodeFIRO},
+	"MONA":  {"MonaCoin", "MONA", Secp256k1, "m/44'/22'/0'/0/0", encodeMONA},
+	"XVG":   {"Verge", "XVG", Secp256k1, "m/44'/77'/0'/0/0", encodeXVG},
+	"PIVX":  {"PIVX", "PIVX", Secp256k1, "m/44'/119'/0'/0/0", encodePIVX},
+	"NEBL":  {"Neblio", "NEBL", Secp256k1, "m/44'/146'/0'/0/0", encodeNEBL},
+	"STRAX": {"Stratis", "STRAX", Secp256k1, "m/84'/105105'/0'/0/0", encodeStratis},
+	"ZEN":   {"Horizen", "ZEN", Secp256k1, "m/44'/121'/0'/0/0", encodeZEN},
+	"BCD":   {"Bitcoin Diamond", "BCD", Secp256k1, "m/44'/999'/0'/0/0", encodeBCD},
+	"XEC":   {"eCash", "XEC", Secp256k1, "m/44'/899'/0'/0/0", encodeECash},
+	"FLUX":  {"Flux", "FLUX", Secp256k1, "m/44'/19167'/0'/0/0", encodeFLUX},
 
 	// ---- secp256k1 : account-based / keccak ----
 	"ETH": {"Ethereum", "ETH", Secp256k1, "m/44'/60'/0'/0/0", encodeETH},
@@ -421,6 +431,11 @@ func init() {
 	validators[XVG] = base58CheckValidator1(0x1e, XVG)
 	validators[PIVX] = base58CheckValidator1(0x1e, PIVX)
 	validators[NEBL] = base58CheckValidator1(0x35, NEBL)
+	validators[STRAX] = segwitValidator("strax", STRAX)
+	validators[ZEN] = base58CheckValidatorN(base58BTC, []byte{0x20, 0x89}, ZEN)
+	validators[BCD] = base58CheckValidator1(0x00, BCD)
+	validators[FLUX] = base58CheckValidatorN(base58BTC, []byte{0x1c, 0xb8}, FLUX)
+	validators[XEC] = cashAddrValidator("ecash", XEC)
 
 	// Additional Cosmos SDK chains (bech32, 20-byte payload, per-HRP). The same
 	// validator handles both hash160-key and EVM-key chains since both encode a
