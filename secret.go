@@ -3,21 +3,38 @@ package hdwallet
 import (
 	"bytes"
 	"errors"
+	"fmt"
 
 	"github.com/awnumar/memguard"
 	bip39 "github.com/tyler-smith/go-bip39"
 )
 
-// secret holds the wallet's sensitive material — the BIP-39 mnemonic and the
-// derived seed — inside memguard enclaves. Enclaves keep the data encrypted in
-// RAM, in pages locked against swapping to disk; they are decrypted into a
-// short-lived LockedBuffer only for the duration of a single operation and
-// destroyed immediately afterwards. The plaintext is never stored on the Go
-// heap for longer than one derivation.
+// secret holds the wallet's sensitive material inside memguard enclaves.
+// Enclaves keep the data encrypted in RAM, in pages locked against swapping to
+// disk; they are decrypted into a short-lived LockedBuffer only for the duration
+// of a single operation and destroyed immediately afterwards. The plaintext is
+// never stored on the Go heap for longer than one derivation.
+//
+// A secret is in one of two modes:
+//
+//   - Seed mode (the default, from a BIP-39 mnemonic): seed and mnemonic are set
+//     and privKey is nil. Keys are derived on demand from the seed.
+//   - Key-only mode (from an imported private key): privKey and curve are set and
+//     seed/mnemonic are nil. The imported key IS the leaf — there is no HD path,
+//     so only address index 0 is meaningful and there is no mnemonic to read.
 type secret struct {
 	seed     *memguard.Enclave
 	mnemonic *memguard.Enclave
+
+	// Key-only mode: a single imported leaf private key and its curve. When
+	// privKey is non-nil the secret is key-only and seed/mnemonic are nil.
+	privKey *memguard.Enclave
+	curve   Curve
 }
+
+// isKeyOnly reports whether the secret was built from an imported private key
+// (no seed, no mnemonic, no HD path).
+func (s *secret) isKeyOnly() bool { return s.privKey != nil }
 
 // newSecret validates the mnemonic, derives the seed, and seals both into
 // enclaves. Surrounding ASCII whitespace is trimmed first, matching
@@ -76,6 +93,82 @@ func newSecretFromBuffer(buf *memguard.LockedBuffer) (*secret, error) {
 	return &secret{seed: seedEnclave, mnemonic: mnemonic}, nil
 }
 
+// privateKeyLen is the raw private-key length for every supported curve: 32
+// bytes (secp256k1 scalar, ed25519 seed, NIST P-256 scalar).
+const privateKeyLen = 32
+
+// newSecretFromPrivateKey seals an imported raw private key into a key-only
+// secret. The input slice is wiped — callers must surrender ownership of it
+// (mirrors newSecret). The key is validated for the curve before sealing.
+func newSecretFromPrivateKey(priv []byte, curve Curve) (*secret, error) {
+	defer wipe(priv)
+
+	if err := validatePrivateKey(priv, curve); err != nil {
+		return nil, err
+	}
+
+	// Seal a copy so the caller's backing array is still wiped by the deferred
+	// wipe above.
+	buf := memguard.NewBufferFromBytes(priv) // wipes priv into protected memory
+	return &secret{privKey: buf.Seal(), curve: curve}, nil
+}
+
+// newSecretFromPrivateKeyBuffer is the strongest key-import entry point: the
+// private key is supplied in a memguard LockedBuffer and sealed into an enclave
+// without ever being copied onto an unprotected heap slice. The wallet takes
+// ownership of buf and destroys it (mirrors newSecretFromBuffer).
+func newSecretFromPrivateKeyBuffer(buf *memguard.LockedBuffer, curve Curve) (*secret, error) {
+	if buf == nil || !buf.IsAlive() {
+		return nil, errors.New("hdwallet: private-key buffer is nil or destroyed")
+	}
+
+	if err := validatePrivateKey(buf.Bytes(), curve); err != nil {
+		buf.Destroy()
+		return nil, err
+	}
+
+	// Zero-copy: seal the caller's protected buffer directly.
+	return &secret{privKey: buf.Seal(), curve: curve}, nil
+}
+
+// validatePrivateKey checks that priv is a plausible private key for curve: the
+// correct length and not the all-zero scalar (which is not a valid key on any of
+// the supported curves and would derive a point at infinity).
+func validatePrivateKey(priv []byte, curve Curve) error {
+	switch curve {
+	case Secp256k1, Ed25519, Nist256p1:
+	default:
+		return fmt.Errorf("%w: %s", ErrUnsupportedCurve, curve)
+	}
+	if len(priv) != privateKeyLen {
+		return fmt.Errorf("%w: got %d bytes, want %d", ErrInvalidPrivateKey, len(priv), privateKeyLen)
+	}
+	allZero := true
+	for _, b := range priv {
+		if b != 0 {
+			allZero = false
+			break
+		}
+	}
+	if allZero {
+		return fmt.Errorf("%w: key is all zero", ErrInvalidPrivateKey)
+	}
+	return nil
+}
+
+// withImportedKey opens the key-only private-key enclave, copies the plaintext
+// into a transient slice, runs fn with it, and wipes that copy before returning.
+// The decrypted LockedBuffer is destroyed regardless of fn's outcome. It must
+// only be called on a key-only secret (privKey != nil).
+func (s *secret) withImportedKey(fn func(priv []byte) error) error {
+	buf, err := s.privKey.Open()
+	if err != nil {
+		return err
+	}
+	defer buf.Destroy()
+	return fn(buf.Bytes())
+}
+
 // deriveSeedEnclave validates a mnemonic and returns its BIP-39 seed sealed in
 // an enclave. It does not take ownership of mnemonic (the caller wipes/seals it).
 //
@@ -114,4 +207,5 @@ func (s *secret) openMnemonic() (*memguard.LockedBuffer, error) {
 func (s *secret) destroy() {
 	s.seed = nil
 	s.mnemonic = nil
+	s.privKey = nil
 }

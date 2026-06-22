@@ -33,6 +33,21 @@ var (
 	ErrDestroyed = errors.New("hdwallet: wallet has been destroyed")
 	// ErrInvalidDigest is returned when an ECDSA signing input is not 32 bytes.
 	ErrInvalidDigest = errors.New("hdwallet: digest must be 32 bytes")
+	// ErrInvalidPrivateKey is returned when an imported private key has the wrong
+	// length or is otherwise invalid for its curve.
+	ErrInvalidPrivateKey = errors.New("hdwallet: invalid private key")
+	// ErrUnsupportedCurve is returned when a curve is not one of the supported
+	// elliptic curves.
+	ErrUnsupportedCurve = errors.New("hdwallet: unsupported curve")
+	// ErrCurveMismatch is returned when an operation targets a coin whose curve
+	// differs from the curve of a key-only wallet's imported private key.
+	ErrCurveMismatch = errors.New("hdwallet: coin curve does not match imported key curve")
+	// ErrKeyOnlyWallet is returned by mnemonic/seed-only operations (Mnemonic,
+	// WithMnemonic, AllAddresses) on a wallet imported from a raw private key.
+	ErrKeyOnlyWallet = errors.New("hdwallet: operation not available on a private-key-only wallet")
+	// ErrKeyOnlyIndex is returned when a non-zero address/sign index is requested
+	// on a key-only wallet, which has a single leaf key and no HD path.
+	ErrKeyOnlyIndex = errors.New("hdwallet: private-key-only wallet supports only index 0")
 )
 
 // HDWallet is an HD wallet derived from a BIP-39 mnemonic. Its sensitive
@@ -134,26 +149,14 @@ func (w *HDWallet) Address(symbol Symbol) (string, error) {
 // index must be below 2^31 (0x80000000); a larger value returns an error, as
 // does an unknown symbol (wrapping ErrUnsupportedCoin) or a destroyed wallet.
 func (w *HDWallet) AddressIndex(symbol Symbol, index uint32) (string, error) {
-	w.mu.RLock()
-	defer w.mu.RUnlock()
-	if w.secret == nil {
-		return "", ErrDestroyed
-	}
-	coin, ok := coins[symbol]
-	if !ok {
-		return "", fmt.Errorf("%w: %s", ErrUnsupportedCoin, symbol)
-	}
-	path, err := withIndex(coin.Path, index)
-	if err != nil {
-		return "", fmt.Errorf("hdwallet: %s: %w", symbol, err)
-	}
-	coin.Path = path // local copy; the registry entry is unchanged
-
 	var addr string
-	err = w.secret.withSeed(func(seed []byte) error {
-		a, err := addressFromSeed(seed, symbol, coin)
+	err := w.withLeafPublicKey(symbol, index, func(pub []byte, coin Coin) error {
+		a, err := coin.Encode(pub)
+		if err != nil {
+			return fmt.Errorf("hdwallet: %s: %w", symbol, err)
+		}
 		addr = a
-		return err
+		return nil
 	})
 	if err != nil {
 		return "", err
@@ -164,11 +167,17 @@ func (w *HDWallet) AddressIndex(symbol Symbol, index uint32) (string, error) {
 // AllAddresses derives the first address for every supported coin. The seed
 // enclave is opened exactly once and every coin is derived inside that single
 // decryption window.
+//
+// It is only available on seed-based wallets; a key-only wallet (imported from a
+// single private key) has no seed to enumerate over and returns ErrKeyOnlyWallet.
 func (w *HDWallet) AllAddresses() (map[Symbol]string, error) {
 	w.mu.RLock()
 	defer w.mu.RUnlock()
 	if w.secret == nil {
 		return nil, ErrDestroyed
+	}
+	if w.secret.isKeyOnly() {
+		return nil, ErrKeyOnlyWallet
 	}
 	out := make(map[Symbol]string, len(coins))
 	err := w.secret.withSeed(func(seed []byte) error {
@@ -202,11 +211,20 @@ func addressFromSeed(seed []byte, symbol Symbol, coin Coin) (string, error) {
 	return addr, nil
 }
 
-// withCoin resolves symbol at the given address index to a Coin (with its Path
-// set to the indexed path) and runs fn with the wallet's seed opened exactly
-// once. It holds the read lock and guards against a destroyed wallet, mirroring
-// AddressIndex. The registry entry is never mutated (coin is a copy).
-func (w *HDWallet) withCoin(symbol Symbol, index uint32, fn func(seed []byte, coin Coin) error) error {
+// withLeafPrivateKey is the single entry point that materialises the leaf private
+// key for symbol at index in BOTH wallet modes, passes the raw key plus the
+// resolved coin to fn, and guarantees the key is wiped before returning.
+//
+//   - Seed wallets: derive the key from the seed via withPrivateKey (which wipes
+//     the derived key on return).
+//   - Key-only wallets: the imported key is the leaf. The coin's curve must equal
+//     the imported curve (else ErrCurveMismatch) and index must be 0 (else
+//     ErrKeyOnlyIndex); the key is opened and the decrypted copy destroyed on
+//     return by withImportedKey.
+//
+// It holds the read lock and rejects a destroyed wallet. The registry entry is
+// never mutated (coin is a copy).
+func (w *HDWallet) withLeafPrivateKey(symbol Symbol, index uint32, fn func(priv []byte, coin Coin) error) error {
 	w.mu.RLock()
 	defer w.mu.RUnlock()
 	if w.secret == nil {
@@ -216,12 +234,38 @@ func (w *HDWallet) withCoin(symbol Symbol, index uint32, fn func(seed []byte, co
 	if !ok {
 		return fmt.Errorf("%w: %s", ErrUnsupportedCoin, symbol)
 	}
+
+	if w.secret.isKeyOnly() {
+		if coin.Curve != w.secret.curve {
+			return fmt.Errorf("%w: coin %s is %s, key is %s", ErrCurveMismatch, symbol, coin.Curve, w.secret.curve)
+		}
+		if index != 0 {
+			return fmt.Errorf("%w: %s index %d", ErrKeyOnlyIndex, symbol, index)
+		}
+		return w.secret.withImportedKey(func(priv []byte) error { return fn(priv, coin) })
+	}
+
 	path, err := withIndex(coin.Path, index)
 	if err != nil {
 		return fmt.Errorf("hdwallet: %s: %w", symbol, err)
 	}
 	coin.Path = path
-	return w.secret.withSeed(func(seed []byte) error { return fn(seed, coin) })
+	return w.secret.withSeed(func(seed []byte) error {
+		return withPrivateKey(seed, coin, func(priv []byte) error { return fn(priv, coin) })
+	})
+}
+
+// withLeafPublicKey materialises the leaf private key (both modes), derives its
+// public key, and runs fn with the public key bytes and resolved coin. The
+// private key is wiped before fn runs (it is consumed inside withLeafPrivateKey).
+func (w *HDWallet) withLeafPublicKey(symbol Symbol, index uint32, fn func(pub []byte, coin Coin) error) error {
+	return w.withLeafPrivateKey(symbol, index, func(priv []byte, coin Coin) error {
+		pub, err := publicKeyFromPriv(coin.Curve, priv)
+		if err != nil {
+			return fmt.Errorf("hdwallet: %s: %w", symbol, err)
+		}
+		return fn(pub, coin)
+	})
 }
 
 // Sign signs data with the key for symbol at address index 0. See SignIndex.
@@ -242,15 +286,13 @@ func (w *HDWallet) Sign(symbol Symbol, data []byte) (*Signature, error) {
 // the package.
 func (w *HDWallet) SignIndex(symbol Symbol, index uint32, data []byte) (*Signature, error) {
 	var sig *Signature
-	err := w.withCoin(symbol, index, func(seed []byte, coin Coin) error {
-		return withPrivateKey(seed, coin, func(priv []byte) error {
-			s, err := signDigest(coin.Curve, priv, data)
-			if err != nil {
-				return fmt.Errorf("hdwallet: %s: %w", symbol, err)
-			}
-			sig = s
-			return nil
-		})
+	err := w.withLeafPrivateKey(symbol, index, func(priv []byte, coin Coin) error {
+		s, err := signDigest(coin.Curve, priv, data)
+		if err != nil {
+			return fmt.Errorf("hdwallet: %s: %w", symbol, err)
+		}
+		sig = s
+		return nil
 	})
 	if err != nil {
 		return nil, err
@@ -269,12 +311,8 @@ func (w *HDWallet) PublicKey(symbol Symbol) ([]byte, error) {
 // for ed25519. Signing callers need this to build or verify transactions.
 func (w *HDWallet) PublicKeyIndex(symbol Symbol, index uint32) ([]byte, error) {
 	var pub []byte
-	err := w.withCoin(symbol, index, func(seed []byte, coin Coin) error {
-		p, err := derivePublicKey(seed, coin)
-		if err != nil {
-			return fmt.Errorf("hdwallet: %s: %w", symbol, err)
-		}
-		pub = p
+	err := w.withLeafPublicKey(symbol, index, func(p []byte, _ Coin) error {
+		pub = append([]byte(nil), p...) // copy out before the lock is released
 		return nil
 	})
 	if err != nil {
@@ -294,6 +332,9 @@ func (w *HDWallet) Mnemonic() (*memguard.LockedBuffer, error) {
 	if w.secret == nil {
 		return nil, ErrDestroyed
 	}
+	if w.secret.isKeyOnly() {
+		return nil, ErrKeyOnlyWallet
+	}
 	return w.secret.openMnemonic()
 }
 
@@ -304,6 +345,9 @@ func (w *HDWallet) WithMnemonic(fn func(mnemonic []byte) error) error {
 	defer w.mu.RUnlock()
 	if w.secret == nil {
 		return ErrDestroyed
+	}
+	if w.secret.isKeyOnly() {
+		return ErrKeyOnlyWallet
 	}
 	buf, err := w.secret.openMnemonic()
 	if err != nil {
