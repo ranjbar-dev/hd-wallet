@@ -89,6 +89,21 @@ const (
 	DASH Symbol = "DASH"
 	ZEC  Symbol = "ZEC"
 
+	// secp256k1 — additional UTXO chains.
+	GRS  Symbol = "GRS"  // Groestlcoin (segwit)
+	DGB  Symbol = "DGB"  // DigiByte (segwit)
+	BTG  Symbol = "BTG"  // Bitcoin Gold (segwit)
+	SYS  Symbol = "SYS"  // Syscoin (segwit)
+	VIA  Symbol = "VIA"  // Viacoin (segwit)
+	QTUM Symbol = "QTUM" // Qtum (base58check P2PKH)
+	RVN  Symbol = "RVN"  // Ravencoin (base58check P2PKH)
+	KMD  Symbol = "KMD"  // Komodo (base58check P2PKH)
+	FIRO Symbol = "FIRO" // Firo (base58check P2PKH)
+	MONA Symbol = "MONA" // MonaCoin (base58check P2PKH)
+	XVG  Symbol = "XVG"  // Verge (base58check P2PKH)
+	PIVX Symbol = "PIVX" // PIVX (base58check P2PKH)
+	NEBL Symbol = "NEBL" // Neblio (base58check P2PKH)
+
 	// secp256k1 — account-based / keccak.
 	ETH Symbol = "ETH"
 	TRX Symbol = "TRX"
@@ -186,6 +201,23 @@ var coins = map[Symbol]Coin{
 	"DASH": {"Dash", "DASH", Secp256k1, "m/44'/5'/0'/0/0", encodeDASH},
 	"ZEC":  {"Zcash", "ZEC", Secp256k1, "m/44'/133'/0'/0/0", encodeZEC},
 
+	// ---- secp256k1 : additional UTXO chains ----
+	// Native SegWit (P2WPKH, bech32) chains — witness program is hash160(pub).
+	"GRS": {"Groestlcoin", "GRS", Secp256k1, "m/84'/17'/0'/0/0", encodeGRS},
+	"DGB": {"DigiByte", "DGB", Secp256k1, "m/84'/20'/0'/0/0", encodeDGB},
+	"BTG": {"Bitcoin Gold", "BTG", Secp256k1, "m/84'/156'/0'/0/0", encodeBTG},
+	"SYS": {"Syscoin", "SYS", Secp256k1, "m/84'/57'/0'/0/0", encodeSYS},
+	"VIA": {"Viacoin", "VIA", Secp256k1, "m/84'/14'/0'/0/0", encodeVIA},
+	// Legacy P2PKH (base58check, single version byte).
+	"QTUM": {"Qtum", "QTUM", Secp256k1, "m/44'/2301'/0'/0/0", encodeQTUM},
+	"RVN":  {"Ravencoin", "RVN", Secp256k1, "m/44'/175'/0'/0/0", encodeRVN},
+	"KMD":  {"Komodo", "KMD", Secp256k1, "m/44'/141'/0'/0/0", encodeKMD},
+	"FIRO": {"Firo", "FIRO", Secp256k1, "m/44'/136'/0'/0/0", encodeFIRO},
+	"MONA": {"MonaCoin", "MONA", Secp256k1, "m/44'/22'/0'/0/0", encodeMONA},
+	"XVG":  {"Verge", "XVG", Secp256k1, "m/44'/77'/0'/0/0", encodeXVG},
+	"PIVX": {"PIVX", "PIVX", Secp256k1, "m/44'/119'/0'/0/0", encodePIVX},
+	"NEBL": {"Neblio", "NEBL", Secp256k1, "m/44'/146'/0'/0/0", encodeNEBL},
+
 	// ---- secp256k1 : account-based / keccak ----
 	"ETH": {"Ethereum", "ETH", Secp256k1, "m/44'/60'/0'/0/0", encodeETH},
 	"TRX": {"Tron", "TRX", Secp256k1, "m/44'/195'/0'/0/0", encodeTRX},
@@ -277,4 +309,20 @@ func init() {
 	}
 	// Ronin is an Ethereum address with a "ronin:" prefix instead of "0x".
 	validators[RONIN] = roninValidator(RONIN)
+
+	// Additional native-SegWit UTXO chains (witness program is hash160).
+	validators[GRS] = segwitValidator("grs", GRS)
+	validators[DGB] = segwitValidator("dgb", DGB)
+	validators[BTG] = segwitValidator("btg", BTG)
+	validators[SYS] = segwitValidator("sys", SYS)
+	validators[VIA] = segwitValidator("via", VIA)
+	// Additional legacy P2PKH (base58check, single version byte) chains.
+	validators[QTUM] = base58CheckValidator1(0x3a, QTUM)
+	validators[RVN] = base58CheckValidator1(0x3c, RVN)
+	validators[KMD] = base58CheckValidator1(0x3c, KMD)
+	validators[FIRO] = base58CheckValidator1(0x52, FIRO)
+	validators[MONA] = base58CheckValidator1(0x32, MONA)
+	validators[XVG] = base58CheckValidator1(0x1e, XVG)
+	validators[PIVX] = base58CheckValidator1(0x1e, PIVX)
+	validators[NEBL] = base58CheckValidator1(0x35, NEBL)
 }
