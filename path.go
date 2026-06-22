@@ -150,7 +150,7 @@ func (w *HDWallet) accountPath(symbol Symbol, account, change, index uint32) (st
 		return "", fmt.Errorf("%w: %s (%s)", ErrPathArity, symbol, coin.Path)
 	}
 	if account >= hardenedOffset || change >= hardenedOffset || index >= hardenedOffset {
-		return "", fmt.Errorf("hdwallet: %s: account/change/index must each be < %d", symbol, uint32(hardenedOffset))
+		return "", fmt.Errorf("hdwallet: %s: account/change/index must each be < %d", symbol, hardenedOffset)
 	}
 	parts[3] = strconv.FormatUint(uint64(account), 10) + "'" // account is hardened
 	parts[4] = strconv.FormatUint(uint64(change), 10)

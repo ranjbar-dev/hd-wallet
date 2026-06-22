@@ -106,7 +106,7 @@ func accountPathIndices(template string, account uint32) ([]uint32, error) {
 		return nil, fmt.Errorf("%w: %s", ErrPathArity, template)
 	}
 	if account >= hardenedOffset {
-		return nil, fmt.Errorf("account index out of range: %d (must be < %d)", account, uint32(hardenedOffset))
+		return nil, fmt.Errorf("account index out of range: %d (must be < %d)", account, hardenedOffset)
 	}
 	acctPath := "m/" + parts[1] + "/" + parts[2] + "/" + strconv.FormatUint(uint64(account), 10) + "'"
 	return parsePath(acctPath)
@@ -165,7 +165,7 @@ func (ww *WatchWallet) PublicKey(change, index uint32) ([]byte, error) {
 
 func (ww *WatchWallet) publicKey(change, index uint32) ([]byte, error) {
 	if change >= hardenedOffset || index >= hardenedOffset {
-		return nil, fmt.Errorf("%w: watch-only change/index must be non-hardened (< %d)", ErrExtKeyUnsupportedCurve, uint32(hardenedOffset))
+		return nil, fmt.Errorf("%w: watch-only change/index must be non-hardened (< %d)", ErrExtKeyUnsupportedCurve, hardenedOffset)
 	}
 	branch, err := ww.acct.Derive(change)
 	if err != nil {

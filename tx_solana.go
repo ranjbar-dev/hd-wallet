@@ -40,8 +40,9 @@ import (
 // solanaSystemProgramID is the System Program account "111...1" (32 zero bytes).
 var solanaSystemProgramID = make([]byte, 32)
 
-// solanaTokenProgramID is the SPL Token program account, base58.
-const solanaTokenProgramID = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+// solanaTokenProgramID is the SPL Token program account, base58. It is a public
+// well-known program address, not a secret.
+const solanaTokenProgramID = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" // #nosec G101 -- public SPL Token program id, not a credential
 
 // solanaTransferInstruction is the System Program instruction index for Transfer.
 const solanaTransferInstruction uint32 = 2
@@ -148,7 +149,8 @@ func (w *HDWallet) signSolanaTokenTransfer(symbol Symbol, index uint32, in *txso
 		return nil, fmt.Errorf("%w: solana: token program id: %v", ErrTxInput, err)
 	}
 
-	message := solanaTokenTransferMessage(owner, source, dest, mint, tokenProgram, blockhash, tt.GetAmount(), byte(tt.GetDecimals()))
+	decimals := byte(tt.GetDecimals()) // #nosec G115 -- range-checked (<= 255) above
+	message := solanaTokenTransferMessage(owner, source, dest, mint, tokenProgram, blockhash, tt.GetAmount(), decimals)
 
 	sig, err := w.SignIndex(symbol, index, message)
 	if err != nil {
