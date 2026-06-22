@@ -108,7 +108,7 @@ func tronRawData(in *txtron.SigningInput, transfer *txtron.TransferContract, own
 	contract = protowire.AppendTag(contract, 2, protowire.BytesType)
 	contract = protowire.AppendBytes(contract, to)
 	contract = protowire.AppendTag(contract, 3, protowire.VarintType)
-	contract = protowire.AppendVarint(contract, uint64(transfer.GetAmount()))
+	contract = protowire.AppendVarint(contract, i64AsU64(transfer.GetAmount()))
 
 	// google.protobuf.Any: {1: type_url, 2: value}.
 	var anyMsg []byte
@@ -131,14 +131,14 @@ func tronRawData(in *txtron.SigningInput, transfer *txtron.TransferContract, own
 	raw = protowire.AppendTag(raw, 4, protowire.BytesType)
 	raw = protowire.AppendBytes(raw, refBlockHash)
 	raw = protowire.AppendTag(raw, 8, protowire.VarintType)
-	raw = protowire.AppendVarint(raw, uint64(tx.GetExpiration()))
+	raw = protowire.AppendVarint(raw, i64AsU64(tx.GetExpiration()))
 	raw = protowire.AppendTag(raw, 11, protowire.BytesType)
 	raw = protowire.AppendBytes(raw, contractMsg)
 	raw = protowire.AppendTag(raw, 14, protowire.VarintType)
-	raw = protowire.AppendVarint(raw, uint64(tx.GetTimestamp()))
+	raw = protowire.AppendVarint(raw, i64AsU64(tx.GetTimestamp()))
 	if fee := tx.GetFeeLimit(); fee != 0 {
 		raw = protowire.AppendTag(raw, 18, protowire.VarintType)
-		raw = protowire.AppendVarint(raw, uint64(fee))
+		raw = protowire.AppendVarint(raw, i64AsU64(fee))
 	}
 	return raw
 }
@@ -148,7 +148,7 @@ func tronRawData(in *txtron.SigningInput, transfer *txtron.TransferContract, own
 // equivalently bytes [6:8] of the big-endian encoding).
 func tronRefBlockBytes(number int64) []byte {
 	var be [8]byte
-	n := uint64(number)
+	n := i64AsU64(number)
 	for i := 7; i >= 0; i-- {
 		be[i] = byte(n)
 		n >>= 8
@@ -165,17 +165,17 @@ func tronRefBlockHash(bh *txtron.BlockHeader) ([]byte, error) {
 	// 7: number, 9: witness_address, 10: version}, ascending order.
 	var raw []byte
 	raw = protowire.AppendTag(raw, 1, protowire.VarintType)
-	raw = protowire.AppendVarint(raw, uint64(bh.GetTimestamp()))
+	raw = protowire.AppendVarint(raw, i64AsU64(bh.GetTimestamp()))
 	raw = protowire.AppendTag(raw, 2, protowire.BytesType)
 	raw = protowire.AppendBytes(raw, bh.GetTxTrieRoot())
 	raw = protowire.AppendTag(raw, 3, protowire.BytesType)
 	raw = protowire.AppendBytes(raw, bh.GetParentHash())
 	raw = protowire.AppendTag(raw, 7, protowire.VarintType)
-	raw = protowire.AppendVarint(raw, uint64(bh.GetNumber()))
+	raw = protowire.AppendVarint(raw, i64AsU64(bh.GetNumber()))
 	raw = protowire.AppendTag(raw, 9, protowire.BytesType)
 	raw = protowire.AppendBytes(raw, bh.GetWitnessAddress())
 	raw = protowire.AppendTag(raw, 10, protowire.VarintType)
-	raw = protowire.AppendVarint(raw, uint64(bh.GetVersion()))
+	raw = protowire.AppendVarint(raw, i32AsU64(bh.GetVersion()))
 
 	hash := sha256Sum(raw)
 	if len(hash) < 16 {

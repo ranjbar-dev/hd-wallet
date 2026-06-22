@@ -7,6 +7,28 @@ import (
 	txtron "github.com/ranjbar-dev/hd-wallet/txproto/tron"
 )
 
+// TestTronAddressBytes covers both accepted address forms: a base58check "T..."
+// address and a raw 21-byte hex (0x41-prefixed) address must decode to the same
+// 21-byte payload.
+func TestTronAddressBytes(t *testing.T) {
+	const hexAddr = "415cd0fb0ab3ce40f3051414c604b27756e69e43db"
+	raw := mustHexTx(t, hexAddr)
+	// Build the canonical base58check T-address for the same payload.
+	b58 := base58CheckEncode(base58BTC, raw[:1], raw[1:])
+
+	fromHex, err := tronAddressBytes(hexAddr)
+	if err != nil {
+		t.Fatalf("hex: %v", err)
+	}
+	fromB58, err := tronAddressBytes(b58)
+	if err != nil {
+		t.Fatalf("base58: %v", err)
+	}
+	if hex.EncodeToString(fromHex) != hexAddr || hex.EncodeToString(fromB58) != hexAddr {
+		t.Fatalf("address decode mismatch: hex=%x b58=%x want=%s", fromHex, fromB58, hexAddr)
+	}
+}
+
 // Tron TransferContract signing verified against Trust Wallet Core's Tron
 // AnySigner vector (swift/Tests/Blockchains/TronTests.swift). The expected txID
 // and 65-byte recoverable signature pin both the raw_data protobuf serialization

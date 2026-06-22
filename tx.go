@@ -162,3 +162,29 @@ func sha512Sum(b []byte) []byte {
 func base64Std(b []byte) string {
 	return base64.StdEncoding.EncodeToString(b)
 }
+
+// i64AsU64 reinterprets an int64 as a uint64. Protobuf encodes an int64 field as
+// the bit-identical uint64 varint, so this conversion is exact and lossless (it
+// is a reinterpretation, not a range-narrowing cast).
+func i64AsU64(v int64) uint64 {
+	return uint64(v) // #nosec G115 -- exact int64->uint64 bit reinterpretation for protobuf varint
+}
+
+// i32AsU64 sign-extends an int32 to a uint64 the same way protobuf encodes an
+// int32 field (negative values become 10-byte varints); exact and lossless.
+func i32AsU64(v int32) uint64 {
+	return uint64(int64(v)) // #nosec G115 -- protobuf int32 varint encoding (sign-extended)
+}
+
+// lowByte returns the low 8 bits of n. Used for wire-format header/length bytes
+// whose values are bounded by construction; the mask makes the truncation
+// explicit and intentional.
+func lowByte(n int) byte {
+	return byte(n & 0xff) // #nosec G115 -- explicit low-byte mask for a bounded wire value
+}
+
+// u32Trunc returns the low 32 bits of v. Used for fields the chain defines as
+// 32-bit (e.g. XRP DestinationTag) carried as a wider integer in the proto.
+func u32Trunc(v uint64) uint32 {
+	return uint32(v & 0xffffffff) // #nosec G115 -- explicit 32-bit mask for a 32-bit wire field
+}

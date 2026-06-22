@@ -131,7 +131,7 @@ func solanaTransferMessage(from, to, blockhash []byte, value uint64) []byte {
 // solanaCompactU16 encodes a length as Solana's compact-u16 (ShortVec) varint:
 // 7 bits per byte, little-endian, high bit as the continuation flag.
 func solanaCompactU16(n int) []byte {
-	v := uint32(n)
+	v := uint32(n) & 0xffff // #nosec G115 -- ShortVec is at most 16 bits; counts here are tiny
 	var out []byte
 	for {
 		b := byte(v & 0x7f)

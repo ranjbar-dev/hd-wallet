@@ -103,18 +103,18 @@ type xrpField struct {
 // TxnSignature (added after signing).
 func xrpPaymentFields(in *txripple.SigningInput, payment *txripple.Payment, account, destination, pub []byte) []xrpField {
 	fields := []xrpField{
-		{typeCode: 1, fieldCode: 2, value: xrpUint16(0)},                           // TransactionType = Payment
-		{typeCode: 2, fieldCode: 2, value: xrpUint32(in.GetFlags())},               // Flags
-		{typeCode: 2, fieldCode: 4, value: xrpUint32(in.GetSequence())},            // Sequence
-		{typeCode: 2, fieldCode: 27, value: xrpUint32(in.GetLastLedgerSequence())}, // LastLedgerSequence
-		{typeCode: 6, fieldCode: 1, value: xrpAmount(uint64(payment.GetAmount()))}, // Amount
-		{typeCode: 6, fieldCode: 8, value: xrpAmount(uint64(in.GetFee()))},         // Fee
-		{typeCode: 7, fieldCode: 3, value: xrpBlob(pub)},                           // SigningPubKey
-		{typeCode: 8, fieldCode: 1, value: xrpAccountID(account)},                  // Account
-		{typeCode: 8, fieldCode: 3, value: xrpAccountID(destination)},              // Destination
+		{typeCode: 1, fieldCode: 2, value: xrpUint16(0)},                             // TransactionType = Payment
+		{typeCode: 2, fieldCode: 2, value: xrpUint32(in.GetFlags())},                 // Flags
+		{typeCode: 2, fieldCode: 4, value: xrpUint32(in.GetSequence())},              // Sequence
+		{typeCode: 2, fieldCode: 27, value: xrpUint32(in.GetLastLedgerSequence())},   // LastLedgerSequence
+		{typeCode: 6, fieldCode: 1, value: xrpAmount(i64AsU64(payment.GetAmount()))}, // Amount
+		{typeCode: 6, fieldCode: 8, value: xrpAmount(i64AsU64(in.GetFee()))},         // Fee
+		{typeCode: 7, fieldCode: 3, value: xrpBlob(pub)},                             // SigningPubKey
+		{typeCode: 8, fieldCode: 1, value: xrpAccountID(account)},                    // Account
+		{typeCode: 8, fieldCode: 3, value: xrpAccountID(destination)},                // Destination
 	}
 	if tag := payment.GetDestinationTag(); tag != 0 {
-		fields = append(fields, xrpField{typeCode: 2, fieldCode: 14, value: xrpUint32(uint32(tag))})
+		fields = append(fields, xrpField{typeCode: 2, fieldCode: 14, value: xrpUint32(u32Trunc(i64AsU64(tag)))})
 	}
 	xrpSortFields(fields)
 	return fields
@@ -153,15 +153,16 @@ func xrpSerialize(fields []xrpField) []byte {
 // they pack into one byte (type<<4 | field); otherwise the large code(s) spill
 // into following byte(s) per the XRP wire format.
 func xrpFieldHeader(typeCode, fieldCode int) []byte {
+	tc, fc := lowByte(typeCode), lowByte(fieldCode)
 	switch {
 	case typeCode < 16 && fieldCode < 16:
-		return []byte{byte(typeCode<<4 | fieldCode)}
+		return []byte{tc<<4 | fc}
 	case typeCode < 16: // small type, large field
-		return []byte{byte(typeCode << 4), byte(fieldCode)}
+		return []byte{tc << 4, fc}
 	case fieldCode < 16: // large type, small field
-		return []byte{byte(fieldCode), byte(typeCode)}
+		return []byte{fc, tc}
 	default: // both large
-		return []byte{0x00, byte(typeCode), byte(fieldCode)}
+		return []byte{0x00, tc, fc}
 	}
 }
 
@@ -205,13 +206,13 @@ func xrpAccountID(id []byte) []byte {
 func xrpVarLength(n int) []byte {
 	switch {
 	case n <= 192:
-		return []byte{byte(n)}
+		return []byte{lowByte(n)}
 	case n <= 12480:
 		n -= 193
-		return []byte{byte(193 + (n >> 8)), byte(n & 0xff)}
+		return []byte{lowByte(193 + (n >> 8)), lowByte(n)}
 	default:
 		n -= 12481
-		return []byte{byte(241 + (n >> 16)), byte((n >> 8) & 0xff), byte(n & 0xff)}
+		return []byte{lowByte(241 + (n >> 16)), lowByte(n >> 8), lowByte(n)}
 	}
 }
 
