@@ -20,6 +20,7 @@ package hdwallet
 import (
 	"crypto/sha256"
 	"crypto/sha512"
+	"encoding/base64"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -154,4 +155,10 @@ func sha256Sum(b []byte) []byte {
 func sha512Sum(b []byte) []byte {
 	h := sha512.Sum512(b)
 	return h[:]
+}
+
+// base64Std returns the standard (padded) base64 of b, the form Cosmos reports
+// in its tx_bytes field.
+func base64Std(b []byte) string {
+	return base64.StdEncoding.EncodeToString(b)
 }

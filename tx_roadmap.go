@@ -8,13 +8,8 @@ package hdwallet
 
 import (
 	txbtc "github.com/ranjbar-dev/hd-wallet/txproto/bitcoin"
-	txcosmos "github.com/ranjbar-dev/hd-wallet/txproto/cosmos"
 	txsolana "github.com/ranjbar-dev/hd-wallet/txproto/solana"
 )
-
-func (w *HDWallet) signCosmosTx(_ Symbol, _ uint32, _ *txcosmos.SigningInput) (*txcosmos.SigningOutput, error) {
-	return nil, ErrTxRoadmap
-}
 
 func (w *HDWallet) signSolanaTx(_ Symbol, _ uint32, _ *txsolana.SigningInput) (*txsolana.SigningOutput, error) {
 	return nil, ErrTxRoadmap
