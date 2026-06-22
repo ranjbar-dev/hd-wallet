@@ -106,6 +106,42 @@ const (
 	GNO   Symbol = "GNO"
 	CELO  Symbol = "CELO"
 
+	// secp256k1 — additional EVM chains (Ethereum address format, EIP-55).
+	ETC      Symbol = "ETC"
+	RONIN    Symbol = "RONIN"
+	ZKSYNC   Symbol = "ZKSYNC"
+	LINEA    Symbol = "LINEA"
+	SCROLL   Symbol = "SCROLL"
+	MANTLE   Symbol = "MANTLE"
+	BLAST    Symbol = "BLAST"
+	KAIA     Symbol = "KAIA"
+	AURORA   Symbol = "AURORA"
+	GLMR     Symbol = "GLMR"
+	MOVR     Symbol = "MOVR"
+	BOBA     Symbol = "BOBA"
+	METIS    Symbol = "METIS"
+	OPBNB    Symbol = "OPBNB"
+	POLZKEVM Symbol = "POLZKEVM"
+	MANTA    Symbol = "MANTA"
+	RBTC     Symbol = "RBTC"
+	HECO     Symbol = "HECO"
+	OKT      Symbol = "OKT"
+	KCS      Symbol = "KCS"
+	WAN      Symbol = "WAN"
+	POA      Symbol = "POA"
+	CLO      Symbol = "CLO"
+	GO       Symbol = "GO"
+	TT       Symbol = "TT"
+	VET      Symbol = "VET"
+	IOTX     Symbol = "IOTX"
+	THETA    Symbol = "THETA"
+	NEON     Symbol = "NEON"
+	MERLIN   Symbol = "MERLIN"
+	LIGHT    Symbol = "LIGHT"
+	SONIC    Symbol = "SONIC"
+	ZENEON   Symbol = "ZENEON"
+	ZETAEVM  Symbol = "ZETAEVM"
+
 	// secp256k1 — Cosmos SDK chains.
 	ATOM Symbol = "ATOM"
 	OSMO Symbol = "OSMO"
@@ -167,6 +203,42 @@ var coins = map[Symbol]Coin{
 	"GNO":   {"Gnosis", "GNO", Secp256k1, "m/44'/60'/0'/0/0", encodeETH},
 	"CELO":  {"Celo", "CELO", Secp256k1, "m/44'/60'/0'/0/0", encodeETH},
 
+	// ---- secp256k1 : additional EVM chains (Ethereum address format) ----
+	"ETC":      {"Ethereum Classic", "ETC", Secp256k1, "m/44'/61'/0'/0/0", encodeETH},
+	"RONIN":    {"Ronin", "RONIN", Secp256k1, "m/44'/60'/0'/0/0", encodeRonin},
+	"ZKSYNC":   {"zkSync Era", "ZKSYNC", Secp256k1, "m/44'/60'/0'/0/0", encodeETH},
+	"LINEA":    {"Linea", "LINEA", Secp256k1, "m/44'/60'/0'/0/0", encodeETH},
+	"SCROLL":   {"Scroll", "SCROLL", Secp256k1, "m/44'/60'/0'/0/0", encodeETH},
+	"MANTLE":   {"Mantle", "MANTLE", Secp256k1, "m/44'/60'/0'/0/0", encodeETH},
+	"BLAST":    {"Blast", "BLAST", Secp256k1, "m/44'/60'/0'/0/0", encodeETH},
+	"KAIA":     {"Kaia", "KAIA", Secp256k1, "m/44'/60'/0'/0/0", encodeETH},
+	"AURORA":   {"Aurora", "AURORA", Secp256k1, "m/44'/60'/0'/0/0", encodeETH},
+	"GLMR":     {"Moonbeam", "GLMR", Secp256k1, "m/44'/60'/0'/0/0", encodeETH},
+	"MOVR":     {"Moonriver", "MOVR", Secp256k1, "m/44'/60'/0'/0/0", encodeETH},
+	"BOBA":     {"Boba", "BOBA", Secp256k1, "m/44'/60'/0'/0/0", encodeETH},
+	"METIS":    {"Metis", "METIS", Secp256k1, "m/44'/60'/0'/0/0", encodeETH},
+	"OPBNB":    {"opBNB", "OPBNB", Secp256k1, "m/44'/60'/0'/0/0", encodeETH},
+	"POLZKEVM": {"Polygon zkEVM", "POLZKEVM", Secp256k1, "m/44'/60'/0'/0/0", encodeETH},
+	"MANTA":    {"Manta Pacific", "MANTA", Secp256k1, "m/44'/60'/0'/0/0", encodeETH},
+	"RBTC":     {"Rootstock", "RBTC", Secp256k1, "m/44'/137'/0'/0/0", encodeETH},
+	"HECO":     {"Huobi ECO Chain", "HECO", Secp256k1, "m/44'/60'/0'/0/0", encodeETH},
+	"OKT":      {"OKX Chain", "OKT", Secp256k1, "m/44'/60'/0'/0/0", encodeETH},
+	"KCS":      {"KuCoin Community Chain", "KCS", Secp256k1, "m/44'/60'/0'/0/0", encodeETH},
+	"WAN":      {"Wanchain", "WAN", Secp256k1, "m/44'/5718350'/0'/0/0", encodeETH},
+	"POA":      {"POA Network", "POA", Secp256k1, "m/44'/178'/0'/0/0", encodeETH},
+	"CLO":      {"Callisto", "CLO", Secp256k1, "m/44'/820'/0'/0/0", encodeETH},
+	"GO":       {"GoChain", "GO", Secp256k1, "m/44'/6060'/0'/0/0", encodeETH},
+	"TT":       {"ThunderCore", "TT", Secp256k1, "m/44'/1001'/0'/0/0", encodeETH},
+	"VET":      {"VeChain", "VET", Secp256k1, "m/44'/818'/0'/0/0", encodeETH},
+	"IOTX":     {"IoTeX", "IOTX", Secp256k1, "m/44'/304'/0'/0/0", encodeETH},
+	"THETA":    {"Theta", "THETA", Secp256k1, "m/44'/500'/0'/0/0", encodeETH},
+	"NEON":     {"Neon", "NEON", Secp256k1, "m/44'/60'/0'/0/0", encodeETH},
+	"MERLIN":   {"Merlin", "MERLIN", Secp256k1, "m/44'/60'/0'/0/0", encodeETH},
+	"LIGHT":    {"Lightlink", "LIGHT", Secp256k1, "m/44'/60'/0'/0/0", encodeETH},
+	"SONIC":    {"Sonic", "SONIC", Secp256k1, "m/44'/60'/0'/0/0", encodeETH},
+	"ZENEON":   {"Horizen EON", "ZENEON", Secp256k1, "m/44'/60'/0'/0/0", encodeETH},
+	"ZETAEVM":  {"ZetaChain EVM", "ZETAEVM", Secp256k1, "m/44'/60'/0'/0/0", encodeETH},
+
 	// ---- secp256k1 : Cosmos SDK chains (bech32, same key, per-chain HRP) ----
 	"ATOM": {"Cosmos", "ATOM", Secp256k1, "m/44'/118'/0'/0/0", cosmosEncoder("cosmos")},
 	"OSMO": {"Osmosis", "OSMO", Secp256k1, "m/44'/118'/0'/0/0", cosmosEncoder("osmo")},
@@ -186,4 +258,23 @@ var coins = map[Symbol]Coin{
 
 	// ---- nist256p1 (SLIP-0010) ----
 	"NEO": {"NEO", "NEO", Nist256p1, "m/44'/888'/0'/0/0", encodeNEO},
+}
+
+// init registers address validators for the networks added beyond the original
+// base set, reusing the validator constructors defined in address_validate.go.
+// Keeping these registrations here (rather than in address_validate.go) lets new
+// chains ship as a single registry change while ValidateAddress/ParseAddress and
+// the AddressFromPublicKey round-trip test stay correct for every coin.
+func init() {
+	// EVM chains validate exactly like Ethereum (0x + EIP-55).
+	for _, s := range []Symbol{
+		ETC, ZKSYNC, LINEA, SCROLL, MANTLE, BLAST, KAIA, AURORA, GLMR, MOVR,
+		BOBA, METIS, OPBNB, POLZKEVM, MANTA, RBTC, HECO, OKT, KCS, WAN,
+		POA, CLO, GO, TT, VET, IOTX, THETA, NEON, MERLIN, LIGHT,
+		SONIC, ZENEON, ZETAEVM,
+	} {
+		validators[s] = ethValidator(s)
+	}
+	// Ronin is an Ethereum address with a "ronin:" prefix instead of "0x".
+	validators[RONIN] = roninValidator(RONIN)
 }

@@ -47,6 +47,28 @@ func encodeETH(pub []byte) (string, error) {
 	return eip55(raw), nil
 }
 
+// encodeRonin produces a Ronin address: the EIP-55 Ethereum address with the
+// "0x" prefix replaced by "ronin:" (lower-case prefix, mixed-case body).
+func encodeRonin(pub []byte) (string, error) {
+	addr, err := encodeETH(pub)
+	if err != nil {
+		return "", err
+	}
+	return "ronin:" + strings.TrimPrefix(addr, "0x"), nil
+}
+
+// roninValidator validates a Ronin address by stripping the "ronin:" prefix,
+// restoring the "0x" form, and delegating to the Ethereum validator.
+func roninValidator(symbol Symbol) addressValidator {
+	eth := ethValidator(symbol)
+	return func(addr string) ([]byte, error) {
+		if !strings.HasPrefix(addr, "ronin:") {
+			return nil, addrErr(symbol, "must start with ronin:")
+		}
+		return eth("0x" + strings.TrimPrefix(addr, "ronin:"))
+	}
+}
+
 func eip55(addr []byte) string {
 	hexAddr := hex.EncodeToString(addr)
 	hash := keccak256([]byte(hexAddr))

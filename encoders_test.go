@@ -31,8 +31,10 @@ var trustWalletVectors = map[string]string{
 	"ETH":  "0x9d8A62f656a8d1615C1294fd71e9CFb3E4855A4F",
 	"TRX":  "TQLCsShbQNXMTVCjprY64qZmEA4rBarpQp",
 	"XRP":  "rJHMeqKu8Ep7Fazx8MQG6JunaafBXz93YQ",
-	"ATOM": "cosmos1hkfq3zahaqkkzx5mjnamwjsfpq2jk7z0emlrvp",
-	"OSMO": "osmo1hkfq3zahaqkkzx5mjnamwjsfpq2jk7z03qvn6n",
+	// secp256k1 EVM — Ronin uses the "ronin:" prefix instead of "0x".
+	"RONIN": "ronin:9d8A62f656a8d1615C1294fd71e9CFb3E4855A4F",
+	"ATOM":  "cosmos1hkfq3zahaqkkzx5mjnamwjsfpq2jk7z0emlrvp",
+	"OSMO":  "osmo1hkfq3zahaqkkzx5mjnamwjsfpq2jk7z03qvn6n",
 	// ed25519
 	"SOL":   "H4JcMPicKkHcxxDjkyyrLoQj7Kcibd9t815ak4UvTr9M",
 	"XLM":   "GDXJHJHWN6GRNOAZXON6XH74ZX6NYFAS5B7642RSJQVJTIPA4ZYUQLEB",
@@ -75,7 +77,13 @@ func TestEncodersAgainstTrustWalletVectors(t *testing.T) {
 func TestEVMChainsMatchEthereum(t *testing.T) {
 	priv := dummyKey()
 	const wantETH = "0x9d8A62f656a8d1615C1294fd71e9CFb3E4855A4F"
-	for _, symbol := range []Symbol{BNB, MATIC, AVAX, ARB, OP, FTM, BASE, CRO, GNO, CELO} {
+	for _, symbol := range []Symbol{
+		BNB, MATIC, AVAX, ARB, OP, FTM, BASE, CRO, GNO, CELO,
+		ETC, ZKSYNC, LINEA, SCROLL, MANTLE, BLAST, KAIA, AURORA, GLMR, MOVR,
+		BOBA, METIS, OPBNB, POLZKEVM, MANTA, RBTC, HECO, OKT, KCS, WAN,
+		POA, CLO, GO, TT, VET, IOTX, THETA, NEON, MERLIN, LIGHT,
+		SONIC, ZENEON, ZETAEVM,
+	} {
 		coin := coins[symbol]
 		pub, err := publicKeyFromPriv(coin.Curve, priv)
 		if err != nil {
