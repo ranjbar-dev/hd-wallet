@@ -1,0 +1,44 @@
+syntax = "proto3";
+
+package hdwallet.cosmos.proto;
+
+option go_package = "github.com/ranjbar-dev/hd-wallet/txproto/cosmos";
+
+// A bank MsgSend.
+message SendCoinsMessage {
+  string from_address = 1;
+  string to_address = 2;
+  // Single denom/amount pair (the common case).
+  string amount = 3;
+  string denom = 4;
+}
+
+// Fee for the transaction.
+message Fee {
+  string amount = 1; // single coin amount
+  string denom = 2;  // single coin denom
+  uint64 gas = 3;
+}
+
+// SigningInput mirrors a minimal subset of TW.Cosmos.Proto.SigningInput for
+// DIRECT (protobuf) sign mode with a single bank MsgSend.
+message SigningInput {
+  uint64 account_number = 1;
+  string chain_id = 2;
+  uint64 sequence = 3;
+  string memo = 4;
+  Fee fee = 5;
+  SendCoinsMessage send = 6;
+}
+
+// SigningOutput mirrors a minimal subset of TW.Cosmos.Proto.SigningOutput.
+message SigningOutput {
+  // Protobuf-serialized TxRaw bytes.
+  bytes encoded = 1;
+  // base64 of `encoded`, as TWC reports it in `serialized` tx_bytes.
+  string tx_bytes = 2;
+  // 64-byte signature (R||S).
+  bytes signature = 3;
+  // Error message, empty on success.
+  string error = 4;
+}

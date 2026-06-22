@@ -1,0 +1,78 @@
+syntax = "proto3";
+
+package hdwallet.ethereum.proto;
+
+option go_package = "github.com/ranjbar-dev/hd-wallet/txproto/ethereum";
+
+// Transaction type / payload. Mirrors a minimal subset of Trust Wallet Core's
+// TW.Ethereum.Proto.Transaction.
+message Transaction {
+  // Native coin transfer.
+  message Transfer {
+    // Amount to send, big-endian uint256 bytes.
+    bytes amount = 1;
+    // Optional contract-call payload appended after the value transfer.
+    bytes data = 2;
+  }
+
+  // ERC-20 token transfer.
+  message ERC20Transfer {
+    // Recipient address ("0x"-prefixed hex).
+    string to = 1;
+    // Token amount, big-endian uint256 bytes.
+    bytes amount = 2;
+  }
+
+  oneof transaction_oneof {
+    Transfer transfer = 1;
+    ERC20Transfer erc20_transfer = 2;
+  }
+}
+
+// SigningInput mirrors a minimal subset of TW.Ethereum.Proto.SigningInput.
+message SigningInput {
+  // Chain id, big-endian bytes (EIP-155).
+  bytes chain_id = 1;
+
+  // Sender nonce, big-endian bytes.
+  bytes nonce = 2;
+
+  // Transaction type: 0 = legacy, 2 = EIP-1559 (type-2).
+  uint32 tx_mode = 3;
+
+  // Legacy gas price, big-endian bytes (tx_mode == 0).
+  bytes gas_price = 4;
+
+  // Gas limit, big-endian bytes.
+  bytes gas_limit = 5;
+
+  // EIP-1559 max inclusion (priority) fee per gas, big-endian bytes.
+  bytes max_inclusion_fee_per_gas = 6;
+
+  // EIP-1559 max fee per gas, big-endian bytes.
+  bytes max_fee_per_gas = 7;
+
+  // Destination: recipient address for native transfer, or token contract
+  // address for ERC-20 transfer ("0x"-prefixed hex).
+  string to_address = 8;
+
+  // What to do.
+  Transaction transaction = 9;
+}
+
+// SigningOutput mirrors a minimal subset of TW.Ethereum.Proto.SigningOutput.
+message SigningOutput {
+  // RLP-encoded signed transaction, ready to broadcast.
+  bytes encoded = 1;
+
+  // Signature scalars and recovery value.
+  bytes r = 2;
+  bytes s = 3;
+  bytes v = 4;
+
+  // Hex of `encoded` (no "0x" prefix), for convenience.
+  string encoded_hex = 5;
+
+  // Error message, empty on success.
+  string error = 6;
+}

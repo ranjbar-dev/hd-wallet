@@ -14,6 +14,7 @@ require (
 	github.com/consensys/gnark-crypto v0.16.0
 	github.com/tyler-smith/go-bip39 v1.1.0
 	golang.org/x/crypto v0.48.0
+	google.golang.org/protobuf v1.36.11
 )
 
 require (

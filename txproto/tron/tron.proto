@@ -1,0 +1,49 @@
+syntax = "proto3";
+
+package hdwallet.tron.proto;
+
+option go_package = "github.com/ranjbar-dev/hd-wallet/txproto/tron";
+
+// TRX transfer (TransferContract).
+message TransferContract {
+  string owner_address = 1; // base58check (T...)
+  string to_address = 2;    // base58check (T...)
+  int64 amount = 3;         // in SUN
+}
+
+// Block header reference values, used to compute ref_block_bytes / ref_block_hash.
+message BlockHeader {
+  int64 timestamp = 1;
+  bytes tx_trie_root = 2;
+  bytes parent_hash = 3;
+  int64 number = 4;
+  bytes witness_address = 5;
+  int32 version = 6;
+}
+
+// Transaction payload selector.
+message Transaction {
+  int64 timestamp = 1;
+  int64 expiration = 2;
+  BlockHeader block_header = 3;
+  int64 fee_limit = 4;
+
+  oneof contract_oneof {
+    TransferContract transfer = 5;
+  }
+}
+
+// SigningInput mirrors a minimal subset of TW.Tron.Proto.SigningInput.
+message SigningInput {
+  Transaction transaction = 1;
+}
+
+// SigningOutput mirrors a minimal subset of TW.Tron.Proto.SigningOutput.
+message SigningOutput {
+  bytes id = 1;         // txID = sha256(raw_data)
+  bytes signature = 2;  // 65-byte recoverable signature
+  bytes raw_data = 3;   // protobuf-serialized raw transaction
+  string ref_block_bytes = 4;
+  string json = 5;      // convenience JSON
+  string error = 6;
+}
