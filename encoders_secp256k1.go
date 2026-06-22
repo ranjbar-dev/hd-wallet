@@ -133,6 +133,43 @@ func encodeTRX(pub []byte) (string, error) {
 	return base58.CheckEncode(raw, 0x41), nil
 }
 
+// ---------- EOS / FIO / WAX: prefix || base58(pubkey || ripemd160(pubkey)[:4]) ----------
+
+// eosEncoder builds a legacy EOS-family public-key string: a fixed prefix
+// (EOS/FIO/PUB_K1 etc.) followed by base58 of the 33-byte compressed public key
+// concatenated with the first 4 bytes of its RIPEMD-160 digest (the checksum).
+func eosEncoder(prefix string) func([]byte) (string, error) {
+	return func(pub []byte) (string, error) {
+		body := make([]byte, 0, len(pub)+4)
+		body = append(body, pub...)
+		body = append(body, ripemd160Sum(pub)[:4]...)
+		return prefix + base58Encode(base58BTC, body), nil
+	}
+}
+
+// eosValidator validates an EOS-family public-key string: the given prefix
+// followed by base58(pubkey || ripemd160(pubkey)[:4]). Returns the 33-byte
+// compressed public key.
+func eosValidator(prefix string, symbol Symbol) addressValidator {
+	return func(addr string) ([]byte, error) {
+		if len(addr) <= len(prefix) || addr[:len(prefix)] != prefix {
+			return nil, addrErr(symbol, "wrong prefix")
+		}
+		raw, err := base58Decode(base58BTC, addr[len(prefix):])
+		if err != nil {
+			return nil, addrErr(symbol, err.Error())
+		}
+		if len(raw) != 33+4 {
+			return nil, addrErr(symbol, "wrong length")
+		}
+		pub := raw[:33]
+		if !bytesEqual(raw[33:], ripemd160Sum(pub)[:4]) {
+			return nil, addrErr(symbol, "bad checksum")
+		}
+		return pub, nil
+	}
+}
+
 // ---------- XRP Ledger: hash160 account ID, base58check (XRP alphabet) ----------
 
 func encodeXRP(pub []byte) (string, error) {

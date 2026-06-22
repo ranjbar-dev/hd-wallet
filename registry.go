@@ -114,6 +114,11 @@ const (
 	TRX Symbol = "TRX"
 	XRP Symbol = "XRP"
 
+	// secp256k1 — EOS-family public-key strings.
+	EOS Symbol = "EOS"
+	WAX Symbol = "WAX"
+	FIO Symbol = "FIO"
+
 	// secp256k1 — EVM chains (same key & address format as Ethereum).
 	BNB   Symbol = "BNB"
 	MATIC Symbol = "MATIC"
@@ -281,6 +286,11 @@ var coins = map[Symbol]Coin{
 	"TRX": {"Tron", "TRX", Secp256k1, "m/44'/195'/0'/0/0", encodeTRX},
 	"XRP": {"XRP Ledger", "XRP", Secp256k1, "m/44'/144'/0'/0/0", encodeXRP},
 
+	// ---- secp256k1 : EOS-family public-key strings ----
+	"EOS": {"EOS", "EOS", Secp256k1, "m/44'/194'/0'/0/0", eosEncoder("EOS")},
+	"WAX": {"WAX", "WAX", Secp256k1, "m/44'/194'/0'/0/0", eosEncoder("EOS")},
+	"FIO": {"FIO", "FIO", Secp256k1, "m/44'/235'/0'/0/0", eosEncoder("FIO")},
+
 	// ---- secp256k1 : EVM chains (same key & address format as Ethereum) ----
 	"BNB":   {"BNB Smart Chain", "BNB", Secp256k1, "m/44'/60'/0'/0/0", encodeETH},
 	"MATIC": {"Polygon", "MATIC", Secp256k1, "m/44'/60'/0'/0/0", encodeETH},
@@ -415,6 +425,11 @@ func init() {
 	}
 	// Ronin is an Ethereum address with a "ronin:" prefix instead of "0x".
 	validators[RONIN] = roninValidator(RONIN)
+
+	// EOS-family public-key strings.
+	validators[EOS] = eosValidator("EOS", EOS)
+	validators[WAX] = eosValidator("EOS", WAX)
+	validators[FIO] = eosValidator("FIO", FIO)
 
 	// Additional native-SegWit UTXO chains (witness program is hash160).
 	validators[GRS] = segwitValidator("grs", GRS)

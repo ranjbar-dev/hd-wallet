@@ -41,6 +41,10 @@ var validAddrVectors = map[Symbol]string{
 	ETH: "0x9d8A62f656a8d1615C1294fd71e9CFb3E4855A4F",
 	TRX: "TQLCsShbQNXMTVCjprY64qZmEA4rBarpQp",
 	XRP: "rJHMeqKu8Ep7Fazx8MQG6JunaafBXz93YQ",
+	// secp256k1 — EOS-family public-key strings
+	EOS: "EOS5TrYnZP1RkDSUMzBY4GanCy6AP68kCMdkAb5EACkAwkdgRLShz",
+	WAX: "EOS5TrYnZP1RkDSUMzBY4GanCy6AP68kCMdkAb5EACkAwkdgRLShz",
+	FIO: "FIO5TrYnZP1RkDSUMzBY4GanCy6AP68kCMdkAb5EACkAwkdgRLShz",
 	// secp256k1 — EVM (share the Ethereum vector)
 	BNB:   "0x9d8A62f656a8d1615C1294fd71e9CFb3E4855A4F",
 	MATIC: "0x9d8A62f656a8d1615C1294fd71e9CFb3E4855A4F",
@@ -437,14 +441,19 @@ func TestParsePayloadLengths(t *testing.T) {
 		// additional 32-byte-payload chains
 		IOST: true, KIN: true, EGLD: true, HBAR: true, AE: true, XNO: true,
 	}
+	// EOS-family validators return the 33-byte compressed public key.
+	want33 := map[Symbol]bool{EOS: true, WAX: true, FIO: true}
 	for sym, addr := range validAddrVectors {
 		payload, err := ParseAddress(sym, addr)
 		if err != nil {
 			t.Fatalf("ParseAddress(%s): %v", sym, err)
 		}
 		exp := 20
-		if want32[sym] {
+		switch {
+		case want32[sym]:
 			exp = 32
+		case want33[sym]:
+			exp = 33
 		}
 		if len(payload) != exp {
 			t.Errorf("%s payload length %d, want %d", sym, len(payload), exp)

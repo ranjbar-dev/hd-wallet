@@ -21,6 +21,14 @@ func hash160(b []byte) []byte {
 	return r.Sum(nil)
 }
 
+// ripemd160Sum is a plain RIPEMD-160 (no SHA-256 pre-hash), used for the EOS /
+// FIO / WAX public-key string checksum (base58 of pubkey || ripemd160(pubkey)[:4]).
+func ripemd160Sum(b []byte) []byte {
+	r := ripemd160.New() // #nosec G406 -- RIPEMD-160 required for EOS-family key checksum
+	r.Write(b)
+	return r.Sum(nil)
+}
+
 // keccak256 is original Keccak (NOT finalized SHA-3) as used by Ethereum/Tron.
 func keccak256(b []byte) []byte {
 	h := sha3.NewLegacyKeccak256()
