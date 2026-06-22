@@ -11,12 +11,7 @@ import (
 	txcosmos "github.com/ranjbar-dev/hd-wallet/txproto/cosmos"
 	txripple "github.com/ranjbar-dev/hd-wallet/txproto/ripple"
 	txsolana "github.com/ranjbar-dev/hd-wallet/txproto/solana"
-	txtron "github.com/ranjbar-dev/hd-wallet/txproto/tron"
 )
-
-func (w *HDWallet) signTronTx(_ Symbol, _ uint32, _ *txtron.SigningInput) (*txtron.SigningOutput, error) {
-	return nil, ErrTxRoadmap
-}
 
 func (w *HDWallet) signRippleTx(_ Symbol, _ uint32, _ *txripple.SigningInput) (*txripple.SigningOutput, error) {
 	return nil, ErrTxRoadmap

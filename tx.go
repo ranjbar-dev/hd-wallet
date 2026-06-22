@@ -18,6 +18,7 @@ package hdwallet
 // shipped, because a wrong signature loses funds.
 
 import (
+	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -138,4 +139,11 @@ func (w *HDWallet) SignTransaction(symbol Symbol, index uint32, input proto.Mess
 // by the SigningOutput *_hex convenience fields.
 func bytesToHex(b []byte) string {
 	return hex.EncodeToString(b)
+}
+
+// sha256Sum returns the single SHA-256 digest of b. Tron uses it for the txID and
+// block-reference hashes; Cosmos uses it for the SignDoc digest.
+func sha256Sum(b []byte) []byte {
+	h := sha256.Sum256(b)
+	return h[:]
 }
