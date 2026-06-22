@@ -354,7 +354,7 @@ func cashAddrValidator(prefix string, symbol Symbol) addressValidator {
 			if pos < 0 {
 				return nil, addrErr(symbol, fmt.Sprintf("invalid character %q", body[i]))
 			}
-			values = append(values, byte(pos))
+			values = append(values, byte(pos)) // #nosec G115 -- pos is an index into a 32-char charset (0..31)
 		}
 		if len(values) < 8 {
 			return nil, addrErr(symbol, "too short")

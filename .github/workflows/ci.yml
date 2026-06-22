@@ -49,7 +49,9 @@ jobs:
       - name: gosec
         uses: securego/gosec@master
         with:
-          args: ./...
+          # Skip protoc-generated files in txproto/ (their unsafe.Pointer use is
+          # an artifact of protobuf-go codegen, not hand-written code).
+          args: -exclude-generated ./...
 
   lint:
     name: Lint

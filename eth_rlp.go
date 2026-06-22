@@ -69,11 +69,11 @@ func encodeBytes(b []byte) []byte {
 // big-endian length of the length.
 func encodeLength(length int, offset byte) []byte {
 	if length < 56 {
-		return []byte{offset + byte(length)}
+		return []byte{offset + byte(length)} // #nosec G115 -- length < 56, so byte(length) <= 55
 	}
 	lenBytes := bigEndianBytes(uint64(length))
 	out := make([]byte, 0, 1+len(lenBytes))
-	out = append(out, offset+55+byte(len(lenBytes)))
+	out = append(out, offset+55+byte(len(lenBytes))) // #nosec G115 -- len(lenBytes) <= 8 (uint64); offset+55+8 = 0xff max
 	out = append(out, lenBytes...)
 	return out
 }
