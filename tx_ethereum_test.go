@@ -139,6 +139,102 @@ func TestSignTxEthereumEIP1559NativeWithData(t *testing.T) {
 	assertEthSigned(t, w, in, want)
 }
 
+// accessListFixture is the single EIP-2930 access tuple shared by the
+// access-list vectors below: address 0x..01 with storage keys 0x..00 and 0x..07.
+func accessListFixture() []*txeth.Access {
+	return []*txeth.Access{{
+		Address: "0x0000000000000000000000000000000000000001",
+		StoredKeys: [][]byte{
+			make([]byte, 32),
+			append(make([]byte, 31), 0x07),
+		},
+	}}
+}
+
+// EIP-2930 (type-1) access-list native transfer. Vector generated from the
+// reference EVM implementation (go-ethereum types.SignTx + NewLondonSigner) with
+// the canonical 0x4646…46 key — the same byte-for-byte oracle role TWC plays for
+// the other vectors. A wrong access-list RLP, envelope byte or v would change it.
+func TestSignTxEthereumEIP2930AccessList(t *testing.T) {
+	w := ethWallet(t, "0x4646464646464646464646464646464646464646464646464646464646464646")
+	defer w.Destroy()
+
+	in := &txeth.SigningInput{
+		ChainId:   mustHexTx(t, "01"),
+		Nonce:     mustHexTx(t, "09"),
+		TxMode:    1,
+		GasPrice:  mustHexTx(t, "04a817c800"),
+		GasLimit:  mustHexTx(t, "5208"),
+		ToAddress: "0x3535353535353535353535353535353535353535",
+		Transaction: &txeth.Transaction{
+			TransactionOneof: &txeth.Transaction_Transfer_{
+				Transfer: &txeth.Transaction_Transfer{
+					Amount: mustHexTx(t, "0de0b6b3a7640000"),
+				},
+			},
+		},
+		AccessList: accessListFixture(),
+	}
+	const want = "01f8ca01098504a817c800825208943535353535353535353535353535353535353535880de0b6b3a764000080f85bf859940000000000000000000000000000000000000001f842a00000000000000000000000000000000000000000000000000000000000000000a0000000000000000000000000000000000000000000000000000000000000000701a0f58c03fa733a8858a5bb0a200f806b3330413d0e23c63085b7c31edf71b7c2b1a02c374fbb0e16af843dd6cbfb43c79d5edae27198f9e47395ec0cbed9de31c2d8"
+	assertEthSigned(t, w, in, want)
+}
+
+// EIP-1559 (type-2) transfer WITH a non-empty access list. Same go-ethereum
+// oracle and key. Confirms the access list is serialized identically in the
+// type-2 payload and signed bytes.
+func TestSignTxEthereumEIP1559AccessList(t *testing.T) {
+	w := ethWallet(t, "0x4646464646464646464646464646464646464646464646464646464646464646")
+	defer w.Destroy()
+
+	in := &txeth.SigningInput{
+		ChainId:               mustHexTx(t, "01"),
+		Nonce:                 mustHexTx(t, "00"),
+		TxMode:                2,
+		GasLimit:              mustHexTx(t, "0130B9"),
+		MaxInclusionFeePerGas: mustHexTx(t, "77359400"),
+		MaxFeePerGas:          mustHexTx(t, "B2D05E00"),
+		ToAddress:             "0x6b175474e89094c44da98b954eedeac495271d0f",
+		Transaction: &txeth.Transaction{
+			TransactionOneof: &txeth.Transaction_Transfer_{
+				Transfer: &txeth.Transaction_Transfer{
+					Amount: nil, // 0
+				},
+			},
+		},
+		AccessList: accessListFixture(),
+	}
+	const want = "02f8c70180847735940084b2d05e00830130b9946b175474e89094c44da98b954eedeac495271d0f8080f85bf859940000000000000000000000000000000000000001f842a00000000000000000000000000000000000000000000000000000000000000000a0000000000000000000000000000000000000000000000000000000000000000780a0486b96125b97b2584a07d47f3e640d41c764757ade8a0ee38e6dd05bef32384ba05825a0ee2dcd37a75435169ef1d493a2c91f2b0ead092cba36ca0d87ce579fd8"
+	assertEthSigned(t, w, in, want)
+}
+
+// An empty/absent access list must reproduce the existing no-access-list type-2
+// vector byte-for-byte (the access-list refactor must not alter prior output).
+func TestSignTxEthereumEIP1559EmptyAccessListUnchanged(t *testing.T) {
+	w := ethWallet(t, "0x608dcb1742bb3fb7aec002074e3420e4fab7d00cced79ccdac53ed5b27138151")
+	defer w.Destroy()
+
+	in := &txeth.SigningInput{
+		ChainId:               mustHexTx(t, "01"),
+		Nonce:                 mustHexTx(t, "00"),
+		TxMode:                2,
+		GasLimit:              mustHexTx(t, "0130B9"),
+		MaxInclusionFeePerGas: mustHexTx(t, "77359400"),
+		MaxFeePerGas:          mustHexTx(t, "B2D05E00"),
+		ToAddress:             "0x6b175474e89094c44da98b954eedeac495271d0f",
+		Transaction: &txeth.Transaction{
+			TransactionOneof: &txeth.Transaction_Erc20Transfer{
+				Erc20Transfer: &txeth.Transaction_ERC20Transfer{
+					To:     "0x5322b34c88ed0691971bf52a7047448f0f4efc84",
+					Amount: mustHexTx(t, "1bc16d674ec80000"),
+				},
+			},
+		},
+		AccessList: nil, // empty
+	}
+	const want = "02f8b00180847735940084b2d05e00830130b9946b175474e89094c44da98b954eedeac495271d0f80b844a9059cbb0000000000000000000000005322b34c88ed0691971bf52a7047448f0f4efc840000000000000000000000000000000000000000000000001bc16d674ec80000c080a0adfcfdf98d4ed35a8967a0c1d78b42adb7c5d831cf5a3272654ec8f8bcd7be2ea011641e065684f6aa476f4fd250aa46cd0b44eccdb0a6e1650d658d1998684cdf"
+	assertEthSigned(t, w, in, want)
+}
+
 // assertEthSigned signs in for ETH and asserts the encoded hex equals want.
 func assertEthSigned(t *testing.T, w *HDWallet, in *txeth.SigningInput, want string) {
 	t.Helper()

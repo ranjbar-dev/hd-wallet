@@ -130,7 +130,7 @@ func TestSignTransactionInputValidation(t *testing.T) {
 			}},
 		}},
 		{"eth unsupported tx_mode", ETH, &txeth.SigningInput{
-			TxMode:    1,
+			TxMode:    3, // 0 legacy, 1 eip-2930, 2 eip-1559 are valid; 3 is not
 			ToAddress: "0x3535353535353535353535353535353535353535",
 			Transaction: &txeth.Transaction{TransactionOneof: &txeth.Transaction_Transfer_{
 				Transfer: &txeth.Transaction_Transfer{Amount: mustHexTx(t, "01")},
