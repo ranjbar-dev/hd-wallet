@@ -13,6 +13,32 @@ message SendCoinsMessage {
   string denom = 4;
 }
 
+// A staking MsgDelegate / MsgUndelegate (identical wire shape; the type_url
+// differs by which Message oneof field carries it).
+message MsgDelegate {
+  string delegator_address = 1;
+  string validator_address = 2;
+  string amount = 3;
+  string denom = 4;
+}
+
+// A distribution MsgWithdrawDelegatorReward.
+message MsgWithdrawReward {
+  string delegator_address = 1;
+  string validator_address = 2;
+}
+
+// One message in the transaction body. Multiple messages may be sent in one tx
+// via SigningInput.messages.
+message Message {
+  oneof message_oneof {
+    SendCoinsMessage send = 1;
+    MsgDelegate delegate = 2;
+    MsgDelegate undelegate = 3;
+    MsgWithdrawReward withdraw_reward = 4;
+  }
+}
+
 // Fee for the transaction.
 message Fee {
   string amount = 1; // single coin amount
@@ -28,7 +54,11 @@ message SigningInput {
   uint64 sequence = 3;
   string memo = 4;
   Fee fee = 5;
+  // Legacy single bank send (kept for back-compat). Prefer `messages`.
   SendCoinsMessage send = 6;
+  // One or more messages (bank send, staking delegate/undelegate, reward
+  // withdrawal). When non-empty this takes precedence over `send`.
+  repeated Message messages = 7;
 }
 
 // SigningOutput mirrors a minimal subset of TW.Cosmos.Proto.SigningOutput.

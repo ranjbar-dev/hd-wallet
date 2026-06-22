@@ -32,20 +32,25 @@ import (
 // signature) against TWC's Cosmos AnySigner direct-mode vector (tx_cosmos_test.go).
 
 const (
-	cosmosMsgSendTypeURL = "/cosmos.bank.v1beta1.MsgSend"
-	cosmosPubKeyTypeURL  = "/cosmos.crypto.secp256k1.PubKey"
-	cosmosSignModeDirect = 1 // SIGN_MODE_DIRECT
+	cosmosMsgSendTypeURL           = "/cosmos.bank.v1beta1.MsgSend"
+	cosmosMsgDelegateTypeURL       = "/cosmos.staking.v1beta1.MsgDelegate"
+	cosmosMsgUndelegateTypeURL     = "/cosmos.staking.v1beta1.MsgUndelegate"
+	cosmosMsgWithdrawRewardTypeURL = "/cosmos.distribution.v1beta1.MsgWithdrawDelegatorReward"
+	cosmosPubKeyTypeURL            = "/cosmos.crypto.secp256k1.PubKey"
+	cosmosSignModeDirect           = 1 // SIGN_MODE_DIRECT
 )
 
-// signCosmosTx builds, signs and serializes a Cosmos direct-mode bank send.
+// signCosmosTx builds, signs and serializes a Cosmos direct-mode transaction
+// (one or more bank/staking/distribution messages).
 func (w *HDWallet) signCosmosTx(symbol Symbol, index uint32, in *txcosmos.SigningInput) (*txcosmos.SigningOutput, error) {
-	send := in.GetSend()
-	if send == nil {
-		return nil, fmt.Errorf("%w: cosmos: only a single bank MsgSend is supported", ErrTxInput)
-	}
 	fee := in.GetFee()
 	if fee == nil {
 		return nil, fmt.Errorf("%w: cosmos: missing fee", ErrTxInput)
+	}
+
+	anyMsgs, err := cosmosMessageAnys(in)
+	if err != nil {
+		return nil, err
 	}
 
 	pub, err := w.PublicKeyIndex(symbol, index)
@@ -56,7 +61,7 @@ func (w *HDWallet) signCosmosTx(symbol Symbol, index uint32, in *txcosmos.Signin
 		return nil, fmt.Errorf("%w: cosmos: expected 33-byte compressed key", ErrTxInput)
 	}
 
-	bodyBytes := cosmosTxBody(send, in.GetMemo())
+	bodyBytes := cosmosTxBody(anyMsgs, in.GetMemo())
 	authInfoBytes := cosmosAuthInfo(fee, pub, in.GetSequence())
 
 	// SignDoc { body_bytes, auth_info_bytes, chain_id, account_number }.
@@ -85,23 +90,83 @@ func (w *HDWallet) signCosmosTx(symbol Symbol, index uint32, in *txcosmos.Signin
 	}, nil
 }
 
-// cosmosTxBody serializes TxBody { 1: messages[Any(MsgSend)], 2: memo }.
-func cosmosTxBody(send *txcosmos.SendCoinsMessage, memo string) []byte {
-	coin := cosmosCoin(send.GetDenom(), send.GetAmount())
-
-	var msgSend []byte
-	msgSend = appendStringField(msgSend, 1, send.GetFromAddress())
-	msgSend = appendStringField(msgSend, 2, send.GetToAddress())
-	msgSend = appendBytesField(msgSend, 3, coin)
-
-	anyMsg := cosmosAny(cosmosMsgSendTypeURL, msgSend)
-
+// cosmosTxBody serializes TxBody { 1: messages (repeated Any), 2: memo }.
+func cosmosTxBody(anyMsgs [][]byte, memo string) []byte {
 	var body []byte
-	body = appendBytesField(body, 1, anyMsg)
+	for _, a := range anyMsgs {
+		body = appendBytesField(body, 1, a)
+	}
 	if memo != "" {
 		body = appendStringField(body, 2, memo)
 	}
 	return body
+}
+
+// cosmosMessageAnys resolves the SigningInput's message set to a list of
+// serialized google.protobuf.Any messages. The repeated `messages` field takes
+// precedence; otherwise the legacy single `send` field is used (back-compat).
+func cosmosMessageAnys(in *txcosmos.SigningInput) ([][]byte, error) {
+	if msgs := in.GetMessages(); len(msgs) > 0 {
+		out := make([][]byte, 0, len(msgs))
+		for _, m := range msgs {
+			anyMsg, err := cosmosMessageAny(m)
+			if err != nil {
+				return nil, err
+			}
+			out = append(out, anyMsg)
+		}
+		return out, nil
+	}
+	if send := in.GetSend(); send != nil {
+		return [][]byte{cosmosAny(cosmosMsgSendTypeURL, cosmosSendBody(send))}, nil
+	}
+	return nil, fmt.Errorf("%w: cosmos: no message (set send or messages)", ErrTxInput)
+}
+
+// cosmosMessageAny serializes one Message oneof to its google.protobuf.Any.
+func cosmosMessageAny(m *txcosmos.Message) ([]byte, error) {
+	switch {
+	case m.GetSend() != nil:
+		return cosmosAny(cosmosMsgSendTypeURL, cosmosSendBody(m.GetSend())), nil
+	case m.GetDelegate() != nil:
+		return cosmosAny(cosmosMsgDelegateTypeURL, cosmosDelegateBody(m.GetDelegate())), nil
+	case m.GetUndelegate() != nil:
+		return cosmosAny(cosmosMsgUndelegateTypeURL, cosmosDelegateBody(m.GetUndelegate())), nil
+	case m.GetWithdrawReward() != nil:
+		return cosmosAny(cosmosMsgWithdrawRewardTypeURL, cosmosWithdrawRewardBody(m.GetWithdrawReward())), nil
+	default:
+		return nil, fmt.Errorf("%w: cosmos: empty message", ErrTxInput)
+	}
+}
+
+// cosmosSendBody serializes MsgSend { 1: from, 2: to, 3: amount(Coin) }.
+func cosmosSendBody(send *txcosmos.SendCoinsMessage) []byte {
+	coin := cosmosCoin(send.GetDenom(), send.GetAmount())
+	var msg []byte
+	msg = appendStringField(msg, 1, send.GetFromAddress())
+	msg = appendStringField(msg, 2, send.GetToAddress())
+	msg = appendBytesField(msg, 3, coin)
+	return msg
+}
+
+// cosmosDelegateBody serializes MsgDelegate/MsgUndelegate
+// { 1: delegator, 2: validator, 3: amount(Coin) }.
+func cosmosDelegateBody(d *txcosmos.MsgDelegate) []byte {
+	coin := cosmosCoin(d.GetDenom(), d.GetAmount())
+	var msg []byte
+	msg = appendStringField(msg, 1, d.GetDelegatorAddress())
+	msg = appendStringField(msg, 2, d.GetValidatorAddress())
+	msg = appendBytesField(msg, 3, coin)
+	return msg
+}
+
+// cosmosWithdrawRewardBody serializes MsgWithdrawDelegatorReward
+// { 1: delegator, 2: validator }.
+func cosmosWithdrawRewardBody(r *txcosmos.MsgWithdrawReward) []byte {
+	var msg []byte
+	msg = appendStringField(msg, 1, r.GetDelegatorAddress())
+	msg = appendStringField(msg, 2, r.GetValidatorAddress())
+	return msg
 }
 
 // cosmosAuthInfo serializes AuthInfo { 1: signer_infos[SignerInfo], 2: Fee }.

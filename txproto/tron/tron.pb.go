@@ -82,6 +82,76 @@ func (x *TransferContract) GetAmount() int64 {
 	return 0
 }
 
+// TRC-20 token transfer, built as a TriggerSmartContract calling the token's
+// transfer(address,uint256). Addresses are base58check (T...).
+type TransferTRC20Contract struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	OwnerAddress    string                 `protobuf:"bytes,1,opt,name=owner_address,json=ownerAddress,proto3" json:"owner_address,omitempty"`          // sender (T...)
+	ContractAddress string                 `protobuf:"bytes,2,opt,name=contract_address,json=contractAddress,proto3" json:"contract_address,omitempty"` // the TRC-20 token contract (T...)
+	ToAddress       string                 `protobuf:"bytes,3,opt,name=to_address,json=toAddress,proto3" json:"to_address,omitempty"`                   // recipient (T...)
+	Amount          []byte                 `protobuf:"bytes,4,opt,name=amount,proto3" json:"amount,omitempty"`                                          // big-endian uint256
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *TransferTRC20Contract) Reset() {
+	*x = TransferTRC20Contract{}
+	mi := &file_txproto_tron_tron_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TransferTRC20Contract) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TransferTRC20Contract) ProtoMessage() {}
+
+func (x *TransferTRC20Contract) ProtoReflect() protoreflect.Message {
+	mi := &file_txproto_tron_tron_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TransferTRC20Contract.ProtoReflect.Descriptor instead.
+func (*TransferTRC20Contract) Descriptor() ([]byte, []int) {
+	return file_txproto_tron_tron_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *TransferTRC20Contract) GetOwnerAddress() string {
+	if x != nil {
+		return x.OwnerAddress
+	}
+	return ""
+}
+
+func (x *TransferTRC20Contract) GetContractAddress() string {
+	if x != nil {
+		return x.ContractAddress
+	}
+	return ""
+}
+
+func (x *TransferTRC20Contract) GetToAddress() string {
+	if x != nil {
+		return x.ToAddress
+	}
+	return ""
+}
+
+func (x *TransferTRC20Contract) GetAmount() []byte {
+	if x != nil {
+		return x.Amount
+	}
+	return nil
+}
+
 // Block header reference values, used to compute ref_block_bytes / ref_block_hash.
 type BlockHeader struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
@@ -97,7 +167,7 @@ type BlockHeader struct {
 
 func (x *BlockHeader) Reset() {
 	*x = BlockHeader{}
-	mi := &file_txproto_tron_tron_proto_msgTypes[1]
+	mi := &file_txproto_tron_tron_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -109,7 +179,7 @@ func (x *BlockHeader) String() string {
 func (*BlockHeader) ProtoMessage() {}
 
 func (x *BlockHeader) ProtoReflect() protoreflect.Message {
-	mi := &file_txproto_tron_tron_proto_msgTypes[1]
+	mi := &file_txproto_tron_tron_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -122,7 +192,7 @@ func (x *BlockHeader) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BlockHeader.ProtoReflect.Descriptor instead.
 func (*BlockHeader) Descriptor() ([]byte, []int) {
-	return file_txproto_tron_tron_proto_rawDescGZIP(), []int{1}
+	return file_txproto_tron_tron_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *BlockHeader) GetTimestamp() int64 {
@@ -177,6 +247,7 @@ type Transaction struct {
 	// Types that are valid to be assigned to ContractOneof:
 	//
 	//	*Transaction_Transfer
+	//	*Transaction_TransferTrc20
 	ContractOneof isTransaction_ContractOneof `protobuf_oneof:"contract_oneof"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -184,7 +255,7 @@ type Transaction struct {
 
 func (x *Transaction) Reset() {
 	*x = Transaction{}
-	mi := &file_txproto_tron_tron_proto_msgTypes[2]
+	mi := &file_txproto_tron_tron_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -196,7 +267,7 @@ func (x *Transaction) String() string {
 func (*Transaction) ProtoMessage() {}
 
 func (x *Transaction) ProtoReflect() protoreflect.Message {
-	mi := &file_txproto_tron_tron_proto_msgTypes[2]
+	mi := &file_txproto_tron_tron_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -209,7 +280,7 @@ func (x *Transaction) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Transaction.ProtoReflect.Descriptor instead.
 func (*Transaction) Descriptor() ([]byte, []int) {
-	return file_txproto_tron_tron_proto_rawDescGZIP(), []int{2}
+	return file_txproto_tron_tron_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *Transaction) GetTimestamp() int64 {
@@ -256,6 +327,15 @@ func (x *Transaction) GetTransfer() *TransferContract {
 	return nil
 }
 
+func (x *Transaction) GetTransferTrc20() *TransferTRC20Contract {
+	if x != nil {
+		if x, ok := x.ContractOneof.(*Transaction_TransferTrc20); ok {
+			return x.TransferTrc20
+		}
+	}
+	return nil
+}
+
 type isTransaction_ContractOneof interface {
 	isTransaction_ContractOneof()
 }
@@ -264,7 +344,13 @@ type Transaction_Transfer struct {
 	Transfer *TransferContract `protobuf:"bytes,5,opt,name=transfer,proto3,oneof"`
 }
 
+type Transaction_TransferTrc20 struct {
+	TransferTrc20 *TransferTRC20Contract `protobuf:"bytes,6,opt,name=transfer_trc20,json=transferTrc20,proto3,oneof"`
+}
+
 func (*Transaction_Transfer) isTransaction_ContractOneof() {}
+
+func (*Transaction_TransferTrc20) isTransaction_ContractOneof() {}
 
 // SigningInput mirrors a minimal subset of TW.Tron.Proto.SigningInput.
 type SigningInput struct {
@@ -276,7 +362,7 @@ type SigningInput struct {
 
 func (x *SigningInput) Reset() {
 	*x = SigningInput{}
-	mi := &file_txproto_tron_tron_proto_msgTypes[3]
+	mi := &file_txproto_tron_tron_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -288,7 +374,7 @@ func (x *SigningInput) String() string {
 func (*SigningInput) ProtoMessage() {}
 
 func (x *SigningInput) ProtoReflect() protoreflect.Message {
-	mi := &file_txproto_tron_tron_proto_msgTypes[3]
+	mi := &file_txproto_tron_tron_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -301,7 +387,7 @@ func (x *SigningInput) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SigningInput.ProtoReflect.Descriptor instead.
 func (*SigningInput) Descriptor() ([]byte, []int) {
-	return file_txproto_tron_tron_proto_rawDescGZIP(), []int{3}
+	return file_txproto_tron_tron_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *SigningInput) GetTransaction() *Transaction {
@@ -326,7 +412,7 @@ type SigningOutput struct {
 
 func (x *SigningOutput) Reset() {
 	*x = SigningOutput{}
-	mi := &file_txproto_tron_tron_proto_msgTypes[4]
+	mi := &file_txproto_tron_tron_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -338,7 +424,7 @@ func (x *SigningOutput) String() string {
 func (*SigningOutput) ProtoMessage() {}
 
 func (x *SigningOutput) ProtoReflect() protoreflect.Message {
-	mi := &file_txproto_tron_tron_proto_msgTypes[4]
+	mi := &file_txproto_tron_tron_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -351,7 +437,7 @@ func (x *SigningOutput) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SigningOutput.ProtoReflect.Descriptor instead.
 func (*SigningOutput) Descriptor() ([]byte, []int) {
-	return file_txproto_tron_tron_proto_rawDescGZIP(), []int{4}
+	return file_txproto_tron_tron_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *SigningOutput) GetId() []byte {
@@ -405,7 +491,13 @@ const file_txproto_tron_tron_proto_rawDesc = "" +
 	"\rowner_address\x18\x01 \x01(\tR\fownerAddress\x12\x1d\n" +
 	"\n" +
 	"to_address\x18\x02 \x01(\tR\ttoAddress\x12\x16\n" +
-	"\x06amount\x18\x03 \x01(\x03R\x06amount\"\xc9\x01\n" +
+	"\x06amount\x18\x03 \x01(\x03R\x06amount\"\x9e\x01\n" +
+	"\x15TransferTRC20Contract\x12#\n" +
+	"\rowner_address\x18\x01 \x01(\tR\fownerAddress\x12)\n" +
+	"\x10contract_address\x18\x02 \x01(\tR\x0fcontractAddress\x12\x1d\n" +
+	"\n" +
+	"to_address\x18\x03 \x01(\tR\ttoAddress\x12\x16\n" +
+	"\x06amount\x18\x04 \x01(\fR\x06amount\"\xc9\x01\n" +
 	"\vBlockHeader\x12\x1c\n" +
 	"\ttimestamp\x18\x01 \x01(\x03R\ttimestamp\x12 \n" +
 	"\ftx_trie_root\x18\x02 \x01(\fR\n" +
@@ -414,7 +506,7 @@ const file_txproto_tron_tron_proto_rawDesc = "" +
 	"parentHash\x12\x16\n" +
 	"\x06number\x18\x04 \x01(\x03R\x06number\x12'\n" +
 	"\x0fwitness_address\x18\x05 \x01(\fR\x0ewitnessAddress\x12\x18\n" +
-	"\aversion\x18\x06 \x01(\x05R\aversion\"\x84\x02\n" +
+	"\aversion\x18\x06 \x01(\x05R\aversion\"\xd9\x02\n" +
 	"\vTransaction\x12\x1c\n" +
 	"\ttimestamp\x18\x01 \x01(\x03R\ttimestamp\x12\x1e\n" +
 	"\n" +
@@ -422,7 +514,8 @@ const file_txproto_tron_tron_proto_rawDesc = "" +
 	"expiration\x12C\n" +
 	"\fblock_header\x18\x03 \x01(\v2 .hdwallet.tron.proto.BlockHeaderR\vblockHeader\x12\x1b\n" +
 	"\tfee_limit\x18\x04 \x01(\x03R\bfeeLimit\x12C\n" +
-	"\btransfer\x18\x05 \x01(\v2%.hdwallet.tron.proto.TransferContractH\x00R\btransferB\x10\n" +
+	"\btransfer\x18\x05 \x01(\v2%.hdwallet.tron.proto.TransferContractH\x00R\btransfer\x12S\n" +
+	"\x0etransfer_trc20\x18\x06 \x01(\v2*.hdwallet.tron.proto.TransferTRC20ContractH\x00R\rtransferTrc20B\x10\n" +
 	"\x0econtract_oneof\"R\n" +
 	"\fSigningInput\x12B\n" +
 	"\vtransaction\x18\x01 \x01(\v2 .hdwallet.tron.proto.TransactionR\vtransaction\"\xaa\x01\n" +
@@ -446,23 +539,25 @@ func file_txproto_tron_tron_proto_rawDescGZIP() []byte {
 	return file_txproto_tron_tron_proto_rawDescData
 }
 
-var file_txproto_tron_tron_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
+var file_txproto_tron_tron_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
 var file_txproto_tron_tron_proto_goTypes = []any{
-	(*TransferContract)(nil), // 0: hdwallet.tron.proto.TransferContract
-	(*BlockHeader)(nil),      // 1: hdwallet.tron.proto.BlockHeader
-	(*Transaction)(nil),      // 2: hdwallet.tron.proto.Transaction
-	(*SigningInput)(nil),     // 3: hdwallet.tron.proto.SigningInput
-	(*SigningOutput)(nil),    // 4: hdwallet.tron.proto.SigningOutput
+	(*TransferContract)(nil),      // 0: hdwallet.tron.proto.TransferContract
+	(*TransferTRC20Contract)(nil), // 1: hdwallet.tron.proto.TransferTRC20Contract
+	(*BlockHeader)(nil),           // 2: hdwallet.tron.proto.BlockHeader
+	(*Transaction)(nil),           // 3: hdwallet.tron.proto.Transaction
+	(*SigningInput)(nil),          // 4: hdwallet.tron.proto.SigningInput
+	(*SigningOutput)(nil),         // 5: hdwallet.tron.proto.SigningOutput
 }
 var file_txproto_tron_tron_proto_depIdxs = []int32{
-	1, // 0: hdwallet.tron.proto.Transaction.block_header:type_name -> hdwallet.tron.proto.BlockHeader
+	2, // 0: hdwallet.tron.proto.Transaction.block_header:type_name -> hdwallet.tron.proto.BlockHeader
 	0, // 1: hdwallet.tron.proto.Transaction.transfer:type_name -> hdwallet.tron.proto.TransferContract
-	2, // 2: hdwallet.tron.proto.SigningInput.transaction:type_name -> hdwallet.tron.proto.Transaction
-	3, // [3:3] is the sub-list for method output_type
-	3, // [3:3] is the sub-list for method input_type
-	3, // [3:3] is the sub-list for extension type_name
-	3, // [3:3] is the sub-list for extension extendee
-	0, // [0:3] is the sub-list for field type_name
+	1, // 2: hdwallet.tron.proto.Transaction.transfer_trc20:type_name -> hdwallet.tron.proto.TransferTRC20Contract
+	3, // 3: hdwallet.tron.proto.SigningInput.transaction:type_name -> hdwallet.tron.proto.Transaction
+	4, // [4:4] is the sub-list for method output_type
+	4, // [4:4] is the sub-list for method input_type
+	4, // [4:4] is the sub-list for extension type_name
+	4, // [4:4] is the sub-list for extension extendee
+	0, // [0:4] is the sub-list for field type_name
 }
 
 func init() { file_txproto_tron_tron_proto_init() }
@@ -470,8 +565,9 @@ func file_txproto_tron_tron_proto_init() {
 	if File_txproto_tron_tron_proto != nil {
 		return
 	}
-	file_txproto_tron_tron_proto_msgTypes[2].OneofWrappers = []any{
+	file_txproto_tron_tron_proto_msgTypes[3].OneofWrappers = []any{
 		(*Transaction_Transfer)(nil),
+		(*Transaction_TransferTrc20)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -479,7 +575,7 @@ func file_txproto_tron_tron_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_txproto_tron_tron_proto_rawDesc), len(file_txproto_tron_tron_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   5,
+			NumMessages:   6,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

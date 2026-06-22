@@ -154,10 +154,10 @@ Verified byte-for-byte against Trust Wallet Core's signing vectors for:
 | Family | Coverage |
 |---|---|
 | **EVM** | legacy (EIP-155) + EIP-1559, native + ERC-20 + arbitrary contract call + contract creation (deploy). All registered EVM chains. |
-| **Tron** | TransferContract |
+| **Tron** | TRX transfer + TRC-20 token transfer (TriggerSmartContract) |
 | **XRP** | Payment |
-| **Cosmos** | bank `MsgSend` (protobuf direct mode). All standard secp256k1 Cosmos chains (ethermint-keyed chains, e.g. INJ/EVMOS, are not yet supported). |
-| **Solana** | system transfer |
+| **Cosmos** | bank `MsgSend`, staking `MsgDelegate`/`MsgUndelegate`, `MsgWithdrawDelegatorReward`, multi-message (protobuf direct mode). All standard secp256k1 Cosmos chains (ethermint-keyed chains, e.g. INJ/EVMOS, are not yet supported). |
+| **Solana** | system transfer + SPL token transfer (TransferChecked) |
 
 ```go
 import ethpb "github.com/ranjbar-dev/hd-wallet/txproto/ethereum"
