@@ -153,11 +153,11 @@ Verified byte-for-byte against Trust Wallet Core's signing vectors for:
 
 | Family | Coverage |
 |---|---|
-| **EVM** | legacy (EIP-155) + EIP-1559, native + ERC-20 |
-| **Tron** | TransferContract |
+| **EVM** | legacy (EIP-155) + EIP-1559, native + ERC-20 + arbitrary contract call + contract creation (deploy). All registered EVM chains. |
+| **Tron** | TRX transfer + TRC-20 token transfer (TriggerSmartContract) |
 | **XRP** | Payment |
-| **Cosmos** | bank `MsgSend` (protobuf direct mode) |
-| **Solana** | system transfer |
+| **Cosmos** | bank `MsgSend`, staking `MsgDelegate`/`MsgUndelegate`, `MsgWithdrawDelegatorReward`, multi-message (protobuf direct mode). All standard secp256k1 Cosmos chains (ethermint-keyed chains, e.g. INJ/EVMOS, are not yet supported). |
+| **Solana** | system transfer + SPL token transfer (TransferChecked) |
 
 ```go
 import ethpb "github.com/ranjbar-dev/hd-wallet/txproto/ethereum"
@@ -365,9 +365,13 @@ go test -race -cover ./...
 | `FromMnemonic(string) (*HDWallet, error)` | Import from a mnemonic string (least secure). |
 | `FromMnemonicBytes([]byte) (*HDWallet, error)` | Import from a byte slice (wiped on use). |
 | `FromMnemonicBuffer(*memguard.LockedBuffer) (*HDWallet, error)` | Import from a memguard buffer (most secure; zero-copy). |
+| `FromMnemonicWithPassphrase([]byte, []byte) (*HDWallet, error)` | Import with a BIP-39 passphrase (the "25th word"). |
+| `FromMnemonicBufferWithPassphrase(buf, pass *memguard.LockedBuffer) (*HDWallet, error)` | Passphrase import, both secrets in memguard buffers. |
 | `GenerateMnemonic() (string, error)` | Generate a mnemonic without building a wallet. |
 | `(*HDWallet) Address(symbol Symbol) (string, error)` | First receive address for one network. |
 | `(*HDWallet) AddressIndex(symbol Symbol, index uint32) (string, error)` | Nth address/account for one network. |
+| `(*HDWallet) AddressPath(symbol Symbol, path string) (string, error)` | Address at an arbitrary absolute BIP-32 path. Also `SignPath`/`PublicKeyPath`/`WithPrivateKeyPath`/`PrivateKeyPath`. |
+| `(*HDWallet) AddressAt(symbol Symbol, account, change, index uint32) (string, error)` | Address by BIP-44 account/change/index. Also `SignAt`/`PublicKeyAt`. |
 | `(*HDWallet) AllAddresses() (map[Symbol]string, error)` | Addresses for all networks. |
 | `(*HDWallet) Sign(symbol Symbol, data []byte) (*Signature, error)` | Sign a digest (ECDSA) / message (ed25519) at index 0. |
 | `(*HDWallet) SignIndex(symbol Symbol, index uint32, data []byte) (*Signature, error)` | Sign with the key at a given index. |
@@ -384,10 +388,13 @@ go test -race -cover ./...
 
 | Function / method | Purpose |
 |---|---|
-| `FromPrivateKeyBytes([]byte, Curve) (*HDWallet, error)` | Key-only wallet from a byte slice (wiped on use). |
+| `FromPrivateKeyBytes([]byte, Curve) (*HDWallet, error)` | Key-only wallet from a byte slice (wiped on use). Any 32-byte-scalar curve. |
 | `FromPrivateKeyBuffer(*memguard.LockedBuffer, Curve) (*HDWallet, error)` | Key-only wallet from a memguard buffer (zero-copy). |
 | `(*HDWallet) WithPrivateKey(symbol, index, func([]byte) error) error` | Use the leaf private key, auto-wiped. |
 | `(*HDWallet) PrivateKey(symbol, index) (*memguard.LockedBuffer, error)` | Leaf key buffer (caller `Destroy`s). |
+| `FromWIF([]byte) (*HDWallet, error)` · `(*HDWallet) WithWIF` / `WIF` | Import/export a Bitcoin WIF (secp256k1). |
+| `(*HDWallet) AccountXPub(symbol, account) (string, error)` · `WithAccountXPrv` | Export account-level BIP-32 extended keys (secp256k1). |
+| `WatchOnlyFromXPub(xpub string, symbol) (*WatchWallet, error)` | Watch-only address derivation from an xpub — no seed. |
 
 **Transaction & Ethereum message signing:**
 

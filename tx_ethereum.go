@@ -79,6 +79,20 @@ func ethDestination(in *txeth.SigningInput) (to, value, data []byte, err error) 
 		}
 		// ERC-20 transfers move zero native value; the contract is the destination.
 		return contract, nil, calldata, nil
+	case tx.GetContractGeneric() != nil:
+		t := tx.GetContractGeneric()
+		// An empty to_address means contract creation (deploy): `to` is left
+		// empty (RLP 0x80) and `data` is the init code. A non-empty to_address is
+		// an arbitrary contract call.
+		var addr []byte
+		if hexAddr := in.GetToAddress(); hexAddr != "" {
+			a, aerr := hexToBytes(hexAddr)
+			if aerr != nil || len(a) != 20 {
+				return nil, nil, nil, fmt.Errorf("%w: ethereum: bad contract to_address", ErrTxInput)
+			}
+			addr = a
+		}
+		return addr, append([]byte(nil), t.GetAmount()...), append([]byte(nil), t.GetData()...), nil
 	default:
 		return nil, nil, nil, fmt.Errorf("%w: ethereum: empty transaction payload", ErrTxInput)
 	}

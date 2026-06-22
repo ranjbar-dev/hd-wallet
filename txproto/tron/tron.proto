@@ -11,6 +11,15 @@ message TransferContract {
   int64 amount = 3;         // in SUN
 }
 
+// TRC-20 token transfer, built as a TriggerSmartContract calling the token's
+// transfer(address,uint256). Addresses are base58check (T...).
+message TransferTRC20Contract {
+  string owner_address = 1;    // sender (T...)
+  string contract_address = 2; // the TRC-20 token contract (T...)
+  string to_address = 3;       // recipient (T...)
+  bytes amount = 4;            // big-endian uint256
+}
+
 // Block header reference values, used to compute ref_block_bytes / ref_block_hash.
 message BlockHeader {
   int64 timestamp = 1;
@@ -30,6 +39,7 @@ message Transaction {
 
   oneof contract_oneof {
     TransferContract transfer = 5;
+    TransferTRC20Contract transfer_trc20 = 6;
   }
 }
 

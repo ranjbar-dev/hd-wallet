@@ -40,15 +40,33 @@ import (
 // solanaSystemProgramID is the System Program account "111...1" (32 zero bytes).
 var solanaSystemProgramID = make([]byte, 32)
 
+// solanaTokenProgramID is the SPL Token program account, base58. It is a public
+// well-known program address, not a secret.
+const solanaTokenProgramID = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" // #nosec G101 -- public SPL Token program id, not a credential
+
 // solanaTransferInstruction is the System Program instruction index for Transfer.
 const solanaTransferInstruction uint32 = 2
 
-// signSolanaTx builds, signs and base58-encodes a Solana system transfer.
+// solanaTokenTransferCheckedInstruction is the SPL Token program instruction
+// index for TransferChecked.
+const solanaTokenTransferCheckedInstruction byte = 12
+
+// signSolanaTx dispatches on the SigningInput's transaction type.
 func (w *HDWallet) signSolanaTx(symbol Symbol, index uint32, in *txsolana.SigningInput) (*txsolana.SigningOutput, error) {
-	transfer := in.GetTransferTransaction()
-	if transfer == nil {
-		return nil, fmt.Errorf("%w: solana: only a native system transfer is supported", ErrTxInput)
+	switch {
+	case in.GetTransferTransaction() != nil:
+		return w.signSolanaSystemTransfer(symbol, index, in)
+	case in.GetTokenTransferTransaction() != nil:
+		return w.signSolanaTokenTransfer(symbol, index, in)
+	default:
+		return nil, fmt.Errorf("%w: solana: no supported transaction set", ErrTxInput)
 	}
+}
+
+// signSolanaSystemTransfer builds, signs and base58-encodes a Solana system
+// (native SOL) transfer.
+func (w *HDWallet) signSolanaSystemTransfer(symbol Symbol, index uint32, in *txsolana.SigningInput) (*txsolana.SigningOutput, error) {
+	transfer := in.GetTransferTransaction()
 
 	from, err := w.PublicKeyIndex(symbol, index)
 	if err != nil {
@@ -89,6 +107,119 @@ func (w *HDWallet) signSolanaTx(symbol Symbol, index uint32, in *txsolana.Signin
 		Encoded: encoded,
 		Raw:     tx,
 	}, nil
+}
+
+// signSolanaTokenTransfer builds, signs and base58-encodes an SPL token
+// TransferChecked between two existing token accounts. The proto supplies the
+// source/destination token accounts and the mint directly (no associated-token-
+// account derivation). The signer (owner of the source account) is also the fee
+// payer.
+func (w *HDWallet) signSolanaTokenTransfer(symbol Symbol, index uint32, in *txsolana.SigningInput) (*txsolana.SigningOutput, error) {
+	tt := in.GetTokenTransferTransaction()
+
+	owner, err := w.PublicKeyIndex(symbol, index)
+	if err != nil {
+		return nil, err
+	}
+	if len(owner) != 32 {
+		return nil, fmt.Errorf("%w: solana: expected 32-byte ed25519 key", ErrTxInput)
+	}
+	if tt.GetDecimals() > 255 {
+		return nil, fmt.Errorf("%w: solana: decimals %d out of range", ErrTxInput, tt.GetDecimals())
+	}
+
+	source, err := base58DecodeFixed(tt.GetSenderTokenAddress(), 32)
+	if err != nil {
+		return nil, fmt.Errorf("%w: solana: sender_token_address: %v", ErrTxInput, err)
+	}
+	dest, err := base58DecodeFixed(tt.GetRecipientTokenAddress(), 32)
+	if err != nil {
+		return nil, fmt.Errorf("%w: solana: recipient_token_address: %v", ErrTxInput, err)
+	}
+	mint, err := base58DecodeFixed(tt.GetTokenMintAddress(), 32)
+	if err != nil {
+		return nil, fmt.Errorf("%w: solana: token_mint_address: %v", ErrTxInput, err)
+	}
+	blockhash, err := base58DecodeFixed(in.GetRecentBlockhash(), 32)
+	if err != nil {
+		return nil, fmt.Errorf("%w: solana: recent_blockhash: %v", ErrTxInput, err)
+	}
+	tokenProgram, err := base58DecodeFixed(solanaTokenProgramID, 32)
+	if err != nil {
+		return nil, fmt.Errorf("%w: solana: token program id: %v", ErrTxInput, err)
+	}
+
+	decimals := byte(tt.GetDecimals()) // #nosec G115 -- range-checked (<= 255) above
+	message := solanaTokenTransferMessage(owner, source, dest, mint, tokenProgram, blockhash, tt.GetAmount(), decimals)
+
+	sig, err := w.SignIndex(symbol, index, message)
+	if err != nil {
+		return nil, err
+	}
+	sigBytes := sig.Bytes()
+	if len(sigBytes) != 64 {
+		return nil, fmt.Errorf("%w: solana: expected 64-byte signature", ErrTxInput)
+	}
+
+	tx := make([]byte, 0, 1+len(sigBytes)+len(message))
+	tx = append(tx, solanaCompactU16(1)...)
+	tx = append(tx, sigBytes...)
+	tx = append(tx, message...)
+
+	return &txsolana.SigningOutput{
+		Encoded: base58Encode(base58BTC, tx),
+		Raw:     tx,
+	}, nil
+}
+
+// solanaTokenTransferMessage serializes the legacy message for an SPL
+// TransferChecked. Account keys, in canonical Solana order (writable signer,
+// then writable non-signers, then readonly non-signers), are:
+//
+//	0: owner   (signer, writable — fee payer + source-account authority)
+//	1: source  (writable)
+//	2: dest    (writable)
+//	3: mint    (readonly)
+//	4: token program (readonly)
+//
+// so the header is (1, 0, 2). The TransferChecked instruction (tag 12) targets
+// the token program with accounts [source, mint, dest, owner] and data
+// 12 || LE-u64(amount) || u8(decimals).
+func solanaTokenTransferMessage(owner, source, dest, mint, tokenProgram, blockhash []byte, amount uint64, decimals byte) []byte {
+	keys := [][]byte{owner, source, dest, mint, tokenProgram}
+
+	var msg []byte
+	// Header: numRequiredSignatures, numReadonlySignedAccounts,
+	// numReadonlyUnsignedAccounts.
+	msg = append(msg, 1, 0, 2)
+
+	// Account keys.
+	msg = append(msg, solanaCompactU16(len(keys))...)
+	for _, k := range keys {
+		msg = append(msg, k...)
+	}
+
+	// Recent blockhash.
+	msg = append(msg, blockhash...)
+
+	// Instruction data: 12 (TransferChecked) || LE-u64(amount) || u8(decimals).
+	data := make([]byte, 0, 10)
+	data = append(data, solanaTokenTransferCheckedInstruction)
+	amt := make([]byte, 8)
+	binary.LittleEndian.PutUint64(amt, amount)
+	data = append(data, amt...)
+	data = append(data, decimals)
+
+	// One instruction: program = token program (idx 4), accounts in
+	// TransferChecked order [source(1), mint(3), dest(2), owner(0)].
+	msg = append(msg, solanaCompactU16(1)...) // instruction count
+	msg = append(msg, 4)                      // programIdIndex (token program)
+	msg = append(msg, solanaCompactU16(4)...) // account index count
+	msg = append(msg, 1, 3, 2, 0)             // [source, mint, dest, owner]
+	msg = append(msg, solanaCompactU16(len(data))...)
+	msg = append(msg, data...)
+
+	return msg
 }
 
 // solanaTransferMessage serializes the (legacy) transaction message for a system

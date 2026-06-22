@@ -91,6 +91,245 @@ func (x *SendCoinsMessage) GetDenom() string {
 	return ""
 }
 
+// A staking MsgDelegate / MsgUndelegate (identical wire shape; the type_url
+// differs by which Message oneof field carries it).
+type MsgDelegate struct {
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	DelegatorAddress string                 `protobuf:"bytes,1,opt,name=delegator_address,json=delegatorAddress,proto3" json:"delegator_address,omitempty"`
+	ValidatorAddress string                 `protobuf:"bytes,2,opt,name=validator_address,json=validatorAddress,proto3" json:"validator_address,omitempty"`
+	Amount           string                 `protobuf:"bytes,3,opt,name=amount,proto3" json:"amount,omitempty"`
+	Denom            string                 `protobuf:"bytes,4,opt,name=denom,proto3" json:"denom,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *MsgDelegate) Reset() {
+	*x = MsgDelegate{}
+	mi := &file_txproto_cosmos_cosmos_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MsgDelegate) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MsgDelegate) ProtoMessage() {}
+
+func (x *MsgDelegate) ProtoReflect() protoreflect.Message {
+	mi := &file_txproto_cosmos_cosmos_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MsgDelegate.ProtoReflect.Descriptor instead.
+func (*MsgDelegate) Descriptor() ([]byte, []int) {
+	return file_txproto_cosmos_cosmos_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *MsgDelegate) GetDelegatorAddress() string {
+	if x != nil {
+		return x.DelegatorAddress
+	}
+	return ""
+}
+
+func (x *MsgDelegate) GetValidatorAddress() string {
+	if x != nil {
+		return x.ValidatorAddress
+	}
+	return ""
+}
+
+func (x *MsgDelegate) GetAmount() string {
+	if x != nil {
+		return x.Amount
+	}
+	return ""
+}
+
+func (x *MsgDelegate) GetDenom() string {
+	if x != nil {
+		return x.Denom
+	}
+	return ""
+}
+
+// A distribution MsgWithdrawDelegatorReward.
+type MsgWithdrawReward struct {
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	DelegatorAddress string                 `protobuf:"bytes,1,opt,name=delegator_address,json=delegatorAddress,proto3" json:"delegator_address,omitempty"`
+	ValidatorAddress string                 `protobuf:"bytes,2,opt,name=validator_address,json=validatorAddress,proto3" json:"validator_address,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *MsgWithdrawReward) Reset() {
+	*x = MsgWithdrawReward{}
+	mi := &file_txproto_cosmos_cosmos_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MsgWithdrawReward) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MsgWithdrawReward) ProtoMessage() {}
+
+func (x *MsgWithdrawReward) ProtoReflect() protoreflect.Message {
+	mi := &file_txproto_cosmos_cosmos_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MsgWithdrawReward.ProtoReflect.Descriptor instead.
+func (*MsgWithdrawReward) Descriptor() ([]byte, []int) {
+	return file_txproto_cosmos_cosmos_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *MsgWithdrawReward) GetDelegatorAddress() string {
+	if x != nil {
+		return x.DelegatorAddress
+	}
+	return ""
+}
+
+func (x *MsgWithdrawReward) GetValidatorAddress() string {
+	if x != nil {
+		return x.ValidatorAddress
+	}
+	return ""
+}
+
+// One message in the transaction body. Multiple messages may be sent in one tx
+// via SigningInput.messages.
+type Message struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Types that are valid to be assigned to MessageOneof:
+	//
+	//	*Message_Send
+	//	*Message_Delegate
+	//	*Message_Undelegate
+	//	*Message_WithdrawReward
+	MessageOneof  isMessage_MessageOneof `protobuf_oneof:"message_oneof"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Message) Reset() {
+	*x = Message{}
+	mi := &file_txproto_cosmos_cosmos_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Message) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Message) ProtoMessage() {}
+
+func (x *Message) ProtoReflect() protoreflect.Message {
+	mi := &file_txproto_cosmos_cosmos_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Message.ProtoReflect.Descriptor instead.
+func (*Message) Descriptor() ([]byte, []int) {
+	return file_txproto_cosmos_cosmos_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *Message) GetMessageOneof() isMessage_MessageOneof {
+	if x != nil {
+		return x.MessageOneof
+	}
+	return nil
+}
+
+func (x *Message) GetSend() *SendCoinsMessage {
+	if x != nil {
+		if x, ok := x.MessageOneof.(*Message_Send); ok {
+			return x.Send
+		}
+	}
+	return nil
+}
+
+func (x *Message) GetDelegate() *MsgDelegate {
+	if x != nil {
+		if x, ok := x.MessageOneof.(*Message_Delegate); ok {
+			return x.Delegate
+		}
+	}
+	return nil
+}
+
+func (x *Message) GetUndelegate() *MsgDelegate {
+	if x != nil {
+		if x, ok := x.MessageOneof.(*Message_Undelegate); ok {
+			return x.Undelegate
+		}
+	}
+	return nil
+}
+
+func (x *Message) GetWithdrawReward() *MsgWithdrawReward {
+	if x != nil {
+		if x, ok := x.MessageOneof.(*Message_WithdrawReward); ok {
+			return x.WithdrawReward
+		}
+	}
+	return nil
+}
+
+type isMessage_MessageOneof interface {
+	isMessage_MessageOneof()
+}
+
+type Message_Send struct {
+	Send *SendCoinsMessage `protobuf:"bytes,1,opt,name=send,proto3,oneof"`
+}
+
+type Message_Delegate struct {
+	Delegate *MsgDelegate `protobuf:"bytes,2,opt,name=delegate,proto3,oneof"`
+}
+
+type Message_Undelegate struct {
+	Undelegate *MsgDelegate `protobuf:"bytes,3,opt,name=undelegate,proto3,oneof"`
+}
+
+type Message_WithdrawReward struct {
+	WithdrawReward *MsgWithdrawReward `protobuf:"bytes,4,opt,name=withdraw_reward,json=withdrawReward,proto3,oneof"`
+}
+
+func (*Message_Send) isMessage_MessageOneof() {}
+
+func (*Message_Delegate) isMessage_MessageOneof() {}
+
+func (*Message_Undelegate) isMessage_MessageOneof() {}
+
+func (*Message_WithdrawReward) isMessage_MessageOneof() {}
+
 // Fee for the transaction.
 type Fee struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -103,7 +342,7 @@ type Fee struct {
 
 func (x *Fee) Reset() {
 	*x = Fee{}
-	mi := &file_txproto_cosmos_cosmos_proto_msgTypes[1]
+	mi := &file_txproto_cosmos_cosmos_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -115,7 +354,7 @@ func (x *Fee) String() string {
 func (*Fee) ProtoMessage() {}
 
 func (x *Fee) ProtoReflect() protoreflect.Message {
-	mi := &file_txproto_cosmos_cosmos_proto_msgTypes[1]
+	mi := &file_txproto_cosmos_cosmos_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -128,7 +367,7 @@ func (x *Fee) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Fee.ProtoReflect.Descriptor instead.
 func (*Fee) Descriptor() ([]byte, []int) {
-	return file_txproto_cosmos_cosmos_proto_rawDescGZIP(), []int{1}
+	return file_txproto_cosmos_cosmos_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *Fee) GetAmount() string {
@@ -161,14 +400,18 @@ type SigningInput struct {
 	Sequence      uint64                 `protobuf:"varint,3,opt,name=sequence,proto3" json:"sequence,omitempty"`
 	Memo          string                 `protobuf:"bytes,4,opt,name=memo,proto3" json:"memo,omitempty"`
 	Fee           *Fee                   `protobuf:"bytes,5,opt,name=fee,proto3" json:"fee,omitempty"`
-	Send          *SendCoinsMessage      `protobuf:"bytes,6,opt,name=send,proto3" json:"send,omitempty"`
+	// Legacy single bank send (kept for back-compat). Prefer `messages`.
+	Send *SendCoinsMessage `protobuf:"bytes,6,opt,name=send,proto3" json:"send,omitempty"`
+	// One or more messages (bank send, staking delegate/undelegate, reward
+	// withdrawal). When non-empty this takes precedence over `send`.
+	Messages      []*Message `protobuf:"bytes,7,rep,name=messages,proto3" json:"messages,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *SigningInput) Reset() {
 	*x = SigningInput{}
-	mi := &file_txproto_cosmos_cosmos_proto_msgTypes[2]
+	mi := &file_txproto_cosmos_cosmos_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -180,7 +423,7 @@ func (x *SigningInput) String() string {
 func (*SigningInput) ProtoMessage() {}
 
 func (x *SigningInput) ProtoReflect() protoreflect.Message {
-	mi := &file_txproto_cosmos_cosmos_proto_msgTypes[2]
+	mi := &file_txproto_cosmos_cosmos_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -193,7 +436,7 @@ func (x *SigningInput) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SigningInput.ProtoReflect.Descriptor instead.
 func (*SigningInput) Descriptor() ([]byte, []int) {
-	return file_txproto_cosmos_cosmos_proto_rawDescGZIP(), []int{2}
+	return file_txproto_cosmos_cosmos_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *SigningInput) GetAccountNumber() uint64 {
@@ -238,6 +481,13 @@ func (x *SigningInput) GetSend() *SendCoinsMessage {
 	return nil
 }
 
+func (x *SigningInput) GetMessages() []*Message {
+	if x != nil {
+		return x.Messages
+	}
+	return nil
+}
+
 // SigningOutput mirrors a minimal subset of TW.Cosmos.Proto.SigningOutput.
 type SigningOutput struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -255,7 +505,7 @@ type SigningOutput struct {
 
 func (x *SigningOutput) Reset() {
 	*x = SigningOutput{}
-	mi := &file_txproto_cosmos_cosmos_proto_msgTypes[3]
+	mi := &file_txproto_cosmos_cosmos_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -267,7 +517,7 @@ func (x *SigningOutput) String() string {
 func (*SigningOutput) ProtoMessage() {}
 
 func (x *SigningOutput) ProtoReflect() protoreflect.Message {
-	mi := &file_txproto_cosmos_cosmos_proto_msgTypes[3]
+	mi := &file_txproto_cosmos_cosmos_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -280,7 +530,7 @@ func (x *SigningOutput) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SigningOutput.ProtoReflect.Descriptor instead.
 func (*SigningOutput) Descriptor() ([]byte, []int) {
-	return file_txproto_cosmos_cosmos_proto_rawDescGZIP(), []int{3}
+	return file_txproto_cosmos_cosmos_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *SigningOutput) GetEncoded() []byte {
@@ -321,18 +571,35 @@ const file_txproto_cosmos_cosmos_proto_rawDesc = "" +
 	"\n" +
 	"to_address\x18\x02 \x01(\tR\ttoAddress\x12\x16\n" +
 	"\x06amount\x18\x03 \x01(\tR\x06amount\x12\x14\n" +
-	"\x05denom\x18\x04 \x01(\tR\x05denom\"E\n" +
+	"\x05denom\x18\x04 \x01(\tR\x05denom\"\x95\x01\n" +
+	"\vMsgDelegate\x12+\n" +
+	"\x11delegator_address\x18\x01 \x01(\tR\x10delegatorAddress\x12+\n" +
+	"\x11validator_address\x18\x02 \x01(\tR\x10validatorAddress\x12\x16\n" +
+	"\x06amount\x18\x03 \x01(\tR\x06amount\x12\x14\n" +
+	"\x05denom\x18\x04 \x01(\tR\x05denom\"m\n" +
+	"\x11MsgWithdrawReward\x12+\n" +
+	"\x11delegator_address\x18\x01 \x01(\tR\x10delegatorAddress\x12+\n" +
+	"\x11validator_address\x18\x02 \x01(\tR\x10validatorAddress\"\xb6\x02\n" +
+	"\aMessage\x12=\n" +
+	"\x04send\x18\x01 \x01(\v2'.hdwallet.cosmos.proto.SendCoinsMessageH\x00R\x04send\x12@\n" +
+	"\bdelegate\x18\x02 \x01(\v2\".hdwallet.cosmos.proto.MsgDelegateH\x00R\bdelegate\x12D\n" +
+	"\n" +
+	"undelegate\x18\x03 \x01(\v2\".hdwallet.cosmos.proto.MsgDelegateH\x00R\n" +
+	"undelegate\x12S\n" +
+	"\x0fwithdraw_reward\x18\x04 \x01(\v2(.hdwallet.cosmos.proto.MsgWithdrawRewardH\x00R\x0ewithdrawRewardB\x0f\n" +
+	"\rmessage_oneof\"E\n" +
 	"\x03Fee\x12\x16\n" +
 	"\x06amount\x18\x01 \x01(\tR\x06amount\x12\x14\n" +
 	"\x05denom\x18\x02 \x01(\tR\x05denom\x12\x10\n" +
-	"\x03gas\x18\x03 \x01(\x04R\x03gas\"\xeb\x01\n" +
+	"\x03gas\x18\x03 \x01(\x04R\x03gas\"\xa7\x02\n" +
 	"\fSigningInput\x12%\n" +
 	"\x0eaccount_number\x18\x01 \x01(\x04R\raccountNumber\x12\x19\n" +
 	"\bchain_id\x18\x02 \x01(\tR\achainId\x12\x1a\n" +
 	"\bsequence\x18\x03 \x01(\x04R\bsequence\x12\x12\n" +
 	"\x04memo\x18\x04 \x01(\tR\x04memo\x12,\n" +
 	"\x03fee\x18\x05 \x01(\v2\x1a.hdwallet.cosmos.proto.FeeR\x03fee\x12;\n" +
-	"\x04send\x18\x06 \x01(\v2'.hdwallet.cosmos.proto.SendCoinsMessageR\x04send\"x\n" +
+	"\x04send\x18\x06 \x01(\v2'.hdwallet.cosmos.proto.SendCoinsMessageR\x04send\x12:\n" +
+	"\bmessages\x18\a \x03(\v2\x1e.hdwallet.cosmos.proto.MessageR\bmessages\"x\n" +
 	"\rSigningOutput\x12\x18\n" +
 	"\aencoded\x18\x01 \x01(\fR\aencoded\x12\x19\n" +
 	"\btx_bytes\x18\x02 \x01(\tR\atxBytes\x12\x1c\n" +
@@ -351,21 +618,29 @@ func file_txproto_cosmos_cosmos_proto_rawDescGZIP() []byte {
 	return file_txproto_cosmos_cosmos_proto_rawDescData
 }
 
-var file_txproto_cosmos_cosmos_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_txproto_cosmos_cosmos_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
 var file_txproto_cosmos_cosmos_proto_goTypes = []any{
-	(*SendCoinsMessage)(nil), // 0: hdwallet.cosmos.proto.SendCoinsMessage
-	(*Fee)(nil),              // 1: hdwallet.cosmos.proto.Fee
-	(*SigningInput)(nil),     // 2: hdwallet.cosmos.proto.SigningInput
-	(*SigningOutput)(nil),    // 3: hdwallet.cosmos.proto.SigningOutput
+	(*SendCoinsMessage)(nil),  // 0: hdwallet.cosmos.proto.SendCoinsMessage
+	(*MsgDelegate)(nil),       // 1: hdwallet.cosmos.proto.MsgDelegate
+	(*MsgWithdrawReward)(nil), // 2: hdwallet.cosmos.proto.MsgWithdrawReward
+	(*Message)(nil),           // 3: hdwallet.cosmos.proto.Message
+	(*Fee)(nil),               // 4: hdwallet.cosmos.proto.Fee
+	(*SigningInput)(nil),      // 5: hdwallet.cosmos.proto.SigningInput
+	(*SigningOutput)(nil),     // 6: hdwallet.cosmos.proto.SigningOutput
 }
 var file_txproto_cosmos_cosmos_proto_depIdxs = []int32{
-	1, // 0: hdwallet.cosmos.proto.SigningInput.fee:type_name -> hdwallet.cosmos.proto.Fee
-	0, // 1: hdwallet.cosmos.proto.SigningInput.send:type_name -> hdwallet.cosmos.proto.SendCoinsMessage
-	2, // [2:2] is the sub-list for method output_type
-	2, // [2:2] is the sub-list for method input_type
-	2, // [2:2] is the sub-list for extension type_name
-	2, // [2:2] is the sub-list for extension extendee
-	0, // [0:2] is the sub-list for field type_name
+	0, // 0: hdwallet.cosmos.proto.Message.send:type_name -> hdwallet.cosmos.proto.SendCoinsMessage
+	1, // 1: hdwallet.cosmos.proto.Message.delegate:type_name -> hdwallet.cosmos.proto.MsgDelegate
+	1, // 2: hdwallet.cosmos.proto.Message.undelegate:type_name -> hdwallet.cosmos.proto.MsgDelegate
+	2, // 3: hdwallet.cosmos.proto.Message.withdraw_reward:type_name -> hdwallet.cosmos.proto.MsgWithdrawReward
+	4, // 4: hdwallet.cosmos.proto.SigningInput.fee:type_name -> hdwallet.cosmos.proto.Fee
+	0, // 5: hdwallet.cosmos.proto.SigningInput.send:type_name -> hdwallet.cosmos.proto.SendCoinsMessage
+	3, // 6: hdwallet.cosmos.proto.SigningInput.messages:type_name -> hdwallet.cosmos.proto.Message
+	7, // [7:7] is the sub-list for method output_type
+	7, // [7:7] is the sub-list for method input_type
+	7, // [7:7] is the sub-list for extension type_name
+	7, // [7:7] is the sub-list for extension extendee
+	0, // [0:7] is the sub-list for field type_name
 }
 
 func init() { file_txproto_cosmos_cosmos_proto_init() }
@@ -373,13 +648,19 @@ func file_txproto_cosmos_cosmos_proto_init() {
 	if File_txproto_cosmos_cosmos_proto != nil {
 		return
 	}
+	file_txproto_cosmos_cosmos_proto_msgTypes[3].OneofWrappers = []any{
+		(*Message_Send)(nil),
+		(*Message_Delegate)(nil),
+		(*Message_Undelegate)(nil),
+		(*Message_WithdrawReward)(nil),
+	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_txproto_cosmos_cosmos_proto_rawDesc), len(file_txproto_cosmos_cosmos_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   4,
+			NumMessages:   7,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
