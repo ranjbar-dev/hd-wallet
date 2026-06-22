@@ -19,6 +19,7 @@ package hdwallet
 
 import (
 	"crypto/sha256"
+	"crypto/sha512"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -145,5 +146,12 @@ func bytesToHex(b []byte) string {
 // block-reference hashes; Cosmos uses it for the SignDoc digest.
 func sha256Sum(b []byte) []byte {
 	h := sha256.Sum256(b)
+	return h[:]
+}
+
+// sha512Sum returns the full SHA-512 digest of b. XRP hashes with its first half
+// (sha512Half).
+func sha512Sum(b []byte) []byte {
+	h := sha512.Sum512(b)
 	return h[:]
 }
