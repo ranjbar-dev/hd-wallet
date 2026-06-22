@@ -57,6 +57,10 @@ var (
 	// (non-hardened) child derivation apply only to secp256k1; the SLIP-0010
 	// ed25519/nist256p1 schemes support hardened derivation only.
 	ErrExtKeyUnsupportedCurve = errors.New("hdwallet: extended keys / watch-only require a secp256k1 coin")
+	// ErrInvalidWordCount is returned when a requested mnemonic length is not a
+	// valid BIP-39 word count (12, 15, 18, 21, or 24) or entropy size in bits
+	// (128, 160, 192, 224, or 256).
+	ErrInvalidWordCount = errors.New("hdwallet: invalid mnemonic word count")
 )
 
 // HDWallet is an HD wallet derived from a BIP-39 mnemonic. Its sensitive
@@ -67,9 +71,29 @@ type HDWallet struct {
 	secret *secret
 }
 
-// NewHDWallet creates a wallet with a fresh 12-word (128-bit) mnemonic.
+// NewHDWallet creates a wallet with a fresh 12-word (128-bit) mnemonic. It is a
+// convenience wrapper over NewHDWalletWithWordCount(12).
 func NewHDWallet() (*HDWallet, error) {
-	mnemonic, err := generateMnemonicBytes()
+	return NewHDWalletWithWordCount(12)
+}
+
+// NewHDWalletWithWordCount creates a wallet with a fresh mnemonic of the given
+// length in words. words must be one of 12, 15, 18, 21, or 24; any other value
+// returns an error wrapping ErrInvalidWordCount.
+func NewHDWalletWithWordCount(words int) (*HDWallet, error) {
+	bits, err := wordCountToEntropyBits(words)
+	if err != nil {
+		return nil, err
+	}
+	return NewHDWalletWithEntropy(bits)
+}
+
+// NewHDWalletWithEntropy creates a wallet with a fresh mnemonic generated from
+// bits of BIP-39 entropy. bits must be one of 128, 160, 192, 224, or 256
+// (yielding 12, 15, 18, 21, or 24 words); any other value returns an error
+// wrapping ErrInvalidWordCount.
+func NewHDWalletWithEntropy(bits int) (*HDWallet, error) {
+	mnemonic, err := generateMnemonicBytes(bits)
 	if err != nil {
 		return nil, err
 	}
@@ -162,7 +186,20 @@ func FromMnemonicBufferWithPassphrase(buf, passphrase *memguard.LockedBuffer) (*
 // wallet with NewHDWallet (which keeps the mnemonic in protected memory) and
 // read it back via Mnemonic or WithMnemonic only when required.
 func GenerateMnemonic() (string, error) {
-	mn, err := generateMnemonicBytes()
+	return GenerateMnemonicWithWordCount(12)
+}
+
+// GenerateMnemonicWithWordCount returns a fresh BIP-39 mnemonic of the given
+// length in words (12, 15, 18, 21, or 24) as a string. Like GenerateMnemonic,
+// the returned string cannot be securely wiped; prefer NewHDWalletWithWordCount
+// for sensitive use. An unsupported word count returns an error wrapping
+// ErrInvalidWordCount.
+func GenerateMnemonicWithWordCount(words int) (string, error) {
+	bits, err := wordCountToEntropyBits(words)
+	if err != nil {
+		return "", err
+	}
+	mn, err := generateMnemonicBytes(bits)
 	if err != nil {
 		return "", err
 	}
@@ -170,8 +207,27 @@ func GenerateMnemonic() (string, error) {
 	return string(mn), nil
 }
 
-func generateMnemonicBytes() ([]byte, error) {
-	entropy, err := bip39.NewEntropy(128) // 128 bits -> 12 words
+// wordCountToEntropyBits maps a BIP-39 word count to its entropy size in bits.
+// Valid counts are 12, 15, 18, 21, and 24 (→ 128, 160, 192, 224, 256 bits).
+func wordCountToEntropyBits(words int) (int, error) {
+	switch words {
+	case 12, 15, 18, 21, 24:
+		// BIP-39: entropy_bits = words/3 * 32.
+		return words / 3 * 32, nil
+	default:
+		return 0, fmt.Errorf("%w: %d words (want 12, 15, 18, 21, or 24)", ErrInvalidWordCount, words)
+	}
+}
+
+// generateMnemonicBytes generates a fresh BIP-39 mnemonic with bits of entropy.
+// bits must be one of 128, 160, 192, 224, or 256.
+func generateMnemonicBytes(bits int) ([]byte, error) {
+	switch bits {
+	case 128, 160, 192, 224, 256:
+	default:
+		return nil, fmt.Errorf("%w: %d bits (want 128, 160, 192, 224, or 256)", ErrInvalidWordCount, bits)
+	}
+	entropy, err := bip39.NewEntropy(bits)
 	if err != nil {
 		return nil, err
 	}
@@ -220,13 +276,21 @@ func (w *HDWallet) AddressIndex(symbol Symbol, index uint32) (string, error) {
 	return addr, nil
 }
 
-// AllAddresses derives the first address for every supported coin. The seed
-// enclave is opened exactly once and every coin is derived inside that single
-// decryption window.
-//
-// It is only available on seed-based wallets; a key-only wallet (imported from a
-// single private key) has no seed to enumerate over and returns ErrKeyOnlyWallet.
+// AllAddresses derives the first address (index 0) for every supported coin. It
+// is exactly equivalent to AllAddressesAt(0).
 func (w *HDWallet) AllAddresses() (map[Symbol]string, error) {
+	return w.AllAddressesAt(0)
+}
+
+// AllAddressesAt derives the address at the given index for every supported
+// coin, varying the final element of each coin's BIP-32 path (preserving its
+// hardened flag) exactly as AddressIndex does. The seed enclave is opened
+// exactly once and every coin is derived inside that single decryption window.
+//
+// index must be below 2^31 (0x80000000); a larger value returns an error. It is
+// only available on seed-based wallets; a key-only wallet (imported from a
+// single private key) has no seed to enumerate over and returns ErrKeyOnlyWallet.
+func (w *HDWallet) AllAddressesAt(index uint32) (map[Symbol]string, error) {
 	w.mu.RLock()
 	defer w.mu.RUnlock()
 	if w.secret == nil {
@@ -238,7 +302,13 @@ func (w *HDWallet) AllAddresses() (map[Symbol]string, error) {
 	out := make(map[Symbol]string, len(coins))
 	err := w.secret.withSeed(func(seed []byte) error {
 		for _, symbol := range SupportedCoins() {
-			addr, err := addressFromSeed(seed, symbol, coins[symbol])
+			coin := coins[symbol] // copy; safe to rewrite its Path
+			path, err := withIndex(coin.Path, index)
+			if err != nil {
+				return fmt.Errorf("hdwallet: %s: %w", symbol, err)
+			}
+			coin.Path = path
+			addr, err := addressFromSeed(seed, symbol, coin)
 			if err != nil {
 				return err
 			}
