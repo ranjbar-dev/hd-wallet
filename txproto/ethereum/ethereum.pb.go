@@ -29,6 +29,7 @@ type Transaction struct {
 	//
 	//	*Transaction_Transfer_
 	//	*Transaction_Erc20Transfer
+	//	*Transaction_ContractGeneric_
 	TransactionOneof isTransaction_TransactionOneof `protobuf_oneof:"transaction_oneof"`
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
@@ -89,6 +90,15 @@ func (x *Transaction) GetErc20Transfer() *Transaction_ERC20Transfer {
 	return nil
 }
 
+func (x *Transaction) GetContractGeneric() *Transaction_ContractGeneric {
+	if x != nil {
+		if x, ok := x.TransactionOneof.(*Transaction_ContractGeneric_); ok {
+			return x.ContractGeneric
+		}
+	}
+	return nil
+}
+
 type isTransaction_TransactionOneof interface {
 	isTransaction_TransactionOneof()
 }
@@ -101,9 +111,15 @@ type Transaction_Erc20Transfer struct {
 	Erc20Transfer *Transaction_ERC20Transfer `protobuf:"bytes,2,opt,name=erc20_transfer,json=erc20Transfer,proto3,oneof"`
 }
 
+type Transaction_ContractGeneric_ struct {
+	ContractGeneric *Transaction_ContractGeneric `protobuf:"bytes,3,opt,name=contract_generic,json=contractGeneric,proto3,oneof"`
+}
+
 func (*Transaction_Transfer_) isTransaction_TransactionOneof() {}
 
 func (*Transaction_Erc20Transfer) isTransaction_TransactionOneof() {}
+
+func (*Transaction_ContractGeneric_) isTransaction_TransactionOneof() {}
 
 // SigningInput mirrors a minimal subset of TW.Ethereum.Proto.SigningInput.
 type SigningInput struct {
@@ -423,20 +439,83 @@ func (x *Transaction_ERC20Transfer) GetAmount() []byte {
 	return nil
 }
 
+// Arbitrary contract call, or contract creation (deploy). For a call, set
+// SigningInput.to_address to the contract address and put the call's ABI
+// calldata in `data`. For creation, leave SigningInput.to_address empty and
+// put the init code in `data`. `amount` is the native value to send (may be
+// empty for zero).
+type Transaction_ContractGeneric struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Native value to send, big-endian uint256 bytes (empty == 0).
+	Amount []byte `protobuf:"bytes,1,opt,name=amount,proto3" json:"amount,omitempty"`
+	// Calldata (contract call) or init code (contract creation).
+	Data          []byte `protobuf:"bytes,2,opt,name=data,proto3" json:"data,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Transaction_ContractGeneric) Reset() {
+	*x = Transaction_ContractGeneric{}
+	mi := &file_txproto_ethereum_ethereum_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Transaction_ContractGeneric) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Transaction_ContractGeneric) ProtoMessage() {}
+
+func (x *Transaction_ContractGeneric) ProtoReflect() protoreflect.Message {
+	mi := &file_txproto_ethereum_ethereum_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Transaction_ContractGeneric.ProtoReflect.Descriptor instead.
+func (*Transaction_ContractGeneric) Descriptor() ([]byte, []int) {
+	return file_txproto_ethereum_ethereum_proto_rawDescGZIP(), []int{0, 2}
+}
+
+func (x *Transaction_ContractGeneric) GetAmount() []byte {
+	if x != nil {
+		return x.Amount
+	}
+	return nil
+}
+
+func (x *Transaction_ContractGeneric) GetData() []byte {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
 var File_txproto_ethereum_ethereum_proto protoreflect.FileDescriptor
 
 const file_txproto_ethereum_ethereum_proto_rawDesc = "" +
 	"\n" +
-	"\x1ftxproto/ethereum/ethereum.proto\x12\x17hdwallet.ethereum.proto\"\xbd\x02\n" +
+	"\x1ftxproto/ethereum/ethereum.proto\x12\x17hdwallet.ethereum.proto\"\xdf\x03\n" +
 	"\vTransaction\x12K\n" +
 	"\btransfer\x18\x01 \x01(\v2-.hdwallet.ethereum.proto.Transaction.TransferH\x00R\btransfer\x12[\n" +
-	"\x0eerc20_transfer\x18\x02 \x01(\v22.hdwallet.ethereum.proto.Transaction.ERC20TransferH\x00R\rerc20Transfer\x1a6\n" +
+	"\x0eerc20_transfer\x18\x02 \x01(\v22.hdwallet.ethereum.proto.Transaction.ERC20TransferH\x00R\rerc20Transfer\x12a\n" +
+	"\x10contract_generic\x18\x03 \x01(\v24.hdwallet.ethereum.proto.Transaction.ContractGenericH\x00R\x0fcontractGeneric\x1a6\n" +
 	"\bTransfer\x12\x16\n" +
 	"\x06amount\x18\x01 \x01(\fR\x06amount\x12\x12\n" +
 	"\x04data\x18\x02 \x01(\fR\x04data\x1a7\n" +
 	"\rERC20Transfer\x12\x0e\n" +
 	"\x02to\x18\x01 \x01(\tR\x02to\x12\x16\n" +
-	"\x06amount\x18\x02 \x01(\fR\x06amountB\x13\n" +
+	"\x06amount\x18\x02 \x01(\fR\x06amount\x1a=\n" +
+	"\x0fContractGeneric\x12\x16\n" +
+	"\x06amount\x18\x01 \x01(\fR\x06amount\x12\x12\n" +
+	"\x04data\x18\x02 \x01(\fR\x04dataB\x13\n" +
 	"\x11transaction_oneof\"\xda\x02\n" +
 	"\fSigningInput\x12\x19\n" +
 	"\bchain_id\x18\x01 \x01(\fR\achainId\x12\x14\n" +
@@ -470,23 +549,25 @@ func file_txproto_ethereum_ethereum_proto_rawDescGZIP() []byte {
 	return file_txproto_ethereum_ethereum_proto_rawDescData
 }
 
-var file_txproto_ethereum_ethereum_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
+var file_txproto_ethereum_ethereum_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
 var file_txproto_ethereum_ethereum_proto_goTypes = []any{
-	(*Transaction)(nil),               // 0: hdwallet.ethereum.proto.Transaction
-	(*SigningInput)(nil),              // 1: hdwallet.ethereum.proto.SigningInput
-	(*SigningOutput)(nil),             // 2: hdwallet.ethereum.proto.SigningOutput
-	(*Transaction_Transfer)(nil),      // 3: hdwallet.ethereum.proto.Transaction.Transfer
-	(*Transaction_ERC20Transfer)(nil), // 4: hdwallet.ethereum.proto.Transaction.ERC20Transfer
+	(*Transaction)(nil),                 // 0: hdwallet.ethereum.proto.Transaction
+	(*SigningInput)(nil),                // 1: hdwallet.ethereum.proto.SigningInput
+	(*SigningOutput)(nil),               // 2: hdwallet.ethereum.proto.SigningOutput
+	(*Transaction_Transfer)(nil),        // 3: hdwallet.ethereum.proto.Transaction.Transfer
+	(*Transaction_ERC20Transfer)(nil),   // 4: hdwallet.ethereum.proto.Transaction.ERC20Transfer
+	(*Transaction_ContractGeneric)(nil), // 5: hdwallet.ethereum.proto.Transaction.ContractGeneric
 }
 var file_txproto_ethereum_ethereum_proto_depIdxs = []int32{
 	3, // 0: hdwallet.ethereum.proto.Transaction.transfer:type_name -> hdwallet.ethereum.proto.Transaction.Transfer
 	4, // 1: hdwallet.ethereum.proto.Transaction.erc20_transfer:type_name -> hdwallet.ethereum.proto.Transaction.ERC20Transfer
-	0, // 2: hdwallet.ethereum.proto.SigningInput.transaction:type_name -> hdwallet.ethereum.proto.Transaction
-	3, // [3:3] is the sub-list for method output_type
-	3, // [3:3] is the sub-list for method input_type
-	3, // [3:3] is the sub-list for extension type_name
-	3, // [3:3] is the sub-list for extension extendee
-	0, // [0:3] is the sub-list for field type_name
+	5, // 2: hdwallet.ethereum.proto.Transaction.contract_generic:type_name -> hdwallet.ethereum.proto.Transaction.ContractGeneric
+	0, // 3: hdwallet.ethereum.proto.SigningInput.transaction:type_name -> hdwallet.ethereum.proto.Transaction
+	4, // [4:4] is the sub-list for method output_type
+	4, // [4:4] is the sub-list for method input_type
+	4, // [4:4] is the sub-list for extension type_name
+	4, // [4:4] is the sub-list for extension extendee
+	0, // [0:4] is the sub-list for field type_name
 }
 
 func init() { file_txproto_ethereum_ethereum_proto_init() }
@@ -497,6 +578,7 @@ func file_txproto_ethereum_ethereum_proto_init() {
 	file_txproto_ethereum_ethereum_proto_msgTypes[0].OneofWrappers = []any{
 		(*Transaction_Transfer_)(nil),
 		(*Transaction_Erc20Transfer)(nil),
+		(*Transaction_ContractGeneric_)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -504,7 +586,7 @@ func file_txproto_ethereum_ethereum_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_txproto_ethereum_ethereum_proto_rawDesc), len(file_txproto_ethereum_ethereum_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   5,
+			NumMessages:   6,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

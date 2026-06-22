@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"math/big"
 
 	"github.com/awnumar/memguard"
 	bip39 "github.com/tyler-smith/go-bip39"
@@ -36,17 +37,20 @@ type secret struct {
 // (no seed, no mnemonic, no HD path).
 func (s *secret) isKeyOnly() bool { return s.privKey != nil }
 
-// newSecret validates the mnemonic, derives the seed, and seals both into
-// enclaves. Surrounding ASCII whitespace is trimmed first, matching
-// FromMnemonicBuffer, so a trailing newline is not mistaken for an invalid
-// phrase. The input mnemonic slice is wiped — callers must pass a slice they are
-// willing to surrender ownership of.
-func newSecret(mnemonic []byte) (*secret, error) {
-	defer wipe(mnemonic) // always wipe the caller's untrimmed copy
+// newSecret validates the mnemonic, derives the seed (with an optional BIP-39
+// passphrase), and seals both into enclaves. Surrounding ASCII whitespace is
+// trimmed from the mnemonic first, matching FromMnemonicBuffer, so a trailing
+// newline is not mistaken for an invalid phrase. The passphrase is used verbatim
+// (BIP-39 does not trim it). Both the input mnemonic and passphrase slices are
+// wiped — callers must pass slices they are willing to surrender ownership of.
+// passphrase may be nil for the empty passphrase (Trust Wallet's default).
+func newSecret(mnemonic, passphrase []byte) (*secret, error) {
+	defer wipe(mnemonic)   // always wipe the caller's untrimmed copy
+	defer wipe(passphrase) // nil-safe; wipe the caller's passphrase copy too
 
 	trimmed := bytes.TrimSpace(mnemonic) // sub-slice; sealed via a copy below
 
-	seedEnclave, err := deriveSeedEnclave(trimmed)
+	seedEnclave, err := deriveSeedEnclave(trimmed, passphrase)
 	if err != nil {
 		return nil, err
 	}
@@ -63,8 +67,10 @@ func newSecret(mnemonic []byte) (*secret, error) {
 // newSecretFromBuffer is the strongest entry point: the mnemonic is supplied in
 // a memguard LockedBuffer and is sealed into an enclave without ever being
 // copied into an unprotected heap slice. The wallet takes ownership of buf and
-// destroys it. Surrounding whitespace is trimmed before use.
-func newSecretFromBuffer(buf *memguard.LockedBuffer) (*secret, error) {
+// destroys it. Surrounding whitespace is trimmed before use. An optional BIP-39
+// passphrase may be supplied; it is used transiently and NOT owned here (the
+// caller destroys its buffer). passphrase may be nil for the empty passphrase.
+func newSecretFromBuffer(buf *memguard.LockedBuffer, passphrase []byte) (*secret, error) {
 	if buf == nil || !buf.IsAlive() {
 		return nil, errors.New("hdwallet: mnemonic buffer is nil or destroyed")
 	}
@@ -72,7 +78,7 @@ func newSecretFromBuffer(buf *memguard.LockedBuffer) (*secret, error) {
 	raw := buf.Bytes()
 	trimmed := bytes.TrimSpace(raw) // sub-slice of protected memory; no copy
 
-	seedEnclave, err := deriveSeedEnclave(trimmed)
+	seedEnclave, err := deriveSeedEnclave(trimmed, passphrase)
 	if err != nil {
 		buf.Destroy()
 		return nil, err
@@ -132,11 +138,17 @@ func newSecretFromPrivateKeyBuffer(buf *memguard.LockedBuffer, curve Curve) (*se
 }
 
 // validatePrivateKey checks that priv is a plausible private key for curve: the
-// correct length and not the all-zero scalar (which is not a valid key on any of
-// the supported curves and would derive a point at infinity).
+// correct length (32 bytes for every supported curve) and not the all-zero
+// scalar (invalid on every curve — it would derive the point at infinity). For
+// the STARK curve the scalar must additionally be below the group order.
+//
+// Ed25519ExtendedCardano is intentionally rejected: Cardano uses a 96-byte
+// extended key derived from BIP-39 entropy, not a raw 32-byte scalar, so it
+// cannot be imported as a plain private key.
 func validatePrivateKey(priv []byte, curve Curve) error {
 	switch curve {
-	case Secp256k1, Ed25519, Nist256p1:
+	case Secp256k1, Ed25519, Nist256p1,
+		Ed25519Blake2bNano, Curve25519, Sr25519, Starkex:
 	default:
 		return fmt.Errorf("%w: %s", ErrUnsupportedCurve, curve)
 	}
@@ -152,6 +164,11 @@ func validatePrivateKey(priv []byte, curve Curve) error {
 	}
 	if allZero {
 		return fmt.Errorf("%w: key is all zero", ErrInvalidPrivateKey)
+	}
+	if curve == Starkex {
+		if new(big.Int).SetBytes(priv).Cmp(starkOrder) >= 0 {
+			return fmt.Errorf("%w: starkex scalar not below the curve order", ErrInvalidPrivateKey)
+		}
 	}
 	return nil
 }
@@ -170,17 +187,20 @@ func (s *secret) withImportedKey(fn func(priv []byte) error) error {
 }
 
 // deriveSeedEnclave validates a mnemonic and returns its BIP-39 seed sealed in
-// an enclave. It does not take ownership of mnemonic (the caller wipes/seals it).
+// an enclave, applying an optional passphrase (the BIP-39 "25th word"). It does
+// not take ownership of mnemonic or passphrase (the caller wipes/seals them).
+// A nil/empty passphrase yields the Trust Wallet default seed.
 //
 // bip39 only accepts strings, so a single transient string conversion is made
-// here for validation and seed derivation; it cannot be wiped and is bounded by
-// GC. This is the one residual plaintext exposure in the secret path.
-func deriveSeedEnclave(mnemonic []byte) (*memguard.Enclave, error) {
+// here for both the mnemonic and the passphrase for validation and seed
+// derivation; those strings cannot be wiped and are bounded by GC. This is the
+// one residual plaintext exposure in the secret path.
+func deriveSeedEnclave(mnemonic, passphrase []byte) (*memguard.Enclave, error) {
 	phrase := string(mnemonic)
 	if !bip39.IsMnemonicValid(phrase) {
 		return nil, ErrInvalidMnemonic
 	}
-	seed := bip39.NewSeed(phrase, "")                    // empty passphrase == Trust Wallet default
+	seed := bip39.NewSeed(phrase, string(passphrase))    // empty passphrase == Trust Wallet default
 	return memguard.NewBufferFromBytes(seed).Seal(), nil // wipes seed
 }
 

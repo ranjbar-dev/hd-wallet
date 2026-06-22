@@ -61,18 +61,22 @@ const (
 	familyBitcoin
 )
 
-// txFamilyOf maps a symbol to its transaction-building family. EVM chains all map
-// to familyEthereum; Cosmos chains all map to familyCosmos.
+// txFamilyOf maps a symbol to its transaction-building family. EVM and standard
+// Cosmos chains are resolved from the data-driven evmTxChains / cosmosTxChains
+// sets (see tx_families.go) so transaction support stays in lockstep with the
+// address registry; the single-chain families are matched directly.
 func txFamilyOf(symbol Symbol) txFamily {
-	switch symbol {
-	case ETH, BNB, MATIC, AVAX, ARB, OP, FTM, BASE, CRO, GNO, CELO:
+	if _, ok := evmTxChains[symbol]; ok {
 		return familyEthereum
+	}
+	if _, ok := cosmosTxChains[symbol]; ok {
+		return familyCosmos
+	}
+	switch symbol {
 	case TRX:
 		return familyTron
 	case XRP:
 		return familyRipple
-	case ATOM, OSMO, JUNO, TIA:
-		return familyCosmos
 	case SOL:
 		return familySolana
 	case BTC, LTC:

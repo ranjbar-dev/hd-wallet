@@ -23,9 +23,22 @@ message Transaction {
     bytes amount = 2;
   }
 
+  // Arbitrary contract call, or contract creation (deploy). For a call, set
+  // SigningInput.to_address to the contract address and put the call's ABI
+  // calldata in `data`. For creation, leave SigningInput.to_address empty and
+  // put the init code in `data`. `amount` is the native value to send (may be
+  // empty for zero).
+  message ContractGeneric {
+    // Native value to send, big-endian uint256 bytes (empty == 0).
+    bytes amount = 1;
+    // Calldata (contract call) or init code (contract creation).
+    bytes data = 2;
+  }
+
   oneof transaction_oneof {
     Transfer transfer = 1;
     ERC20Transfer erc20_transfer = 2;
+    ContractGeneric contract_generic = 3;
   }
 }
 

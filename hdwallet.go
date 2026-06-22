@@ -48,6 +48,15 @@ var (
 	// ErrKeyOnlyIndex is returned when a non-zero address/sign index is requested
 	// on a key-only wallet, which has a single leaf key and no HD path.
 	ErrKeyOnlyIndex = errors.New("hdwallet: private-key-only wallet supports only index 0")
+	// ErrPathArity is returned by the structured account/change/index helpers
+	// (AddressAt, SignAt, PublicKeyAt) when a coin's path template is not a
+	// 5-element BIP-44/BIP-84 path; use the AddressPath/SignPath primitives instead.
+	ErrPathArity = errors.New("hdwallet: coin path is not a 5-element BIP-44/84 path; use the *Path methods")
+	// ErrExtKeyUnsupportedCurve is returned by the extended-key (xprv/xpub) and
+	// watch-only APIs for a non-secp256k1 coin: BIP-32 extended keys and public
+	// (non-hardened) child derivation apply only to secp256k1; the SLIP-0010
+	// ed25519/nist256p1 schemes support hardened derivation only.
+	ErrExtKeyUnsupportedCurve = errors.New("hdwallet: extended keys / watch-only require a secp256k1 coin")
 )
 
 // HDWallet is an HD wallet derived from a BIP-39 mnemonic. Its sensitive
@@ -77,8 +86,28 @@ func FromMnemonic(mnemonic string) (*HDWallet, error) {
 
 // FromMnemonicBytes builds a wallet from a mnemonic held in a byte slice. The
 // slice is wiped before the function returns; callers must not reuse it.
+//
+// It uses the empty BIP-39 passphrase (Trust Wallet's default). For a
+// passphrase-protected ("hidden") wallet, use FromMnemonicWithPassphrase.
 func FromMnemonicBytes(mnemonic []byte) (*HDWallet, error) {
-	s, err := newSecret(mnemonic)
+	s, err := newSecret(mnemonic, nil)
+	if err != nil {
+		return nil, err
+	}
+	return &HDWallet{secret: s}, nil
+}
+
+// FromMnemonicWithPassphrase builds a wallet from a mnemonic and an optional
+// BIP-39 passphrase (the "25th word"), both held in byte slices. A different
+// passphrase derives a completely different set of addresses from the same
+// mnemonic; the empty passphrase (nil or empty slice) matches FromMnemonicBytes
+// and Trust Wallet's default.
+//
+// Both slices are wiped before the function returns; callers must not reuse
+// them. Like the mnemonic, the passphrase is briefly converted to a Go string
+// internally for BIP-39 seed derivation (see the package secret-handling notes).
+func FromMnemonicWithPassphrase(mnemonic, passphrase []byte) (*HDWallet, error) {
+	s, err := newSecret(mnemonic, passphrase)
 	if err != nil {
 		return nil, err
 	}
@@ -92,8 +121,35 @@ func FromMnemonicBytes(mnemonic []byte) (*HDWallet, error) {
 //
 // The wallet takes ownership of buf and destroys it; do not use buf afterwards.
 // Surrounding whitespace in the buffer is trimmed before use.
+//
+// It uses the empty BIP-39 passphrase (Trust Wallet's default). For a
+// passphrase-protected wallet, use FromMnemonicBufferWithPassphrase.
 func FromMnemonicBuffer(buf *memguard.LockedBuffer) (*HDWallet, error) {
-	s, err := newSecretFromBuffer(buf)
+	s, err := newSecretFromBuffer(buf, nil)
+	if err != nil {
+		return nil, err
+	}
+	return &HDWallet{secret: s}, nil
+}
+
+// FromMnemonicBufferWithPassphrase is the most secure passphrase entry point:
+// both the mnemonic and the BIP-39 passphrase are supplied in page-locked,
+// encrypted-at-rest memguard buffers and used without an intermediate plaintext
+// heap copy (aside from the unavoidable transient BIP-39 string conversion).
+//
+// The wallet takes ownership of both buffers and destroys them; do not use
+// either afterwards. passphrase may be nil for the empty passphrase. Surrounding
+// whitespace in the mnemonic buffer is trimmed; the passphrase is used verbatim.
+func FromMnemonicBufferWithPassphrase(buf, passphrase *memguard.LockedBuffer) (*HDWallet, error) {
+	var pass []byte
+	if passphrase != nil {
+		if !passphrase.IsAlive() {
+			return nil, errors.New("hdwallet: passphrase buffer is destroyed")
+		}
+		pass = passphrase.Bytes() // used transiently; destroyed below
+		defer passphrase.Destroy()
+	}
+	s, err := newSecretFromBuffer(buf, pass)
 	if err != nil {
 		return nil, err
 	}
@@ -249,10 +305,43 @@ func (w *HDWallet) withLeafPrivateKey(symbol Symbol, index uint32, fn func(priv 
 	if err != nil {
 		return fmt.Errorf("hdwallet: %s: %w", symbol, err)
 	}
+	return w.deriveLeafSeedMode(coin, path, fn)
+}
+
+// deriveLeafSeedMode derives the leaf private key for coin at the resolved
+// absolute path, opening the seed once and handing the wiped-on-return key plus
+// the resolved coin to fn. The caller MUST hold w.mu and have verified the
+// wallet is in seed mode (secret != nil, not key-only). coin is a copy, so
+// overwriting its Path is safe.
+func (w *HDWallet) deriveLeafSeedMode(coin Coin, path string, fn func(priv []byte, coin Coin) error) error {
 	coin.Path = path
 	return w.secret.withSeed(func(seed []byte) error {
 		return withPrivateKey(seed, coin, func(priv []byte) error { return fn(priv, coin) })
 	})
+}
+
+// withLeafPrivateKeyPath is the custom-path counterpart of withLeafPrivateKey: it
+// materialises the leaf key for symbol at an arbitrary absolute BIP-32 path
+// instead of the coin's template-derived index. It is seed-only — a key-only
+// wallet has a single leaf and no HD path, so it returns ErrKeyOnlyWallet. The
+// path is validated with parsePath before any derivation.
+func (w *HDWallet) withLeafPrivateKeyPath(symbol Symbol, path string, fn func(priv []byte, coin Coin) error) error {
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+	if w.secret == nil {
+		return ErrDestroyed
+	}
+	coin, ok := coins[symbol]
+	if !ok {
+		return fmt.Errorf("%w: %s", ErrUnsupportedCoin, symbol)
+	}
+	if w.secret.isKeyOnly() {
+		return fmt.Errorf("%w: %s custom path", ErrKeyOnlyWallet, symbol)
+	}
+	if _, err := parsePath(path); err != nil {
+		return fmt.Errorf("hdwallet: %s: %w", symbol, err)
+	}
+	return w.deriveLeafSeedMode(coin, path, fn)
 }
 
 // withLeafPublicKey materialises the leaf private key (both modes), derives its
@@ -260,6 +349,17 @@ func (w *HDWallet) withLeafPrivateKey(symbol Symbol, index uint32, fn func(priv 
 // private key is wiped before fn runs (it is consumed inside withLeafPrivateKey).
 func (w *HDWallet) withLeafPublicKey(symbol Symbol, index uint32, fn func(pub []byte, coin Coin) error) error {
 	return w.withLeafPrivateKey(symbol, index, func(priv []byte, coin Coin) error {
+		pub, err := publicKeyFromPriv(coin.Curve, priv)
+		if err != nil {
+			return fmt.Errorf("hdwallet: %s: %w", symbol, err)
+		}
+		return fn(pub, coin)
+	})
+}
+
+// withLeafPublicKeyPath is the custom-path counterpart of withLeafPublicKey.
+func (w *HDWallet) withLeafPublicKeyPath(symbol Symbol, path string, fn func(pub []byte, coin Coin) error) error {
+	return w.withLeafPrivateKeyPath(symbol, path, func(priv []byte, coin Coin) error {
 		pub, err := publicKeyFromPriv(coin.Curve, priv)
 		if err != nil {
 			return fmt.Errorf("hdwallet: %s: %w", symbol, err)
