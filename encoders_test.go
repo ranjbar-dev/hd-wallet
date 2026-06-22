@@ -102,6 +102,9 @@ var trustWalletVectors = map[string]string{
 	// nist256p1
 	"NEO": "AeicEjZyiXKgUeSBbYQHxsU1X3V5Buori5",
 	"ONT": "AeicEjZyiXKgUeSBbYQHxsU1X3V5Buori5",
+	// new-curve chains
+	"XNO":   "nano_1qepdf4k95dhb5gsmhmq3iddqsxiafwkihunm7irn48jdiwdtnn6pe93k3f6",
+	"WAVES": "3P2C786D6mBuvyf4WYr6K6Vch5uhi97nBHG",
 }
 
 func TestEncodersAgainstTrustWalletVectors(t *testing.T) {

@@ -220,6 +220,10 @@ const (
 	// nist256p1 (SLIP-0010).
 	NEO Symbol = "NEO"
 	ONT Symbol = "ONT" // Ontology (same NEO-style address)
+
+	// new-curve chains (SLIP-0010 ed25519 leaf key, chain-specific signing).
+	XNO   Symbol = "XNO"   // Nano (ed25519-blake2b)
+	WAVES Symbol = "WAVES" // Waves (curve25519)
 )
 
 // Coin describes a supported network: its curve, BIP-32 derivation path, and the
@@ -378,6 +382,10 @@ var coins = map[Symbol]Coin{
 	// ---- nist256p1 (SLIP-0010) ----
 	"NEO": {"NEO", "NEO", Nist256p1, "m/44'/888'/0'/0/0", encodeNEO},
 	"ONT": {"Ontology", "ONT", Nist256p1, "m/44'/1024'/0'/0/0", encodeNEO},
+
+	// ---- new-curve chains ----
+	"XNO":   {"Nano", "XNO", Ed25519Blake2bNano, "m/44'/165'/0'", encodeNano},
+	"WAVES": {"Waves", "WAVES", Curve25519, "m/44'/5741564'/0'/0'/0'", encodeWaves},
 }
 
 // init registers address validators for the networks added beyond the original
@@ -438,4 +446,8 @@ func init() {
 	validators[KIN] = strkeyValidator(6<<3, KIN)       // Stellar strkey (version 'G')
 	validators[AE] = aeValidator(AE)                   // ak_ base58check
 	validators[ONT] = base58CheckValidator1(0x17, ONT) // same NEO-style address
+
+	// New-curve chains.
+	validators[XNO] = nanoValidator(XNO)      // nano_ base32 + blake2b-40 checksum
+	validators[WAVES] = wavesValidator(WAVES) // base58 secure-hash address
 }

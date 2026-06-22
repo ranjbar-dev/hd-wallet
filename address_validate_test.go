@@ -140,6 +140,9 @@ var validAddrVectors = map[Symbol]string{
 	// nist256p1
 	NEO: "AeicEjZyiXKgUeSBbYQHxsU1X3V5Buori5",
 	ONT: "AeicEjZyiXKgUeSBbYQHxsU1X3V5Buori5",
+	// new-curve chains
+	XNO:   "nano_1qepdf4k95dhb5gsmhmq3iddqsxiafwkihunm7irn48jdiwdtnn6pe93k3f6",
+	WAVES: "3P2C786D6mBuvyf4WYr6K6Vch5uhi97nBHG",
 }
 
 // TestValidVectorsCoverRegistry guards that the valid-vector table stays in sync
@@ -427,7 +430,7 @@ func TestParsePayloadLengths(t *testing.T) {
 		SOL: true, XLM: true, DOT: true, KSM: true, NEAR: true,
 		ALGO: true, SUI: true, APTOS: true,
 		// additional 32-byte-payload chains
-		IOST: true, KIN: true, EGLD: true, HBAR: true, AE: true,
+		IOST: true, KIN: true, EGLD: true, HBAR: true, AE: true, XNO: true,
 	}
 	for sym, addr := range validAddrVectors {
 		payload, err := ParseAddress(sym, addr)
