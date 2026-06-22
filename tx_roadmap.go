@@ -8,12 +8,7 @@ package hdwallet
 
 import (
 	txbtc "github.com/ranjbar-dev/hd-wallet/txproto/bitcoin"
-	txsolana "github.com/ranjbar-dev/hd-wallet/txproto/solana"
 )
-
-func (w *HDWallet) signSolanaTx(_ Symbol, _ uint32, _ *txsolana.SigningInput) (*txsolana.SigningOutput, error) {
-	return nil, ErrTxRoadmap
-}
 
 func (w *HDWallet) signBitcoinTx(_ Symbol, _ uint32, _ *txbtc.SigningInput) (*txbtc.SigningOutput, error) {
 	return nil, ErrTxRoadmap
