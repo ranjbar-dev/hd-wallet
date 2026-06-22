@@ -7,7 +7,7 @@
 
 A **Trust Wallet–compatible**, security-focused **hierarchical-deterministic (HD) wallet** library for Go.
 
-Generate a BIP-39 mnemonic (or import one) and derive receive addresses for **33 networks across 3 elliptic-curve families** using the same derivation paths and address formats Trust Wallet uses by default — so seeds are interchangeable between the two.
+Generate a BIP-39 mnemonic (or import one) and derive receive addresses for **129 networks** using the same derivation paths and address formats Trust Wallet uses by default — so seeds are interchangeable between the two. Beyond derivation it adds **EVM tooling** (RLP, ABI, EIP-191, EIP-712), **protobuf transaction signing** for core families (EVM, Tron, XRP, Cosmos, Solana — no broadcast), **secure private-key import/export**, and **address validation/parsing**.
 
 Sensitive material (the mnemonic and derived seed) is **never** held as a plain Go string or a long-lived byte slice. It lives in encrypted, page-locked [memguard](https://github.com/awnumar/memguard) enclaves and is decrypted only for the microseconds of a single derivation.
 
@@ -15,12 +15,12 @@ Sensitive material (the mnemonic and derived seed) is **never** held as a plain 
 
 ## Why this library
 
-- 🔐 **Secrets isolated in RAM.** Encrypted enclaves, memory locked against swap (`mlock`/`VirtualLock`), guard pages, and automatic wiping. No mnemonic-as-`string`, no exported secret fields.
-- ✅ **Provably Trust Wallet–compatible.** Every address encoder is tested against Trust Wallet Core's own vectors; key derivation is tested against the SLIP-0010 specification. See [Verification](#verification).
-- 🌐 **33 networks, 3 curves.** secp256k1 (Bitcoin-style, EVM, Cosmos, XRP, Tron), ed25519 (Solana, Stellar, Polkadot, …), and NIST P-256 (NEO).
-- ✍️ **Raw signing** for every network (ECDSA + EdDSA). Derived keys are wiped after each signature and are never exported.
+- 🔐 **Secrets isolated in RAM.** Encrypted enclaves, memory locked against swap (`mlock`/`VirtualLock`), guard pages, and automatic wiping. No mnemonic-as-`string`, no exported secret fields. Private-key import/export goes through the same memguard pattern — there is still no raw key getter.
+- ✅ **Provably Trust Wallet–compatible.** Every address encoder is tested against Trust Wallet Core's own vectors; key derivation is tested against the SLIP-0010 specification; transaction signers reproduce Trust Wallet Core's `AnySigner` vectors byte-for-byte. See [Verification](#verification).
+- 🌐 **129 networks across 5 curves in use.** secp256k1 (Bitcoin-style, 50+ EVM chains, ~30 Cosmos chains, XRP, Tron), ed25519 (Solana, Stellar, …), NIST P-256 (NEO), ed25519-blake2b (Nano), and curve25519 (Waves). 8 curve schemes are implemented in total.
+- ✍️ **Signing at every level.** Raw ECDSA/EdDSA signing for every network, EVM message signing (EIP-191/EIP-712), and full **protobuf transaction signing** (EVM, Tron, XRP, Cosmos, Solana) that returns broadcast-ready raw transactions. Derived keys are wiped after each use.
 - 🧩 **Extensible.** Add a network with a single registry row.
-- 📦 **Small dependency surface.** btcd (secp256k1/bech32/base58), go-bip39, x/crypto, and memguard.
+- 📦 **Focused dependency surface.** btcd (secp256k1/bech32/base58), go-bip39, x/crypto, memguard, protobuf, and curve libraries (edwards25519, schnorrkel, gnark-crypto) for the additional schemes.
 
 ---
 
