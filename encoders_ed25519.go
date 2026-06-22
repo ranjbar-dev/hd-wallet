@@ -5,9 +5,154 @@ import (
 	"encoding/hex"
 
 	"github.com/btcsuite/btcd/btcutil/base58"
+	"github.com/btcsuite/btcd/btcutil/bech32"
 )
 
 // All ed25519 encoders receive the raw 32-byte public key.
+
+// ---------- MultiversX (Elrond): bech32("erd", pubkey) ----------
+
+// encodeEGLD bech32-encodes the raw 32-byte ed25519 public key under the "erd"
+// HRP (no hashing), matching Trust Wallet Core's MultiversX address.
+func encodeEGLD(pub []byte) (string, error) {
+	conv, err := bech32.ConvertBits(pub, 8, 5, true)
+	if err != nil {
+		return "", err
+	}
+	return bech32.Encode("erd", conv)
+}
+
+// ---------- Hedera: "0.0." || hex(DER ed25519 SPKI prefix || pubkey) ----------
+
+// hederaDERPrefix is the fixed 12-byte DER/SPKI prefix for an Ed25519 public key
+// (AlgorithmIdentifier 1.3.101.112 + BIT STRING header).
+var hederaDERPrefix = []byte{0x30, 0x2a, 0x30, 0x05, 0x06, 0x03, 0x2b, 0x65, 0x70, 0x03, 0x21, 0x00}
+
+func encodeHBAR(pub []byte) (string, error) {
+	data := make([]byte, 0, len(hederaDERPrefix)+len(pub))
+	data = append(data, hederaDERPrefix...)
+	data = append(data, pub...)
+	return "0.0." + hex.EncodeToString(data), nil
+}
+
+// ---------- Oasis: bech32("oasis", 0x00 || SHA512/256(ctx || pubkey)[:20]) ----------
+
+// oasisStakingContext is the address-derivation context for Oasis staking
+// accounts (the bytes hashed together with a 0x00 version byte and the pubkey).
+var oasisStakingContext = append([]byte("oasis-core/address: staking"), 0x00)
+
+func encodeOasis(pub []byte) (string, error) {
+	h := sha512Sum256(append(append([]byte{}, oasisStakingContext...), pub...))
+	data := make([]byte, 0, 1+20)
+	data = append(data, 0x00) // address version
+	data = append(data, h[:20]...)
+	conv, err := bech32.ConvertBits(data, 8, 5, true)
+	if err != nil {
+		return "", err
+	}
+	return bech32.Encode("oasis", conv)
+}
+
+// ---------- Aeternity: "ak_" || base58(pubkey || sha256d(pubkey)[:4]) ----------
+
+func encodeAE(pub []byte) (string, error) {
+	body := make([]byte, 0, 32+4)
+	body = append(body, pub...)
+	body = append(body, sha256d(pub)[:4]...)
+	return "ak_" + base58Encode(base58BTC, body), nil
+}
+
+// ---------- validators for the additional ed25519 chains ----------
+
+// egldValidator validates a MultiversX address: bech32("erd", 32-byte pubkey).
+func egldValidator(symbol Symbol) addressValidator {
+	return func(addr string) ([]byte, error) {
+		hrp, data, err := bech32.Decode(addr)
+		if err != nil {
+			return nil, addrErr(symbol, "bech32 decode failed: "+err.Error())
+		}
+		if hrp != "erd" {
+			return nil, addrErr(symbol, "wrong prefix (want erd)")
+		}
+		payload, err := bech32.ConvertBits(data, 5, 8, false)
+		if err != nil {
+			return nil, addrErr(symbol, "invalid payload: "+err.Error())
+		}
+		if len(payload) != 32 {
+			return nil, addrErr(symbol, "payload length not 32")
+		}
+		return payload, nil
+	}
+}
+
+// oasisValidator validates an Oasis address: bech32("oasis", version || 20-byte
+// truncated context hash). Returns the 20-byte account hash.
+func oasisValidator(symbol Symbol) addressValidator {
+	return func(addr string) ([]byte, error) {
+		hrp, data, err := bech32.Decode(addr)
+		if err != nil {
+			return nil, addrErr(symbol, "bech32 decode failed: "+err.Error())
+		}
+		if hrp != "oasis" {
+			return nil, addrErr(symbol, "wrong prefix (want oasis)")
+		}
+		payload, err := bech32.ConvertBits(data, 5, 8, false)
+		if err != nil {
+			return nil, addrErr(symbol, "invalid payload: "+err.Error())
+		}
+		if len(payload) != 21 || payload[0] != 0x00 {
+			return nil, addrErr(symbol, "bad version/length")
+		}
+		return payload[1:], nil
+	}
+}
+
+// hbarValidator validates a Hedera address: "0.0." followed by the hex of the
+// DER ed25519 SPKI prefix and a 32-byte public key.
+func hbarValidator(symbol Symbol) addressValidator {
+	return func(addr string) ([]byte, error) {
+		const p = "0.0."
+		if len(addr) <= len(p) || addr[:len(p)] != p {
+			return nil, addrErr(symbol, "must start with 0.0.")
+		}
+		raw, err := hex.DecodeString(addr[len(p):])
+		if err != nil {
+			return nil, addrErr(symbol, "invalid hex")
+		}
+		if len(raw) != len(hederaDERPrefix)+32 {
+			return nil, addrErr(symbol, "wrong length")
+		}
+		for i := range hederaDERPrefix {
+			if raw[i] != hederaDERPrefix[i] {
+				return nil, addrErr(symbol, "bad DER prefix")
+			}
+		}
+		return raw[len(hederaDERPrefix):], nil
+	}
+}
+
+// aeValidator validates an Aeternity address: "ak_" + base58(pubkey ||
+// sha256d(pubkey)[:4]). Returns the 32-byte public key.
+func aeValidator(symbol Symbol) addressValidator {
+	return func(addr string) ([]byte, error) {
+		const p = "ak_"
+		if len(addr) <= len(p) || addr[:len(p)] != p {
+			return nil, addrErr(symbol, "must start with ak_")
+		}
+		raw, err := base58Decode(base58BTC, addr[len(p):])
+		if err != nil {
+			return nil, addrErr(symbol, err.Error())
+		}
+		if len(raw) != 32+4 {
+			return nil, addrErr(symbol, "wrong length")
+		}
+		pub := raw[:32]
+		if !bytesEqual(raw[32:], sha256d(pub)[:4]) {
+			return nil, addrErr(symbol, "bad checksum")
+		}
+		return pub, nil
+	}
+}
 
 // ---------- Solana: raw base58 (Bitcoin alphabet, no checksum) ----------
 

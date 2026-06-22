@@ -209,8 +209,17 @@ const (
 	APTOS Symbol = "APTOS"
 	XTZ   Symbol = "XTZ"
 
+	// ed25519 (SLIP-0010) — additional chains.
+	EGLD Symbol = "EGLD" // MultiversX (bech32 of pubkey)
+	IOST Symbol = "IOST" // IOST (base58 of pubkey)
+	HBAR Symbol = "HBAR" // Hedera (0.0.<DER-encoded pubkey hex>)
+	ROSE Symbol = "ROSE" // Oasis (bech32 of context-hashed pubkey)
+	KIN  Symbol = "KIN"  // Kin (Stellar strkey)
+	AE   Symbol = "AE"   // Aeternity (ak_ base58check)
+
 	// nist256p1 (SLIP-0010).
 	NEO Symbol = "NEO"
+	ONT Symbol = "ONT" // Ontology (same NEO-style address)
 )
 
 // Coin describes a supported network: its curve, BIP-32 derivation path, and the
@@ -358,8 +367,17 @@ var coins = map[Symbol]Coin{
 	"APTOS": {"Aptos", "APTOS", Ed25519, "m/44'/637'/0'/0'/0'", encodeAPTOS},
 	"XTZ":   {"Tezos", "XTZ", Ed25519, "m/44'/1729'/0'/0'", encodeXTZ},
 
+	// ---- ed25519 (SLIP-0010) : additional chains ----
+	"EGLD": {"MultiversX", "EGLD", Ed25519, "m/44'/508'/0'/0'/0'", encodeEGLD},
+	"IOST": {"IOST", "IOST", Ed25519, "m/44'/899'/0'/0'/0'", encodeSOL},
+	"HBAR": {"Hedera", "HBAR", Ed25519, "m/44'/3030'/0'/0'/0'", encodeHBAR},
+	"ROSE": {"Oasis", "ROSE", Ed25519, "m/44'/474'/0'", encodeOasis},
+	"KIN":  {"Kin", "KIN", Ed25519, "m/44'/2017'/0'", encodeXLM},
+	"AE":   {"Aeternity", "AE", Ed25519, "m/44'/457'/0'/0'/0'", encodeAE},
+
 	// ---- nist256p1 (SLIP-0010) ----
 	"NEO": {"NEO", "NEO", Nist256p1, "m/44'/888'/0'/0/0", encodeNEO},
+	"ONT": {"Ontology", "ONT", Nist256p1, "m/44'/1024'/0'/0/0", encodeNEO},
 }
 
 // init registers address validators for the networks added beyond the original
@@ -411,4 +429,13 @@ func init() {
 	for sym, hrp := range cosmos {
 		validators[sym] = cosmosValidator(hrp, sym)
 	}
+
+	// Additional ed25519 / nist256p1 chains.
+	validators[EGLD] = egldValidator(EGLD)             // bech32("erd", 32-byte pubkey)
+	validators[IOST] = solValidator(IOST)              // base58 32-byte pubkey
+	validators[HBAR] = hbarValidator(HBAR)             // 0.0.<DER hex>
+	validators[ROSE] = oasisValidator(ROSE)            // bech32("oasis", ...)
+	validators[KIN] = strkeyValidator(6<<3, KIN)       // Stellar strkey (version 'G')
+	validators[AE] = aeValidator(AE)                   // ak_ base58check
+	validators[ONT] = base58CheckValidator1(0x17, ONT) // same NEO-style address
 }

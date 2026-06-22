@@ -92,8 +92,16 @@ var trustWalletVectors = map[string]string{
 	"SUI":   "0x870deb25d5c0a4d7250d52d5cd58dacca2d51eb2a120a979b13384cd52e21e1b",
 	"APTOS": "0xce2fd04ac9efa74f17595e5785e847a2399d7e637f5e8179244f76191f653276",
 	"XTZ":   "tz1gcEWswVU6dxfNQWbhTgaZrUrNUFwrsT4z",
+	// ed25519 — additional chains
+	"EGLD": "erd1a6f6fan035ttsxdmn04ellxdlnwpgyhg0lhx5vjv92v6rc8xw9yq83344f",
+	"IOST": "H4JcMPicKkHcxxDjkyyrLoQj7Kcibd9t815ak4UvTr9M",
+	"HBAR": "0.0.302a300506032b6570032100ee93a4f66f8d16b819bb9beb9ffccdfcdc1412e87fee6a324c2a99a1e0e67148",
+	"ROSE": "oasis1qzw4h3wmyjtrttduqqrs8udggyy2emwdzqmuzwg4",
+	"KIN":  "GDXJHJHWN6GRNOAZXON6XH74ZX6NYFAS5B7642RSJQVJTIPA4ZYUQLEB",
+	"AE":   "ak_2p5878zbFhxnrm7meL7TmqwtvBaqcBddyp5eGzZbovZ5FeVfcw",
 	// nist256p1
 	"NEO": "AeicEjZyiXKgUeSBbYQHxsU1X3V5Buori5",
+	"ONT": "AeicEjZyiXKgUeSBbYQHxsU1X3V5Buori5",
 }
 
 func TestEncodersAgainstTrustWalletVectors(t *testing.T) {
