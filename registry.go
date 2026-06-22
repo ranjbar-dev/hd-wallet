@@ -163,6 +163,41 @@ const (
 	JUNO Symbol = "JUNO"
 	TIA  Symbol = "TIA"
 
+	// secp256k1 — additional Cosmos SDK chains (hash160 bech32, per-chain HRP).
+	LUNA      Symbol = "LUNA"
+	KAVA      Symbol = "KAVA"
+	SCRT      Symbol = "SCRT"
+	BAND      Symbol = "BAND"
+	RUNE      Symbol = "RUNE"
+	STARS     Symbol = "STARS"
+	AXL       Symbol = "AXL"
+	STRD      Symbol = "STRD"
+	BLD       Symbol = "BLD"
+	CRE       Symbol = "CRE"
+	KUJI      Symbol = "KUJI"
+	CMDX      Symbol = "CMDX"
+	NTRN      Symbol = "NTRN"
+	SOMM      Symbol = "SOMM"
+	FET       Symbol = "FET"
+	MARS      Symbol = "MARS"
+	UMEE      Symbol = "UMEE"
+	COREUM    Symbol = "COREUM"
+	QSR       Symbol = "QSR"
+	XPRT      Symbol = "XPRT"
+	AKT       Symbol = "AKT"
+	NOBLE     Symbol = "NOBLE"
+	SEI       Symbol = "SEI"
+	DYDX      Symbol = "DYDX"
+	BLZ       Symbol = "BLZ"
+	CRYPTOORG Symbol = "CRYPTOORG"
+
+	// secp256k1 — Cosmos chains with EVM-style keys (keccak address, bech32).
+	EVMOS Symbol = "EVMOS"
+	INJ   Symbol = "INJ"
+	CANTO Symbol = "CANTO"
+	ZETA  Symbol = "ZETA"
+	ONE   Symbol = "ONE"
+
 	// ed25519 (SLIP-0010).
 	SOL   Symbol = "SOL"
 	XLM   Symbol = "XLM"
@@ -277,6 +312,41 @@ var coins = map[Symbol]Coin{
 	"JUNO": {"Juno", "JUNO", Secp256k1, "m/44'/118'/0'/0/0", cosmosEncoder("juno")},
 	"TIA":  {"Celestia", "TIA", Secp256k1, "m/44'/118'/0'/0/0", cosmosEncoder("celestia")},
 
+	// ---- secp256k1 : additional Cosmos SDK chains (hash160 bech32) ----
+	"LUNA":      {"Terra", "LUNA", Secp256k1, "m/44'/330'/0'/0/0", cosmosEncoder("terra")},
+	"KAVA":      {"Kava", "KAVA", Secp256k1, "m/44'/459'/0'/0/0", cosmosEncoder("kava")},
+	"SCRT":      {"Secret", "SCRT", Secp256k1, "m/44'/529'/0'/0/0", cosmosEncoder("secret")},
+	"BAND":      {"Band Protocol", "BAND", Secp256k1, "m/44'/494'/0'/0/0", cosmosEncoder("band")},
+	"RUNE":      {"THORChain", "RUNE", Secp256k1, "m/44'/931'/0'/0/0", cosmosEncoder("thor")},
+	"STARS":     {"Stargaze", "STARS", Secp256k1, "m/44'/118'/0'/0/0", cosmosEncoder("stars")},
+	"AXL":       {"Axelar", "AXL", Secp256k1, "m/44'/118'/0'/0/0", cosmosEncoder("axelar")},
+	"STRD":      {"Stride", "STRD", Secp256k1, "m/44'/118'/0'/0/0", cosmosEncoder("stride")},
+	"BLD":       {"Agoric", "BLD", Secp256k1, "m/44'/564'/0'/0/0", cosmosEncoder("agoric")},
+	"CRE":       {"Crescent", "CRE", Secp256k1, "m/44'/118'/0'/0/0", cosmosEncoder("cre")},
+	"KUJI":      {"Kujira", "KUJI", Secp256k1, "m/44'/118'/0'/0/0", cosmosEncoder("kujira")},
+	"CMDX":      {"Comdex", "CMDX", Secp256k1, "m/44'/118'/0'/0/0", cosmosEncoder("comdex")},
+	"NTRN":      {"Neutron", "NTRN", Secp256k1, "m/44'/118'/0'/0/0", cosmosEncoder("neutron")},
+	"SOMM":      {"Sommelier", "SOMM", Secp256k1, "m/44'/118'/0'/0/0", cosmosEncoder("somm")},
+	"FET":       {"Fetch.ai", "FET", Secp256k1, "m/44'/118'/0'/0/0", cosmosEncoder("fetch")},
+	"MARS":      {"Mars", "MARS", Secp256k1, "m/44'/118'/0'/0/0", cosmosEncoder("mars")},
+	"UMEE":      {"Umee", "UMEE", Secp256k1, "m/44'/118'/0'/0/0", cosmosEncoder("umee")},
+	"COREUM":    {"Coreum", "COREUM", Secp256k1, "m/44'/990'/0'/0/0", cosmosEncoder("core")},
+	"QSR":       {"Quasar", "QSR", Secp256k1, "m/44'/118'/0'/0/0", cosmosEncoder("quasar")},
+	"XPRT":      {"Persistence", "XPRT", Secp256k1, "m/44'/118'/0'/0/0", cosmosEncoder("persistence")},
+	"AKT":       {"Akash", "AKT", Secp256k1, "m/44'/118'/0'/0/0", cosmosEncoder("akash")},
+	"NOBLE":     {"Noble", "NOBLE", Secp256k1, "m/44'/118'/0'/0/0", cosmosEncoder("noble")},
+	"SEI":       {"Sei", "SEI", Secp256k1, "m/44'/118'/0'/0/0", cosmosEncoder("sei")},
+	"DYDX":      {"dYdX", "DYDX", Secp256k1, "m/44'/118'/0'/0/0", cosmosEncoder("dydx")},
+	"BLZ":       {"Bluzelle", "BLZ", Secp256k1, "m/44'/483'/0'/0/0", cosmosEncoder("bluzelle")},
+	"CRYPTOORG": {"Crypto.org", "CRYPTOORG", Secp256k1, "m/44'/394'/0'/0/0", cosmosEncoder("cro")},
+
+	// ---- secp256k1 : Cosmos chains with EVM-style keys (keccak address) ----
+	"EVMOS": {"Evmos", "EVMOS", Secp256k1, "m/44'/60'/0'/0/0", cosmosEvmEncoder("evmos")},
+	"INJ":   {"Injective", "INJ", Secp256k1, "m/44'/60'/0'/0/0", cosmosEvmEncoder("inj")},
+	"CANTO": {"Canto", "CANTO", Secp256k1, "m/44'/60'/0'/0/0", cosmosEvmEncoder("canto")},
+	"ZETA":  {"ZetaChain", "ZETA", Secp256k1, "m/44'/60'/0'/0/0", cosmosEvmEncoder("zeta")},
+	"ONE":   {"Harmony", "ONE", Secp256k1, "m/44'/1023'/0'/0/0", cosmosEvmEncoder("one")},
+
 	// ---- ed25519 (SLIP-0010) ----
 	"SOL":   {"Solana", "SOL", Ed25519, "m/44'/501'/0'", encodeSOL},
 	"XLM":   {"Stellar", "XLM", Ed25519, "m/44'/148'/0'", encodeXLM},
@@ -325,4 +395,20 @@ func init() {
 	validators[XVG] = base58CheckValidator1(0x1e, XVG)
 	validators[PIVX] = base58CheckValidator1(0x1e, PIVX)
 	validators[NEBL] = base58CheckValidator1(0x35, NEBL)
+
+	// Additional Cosmos SDK chains (bech32, 20-byte payload, per-HRP). The same
+	// validator handles both hash160-key and EVM-key chains since both encode a
+	// 20-byte account identifier under the chain HRP.
+	cosmos := map[Symbol]string{
+		LUNA: "terra", KAVA: "kava", SCRT: "secret", BAND: "band", RUNE: "thor",
+		STARS: "stars", AXL: "axelar", STRD: "stride", BLD: "agoric", CRE: "cre",
+		KUJI: "kujira", CMDX: "comdex", NTRN: "neutron", SOMM: "somm", FET: "fetch",
+		MARS: "mars", UMEE: "umee", COREUM: "core", QSR: "quasar", XPRT: "persistence",
+		AKT: "akash", NOBLE: "noble", SEI: "sei", DYDX: "dydx", BLZ: "bluzelle",
+		CRYPTOORG: "cro",
+		EVMOS:     "evmos", INJ: "inj", CANTO: "canto", ZETA: "zeta", ONE: "one",
+	}
+	for sym, hrp := range cosmos {
+		validators[sym] = cosmosValidator(hrp, sym)
+	}
 }

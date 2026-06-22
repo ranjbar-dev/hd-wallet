@@ -138,6 +138,27 @@ func cosmosEncoder(hrp string) func([]byte) (string, error) {
 	}
 }
 
+// ---------- Cosmos EVM chains: bech32 of the Ethereum address bytes ----------
+
+// cosmosEvmEncoder builds an address for Cosmos chains that use Ethereum-style
+// keys (Evmos, Injective, Canto, ZetaChain native, Harmony). The 20-byte
+// account identifier is keccak256(uncompressed pubkey)[12:] — the same bytes as
+// an Ethereum address — bech32-encoded under the chain's HRP.
+func cosmosEvmEncoder(hrp string) func([]byte) (string, error) {
+	return func(pub []byte) (string, error) {
+		pk, err := btcec.ParsePubKey(pub)
+		if err != nil {
+			return "", err
+		}
+		raw := keccak256(pk.SerializeUncompressed()[1:])[12:]
+		conv, err := bech32.ConvertBits(raw, 8, 5, true)
+		if err != nil {
+			return "", err
+		}
+		return bech32.Encode(hrp, conv)
+	}
+}
+
 // ---------- Bitcoin Cash: CashAddr (P2KH, 160-bit) ----------
 
 const cashCharset = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
