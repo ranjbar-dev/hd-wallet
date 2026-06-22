@@ -153,7 +153,7 @@ Verified byte-for-byte against Trust Wallet Core's signing vectors for:
 
 | Family | Coverage |
 |---|---|
-| **EVM** | legacy (EIP-155) + EIP-1559, native + ERC-20 + arbitrary contract call + contract creation (deploy). All registered EVM chains. |
+| **EVM** | legacy (EIP-155) + EIP-2930 (access list) + EIP-1559, native + ERC-20 + arbitrary contract call + contract creation (deploy) + EIP-2930/1559 access lists. All registered EVM chains. |
 | **Tron** | TRX transfer + TRC-20 token transfer (TriggerSmartContract) |
 | **XRP** | Payment |
 | **Cosmos** | bank `MsgSend`, staking `MsgDelegate`/`MsgUndelegate`, `MsgWithdrawDelegatorReward`, multi-message (protobuf direct mode). All standard secp256k1 Cosmos chains (ethermint-keyed chains, e.g. INJ/EVMOS, are not yet supported). |
@@ -178,6 +178,24 @@ sig2, _ := w.SignTypedData(hdwallet.ETH, 0, typedDataJSON)           // EIP-712
 
 Plus standalone EVM tooling: `EncodeRLP`/`DecodeRLP`, `ABIEncode`/`ABIDecode`,
 `ABIFunctionSelector`, `EthereumPersonalMessageHash`, `EIP712Hash`.
+
+### Bitcoin & Solana message signing
+
+Non-EVM message signing, each pinned byte-for-byte to its Trust Wallet Core
+`MessageSigner` vector:
+
+```go
+// Bitcoin "signmessage" standard → base64; verifies against a legacy P2PKH address.
+sig, _  := w.SignBitcoinMessage(hdwallet.BTC, 0, []byte("test signature"))
+ok      := hdwallet.VerifyBitcoinMessage("19cAJn4Ms8jodBBGtroBNNpCZiHAWGAq7X", []byte("test signature"), sig)
+
+// Solana off-chain message (raw ed25519) → base58.
+ssig, _ := w.SignSolanaMessage(hdwallet.SOL, 0, []byte("Hello world"))
+sok     := hdwallet.VerifySolanaMessage(addr, []byte("Hello world"), ssig)
+```
+
+> Cosmos ADR-36 arbitrary-message signing is on the roadmap (no authoritative
+> Trust Wallet Core vector to verify against yet).
 
 ### Address validation & parsing
 
@@ -329,6 +347,10 @@ because a fund-critical address must match an authoritative vector first:
 - **Zilliqa** (Schnorr), **TON**, **ICON**, and a handful of long-tail chains whose
   address scheme isn't reproduced against a vector yet (see `registry.go`).
 
+Deferred signing features (same reason — no authoritative vector yet): **Bitcoin
+transaction** building and **ethermint-keyed Cosmos** tx (INJ/EVMOS/…) — see
+`tx_roadmap.go`; and **Cosmos ADR-36** message signing — see `message_cosmos_test.go`.
+
 Contributions with test vectors welcome.
 
 ---
@@ -362,17 +384,18 @@ go test -race -cover ./...
 | Function / method | Purpose |
 |---|---|
 | `NewHDWallet() (*HDWallet, error)` | New wallet with a fresh 12-word mnemonic. |
+| `NewHDWalletWithWordCount(words int) (*HDWallet, error)` | New wallet with a 12/15/18/21/24-word mnemonic. Also `NewHDWalletWithEntropy(bits)`. |
 | `FromMnemonic(string) (*HDWallet, error)` | Import from a mnemonic string (least secure). |
 | `FromMnemonicBytes([]byte) (*HDWallet, error)` | Import from a byte slice (wiped on use). |
 | `FromMnemonicBuffer(*memguard.LockedBuffer) (*HDWallet, error)` | Import from a memguard buffer (most secure; zero-copy). |
 | `FromMnemonicWithPassphrase([]byte, []byte) (*HDWallet, error)` | Import with a BIP-39 passphrase (the "25th word"). |
 | `FromMnemonicBufferWithPassphrase(buf, pass *memguard.LockedBuffer) (*HDWallet, error)` | Passphrase import, both secrets in memguard buffers. |
-| `GenerateMnemonic() (string, error)` | Generate a mnemonic without building a wallet. |
+| `GenerateMnemonic() (string, error)` | Generate a mnemonic without building a wallet. Also `GenerateMnemonicWithWordCount(words)`. |
 | `(*HDWallet) Address(symbol Symbol) (string, error)` | First receive address for one network. |
 | `(*HDWallet) AddressIndex(symbol Symbol, index uint32) (string, error)` | Nth address/account for one network. |
 | `(*HDWallet) AddressPath(symbol Symbol, path string) (string, error)` | Address at an arbitrary absolute BIP-32 path. Also `SignPath`/`PublicKeyPath`/`WithPrivateKeyPath`/`PrivateKeyPath`. |
 | `(*HDWallet) AddressAt(symbol Symbol, account, change, index uint32) (string, error)` | Address by BIP-44 account/change/index. Also `SignAt`/`PublicKeyAt`. |
-| `(*HDWallet) AllAddresses() (map[Symbol]string, error)` | Addresses for all networks. |
+| `(*HDWallet) AllAddresses() (map[Symbol]string, error)` | Addresses for all networks. Also `AllAddressesAt(index)` for any index. |
 | `(*HDWallet) Sign(symbol Symbol, data []byte) (*Signature, error)` | Sign a digest (ECDSA) / message (ed25519) at index 0. |
 | `(*HDWallet) SignIndex(symbol Symbol, index uint32, data []byte) (*Signature, error)` | Sign with the key at a given index. |
 | `(*HDWallet) PublicKey(symbol Symbol) ([]byte, error)` | Public key at index 0. |
@@ -403,6 +426,8 @@ go test -race -cover ./...
 | `(*HDWallet) SignTransaction(symbol, index, proto.Message) (proto.Message, error)` | Build+sign a raw tx (EVM/Tron/XRP/Cosmos/Solana; no broadcast). |
 | `(*HDWallet) SignMessage(symbol, index, []byte) ([]byte, error)` | EIP-191 `personal_sign` → 65-byte r‖s‖v. |
 | `(*HDWallet) SignTypedData(symbol, index, []byte) ([]byte, error)` | EIP-712 typed-data signature. |
+| `(*HDWallet) SignBitcoinMessage(symbol, index, []byte) (string, error)` | Bitcoin `signmessage` → base64. With `VerifyBitcoinMessage`. |
+| `(*HDWallet) SignSolanaMessage(symbol, index, []byte) (string, error)` | Solana off-chain message → base58. With `VerifySolanaMessage`. |
 | `RecoverEthereumAddress([]byte, []byte) (string, error)` · `VerifyEthereumMessage` / `…TypedData` | Recover/verify EIP-191/712 signers. |
 | `EncodeRLP`/`DecodeRLP` · `ABIEncode`/`ABIDecode` · `ABIFunctionSelector` · `EIP712Hash` | Standalone EVM encoding utilities. |
 
