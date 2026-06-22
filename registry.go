@@ -119,6 +119,9 @@ const (
 	WAX Symbol = "WAX"
 	FIO Symbol = "FIO"
 
+	// secp256k1 — Filecoin (f1 base32 address).
+	FIL Symbol = "FIL"
+
 	// secp256k1 — EVM chains (same key & address format as Ethereum).
 	BNB   Symbol = "BNB"
 	MATIC Symbol = "MATIC"
@@ -291,6 +294,9 @@ var coins = map[Symbol]Coin{
 	"WAX": {"WAX", "WAX", Secp256k1, "m/44'/194'/0'/0/0", eosEncoder("EOS")},
 	"FIO": {"FIO", "FIO", Secp256k1, "m/44'/235'/0'/0/0", eosEncoder("FIO")},
 
+	// ---- secp256k1 : Filecoin ----
+	"FIL": {"Filecoin", "FIL", Secp256k1, "m/44'/461'/0'/0/0", encodeFIL},
+
 	// ---- secp256k1 : EVM chains (same key & address format as Ethereum) ----
 	"BNB":   {"BNB Smart Chain", "BNB", Secp256k1, "m/44'/60'/0'/0/0", encodeETH},
 	"MATIC": {"Polygon", "MATIC", Secp256k1, "m/44'/60'/0'/0/0", encodeETH},
@@ -430,6 +436,9 @@ func init() {
 	validators[EOS] = eosValidator("EOS", EOS)
 	validators[WAX] = eosValidator("EOS", WAX)
 	validators[FIO] = eosValidator("FIO", FIO)
+
+	// Filecoin f1 address.
+	validators[FIL] = filValidator(FIL)
 
 	// Additional native-SegWit UTXO chains (witness program is hash160).
 	validators[GRS] = segwitValidator("grs", GRS)

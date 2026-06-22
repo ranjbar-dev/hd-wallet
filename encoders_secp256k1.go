@@ -1,6 +1,7 @@
 package hdwallet
 
 import (
+	"encoding/base32"
 	"encoding/hex"
 	"strings"
 
@@ -131,6 +132,45 @@ func encodeTRX(pub []byte) (string, error) {
 	}
 	raw := keccak256(pk.SerializeUncompressed()[1:])[12:]
 	return base58.CheckEncode(raw, 0x41), nil
+}
+
+// ---------- Filecoin secp256k1 (f1): base32 of blake2b key hash ----------
+
+// filecoinBase32 is Filecoin's base32 alphabet (RFC 4648 lowercase, no padding).
+var filecoinBase32 = base32.NewEncoding("abcdefghijklmnopqrstuvwxyz234567").WithPadding(base32.NoPadding)
+
+// encodeFIL builds a Filecoin secp256k1 (f1) address: protocol byte 1, the
+// 20-byte BLAKE2b-160 of the UNCOMPRESSED public key as payload, and a 4-byte
+// BLAKE2b checksum of (protocol || payload), base32-encoded.
+func encodeFIL(pub []byte) (string, error) {
+	pk, err := btcec.ParsePubKey(pub)
+	if err != nil {
+		return "", err
+	}
+	payload := blake2b160(pk.SerializeUncompressed())
+	checksum := blake2bSize(4, append([]byte{0x01}, payload...))
+	return "f1" + filecoinBase32.EncodeToString(append(payload, checksum...)), nil
+}
+
+// filValidator validates a Filecoin f1 address and returns the 20-byte payload.
+func filValidator(symbol Symbol) addressValidator {
+	return func(addr string) ([]byte, error) {
+		if len(addr) <= 2 || addr[:2] != "f1" {
+			return nil, addrErr(symbol, "must start with f1")
+		}
+		raw, err := filecoinBase32.DecodeString(addr[2:])
+		if err != nil {
+			return nil, addrErr(symbol, "base32 decode failed: "+err.Error())
+		}
+		if len(raw) != 20+4 {
+			return nil, addrErr(symbol, "wrong length")
+		}
+		payload := raw[:20]
+		if !bytesEqual(raw[20:], blake2bSize(4, append([]byte{0x01}, payload...))) {
+			return nil, addrErr(symbol, "bad checksum")
+		}
+		return payload, nil
+	}
 }
 
 // ---------- EOS / FIO / WAX: prefix || base58(pubkey || ripemd160(pubkey)[:4]) ----------

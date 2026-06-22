@@ -78,6 +78,17 @@ func blake2b160(b []byte) []byte {
 	return h.Sum(nil)
 }
 
+// blake2bSize returns the BLAKE2b digest of b at the given size (1..64 bytes).
+// Used for the Filecoin address checksum (4-byte digest).
+func blake2bSize(size int, b []byte) []byte {
+	h, err := blake2b.New(size, nil)
+	if err != nil {
+		panic("hdwallet: blake2b init failed: " + err.Error())
+	}
+	h.Write(b)
+	return h.Sum(nil)
+}
+
 // wipe overwrites a byte slice with zeros. Used for ephemeral key material;
 // long-lived secrets are protected by memguard (see secret.go). It delegates to
 // memguard.WipeBytes, whose zeroing the compiler is not free to elide.

@@ -53,6 +53,7 @@ var trustWalletVectors = map[string]string{
 	"EOS":   "EOS5TrYnZP1RkDSUMzBY4GanCy6AP68kCMdkAb5EACkAwkdgRLShz",
 	"WAX":   "EOS5TrYnZP1RkDSUMzBY4GanCy6AP68kCMdkAb5EACkAwkdgRLShz",
 	"FIO":   "FIO5TrYnZP1RkDSUMzBY4GanCy6AP68kCMdkAb5EACkAwkdgRLShz",
+	"FIL":   "f1qsx7qwiojh5duxbxhbqgnlyx5hmpcf7mcz5oxsy",
 	// secp256k1 EVM — Ronin uses the "ronin:" prefix instead of "0x".
 	"RONIN": "ronin:9d8A62f656a8d1615C1294fd71e9CFb3E4855A4F",
 	"ATOM":  "cosmos1hkfq3zahaqkkzx5mjnamwjsfpq2jk7z0emlrvp",

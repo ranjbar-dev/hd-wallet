@@ -45,6 +45,7 @@ var validAddrVectors = map[Symbol]string{
 	EOS: "EOS5TrYnZP1RkDSUMzBY4GanCy6AP68kCMdkAb5EACkAwkdgRLShz",
 	WAX: "EOS5TrYnZP1RkDSUMzBY4GanCy6AP68kCMdkAb5EACkAwkdgRLShz",
 	FIO: "FIO5TrYnZP1RkDSUMzBY4GanCy6AP68kCMdkAb5EACkAwkdgRLShz",
+	FIL: "f1qsx7qwiojh5duxbxhbqgnlyx5hmpcf7mcz5oxsy",
 	// secp256k1 — EVM (share the Ethereum vector)
 	BNB:   "0x9d8A62f656a8d1615C1294fd71e9CFb3E4855A4F",
 	MATIC: "0x9d8A62f656a8d1615C1294fd71e9CFb3E4855A4F",
