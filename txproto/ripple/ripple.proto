@@ -1,0 +1,30 @@
+syntax = "proto3";
+
+package hdwallet.ripple.proto;
+
+option go_package = "github.com/ranjbar-dev/hd-wallet/txproto/ripple";
+
+// XRP (native) payment.
+message Payment {
+  int64 amount = 1;        // drops
+  string destination = 2;  // r... address
+  int64 destination_tag = 3;
+}
+
+// SigningInput mirrors a minimal subset of TW.Ripple.Proto.SigningInput for a
+// native XRP Payment.
+message SigningInput {
+  int64 fee = 1;
+  uint32 sequence = 2;
+  uint32 last_ledger_sequence = 3;
+  string account = 4; // sender r... address
+  uint32 flags = 5;
+  Payment payment = 6;
+}
+
+// SigningOutput mirrors a minimal subset of TW.Ripple.Proto.SigningOutput.
+message SigningOutput {
+  bytes encoded = 1; // serialized signed transaction
+  string encoded_hex = 2;
+  string error = 3;
+}

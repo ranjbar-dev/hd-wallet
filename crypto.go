@@ -21,6 +21,14 @@ func hash160(b []byte) []byte {
 	return r.Sum(nil)
 }
 
+// ripemd160Sum is a plain RIPEMD-160 (no SHA-256 pre-hash), used for the EOS /
+// FIO / WAX public-key string checksum (base58 of pubkey || ripemd160(pubkey)[:4]).
+func ripemd160Sum(b []byte) []byte {
+	r := ripemd160.New() // #nosec G406 -- RIPEMD-160 required for EOS-family key checksum
+	r.Write(b)
+	return r.Sum(nil)
+}
+
 // keccak256 is original Keccak (NOT finalized SHA-3) as used by Ethereum/Tron.
 func keccak256(b []byte) []byte {
 	h := sha3.NewLegacyKeccak256()
@@ -43,7 +51,7 @@ func sha512Sum256(b []byte) []byte {
 
 // sha3Sum256 is finalized SHA3-256 (not Keccak), used for Aptos addresses.
 func sha3Sum256(b []byte) []byte {
-	h := sha3.Sum256(b)
+	h := sha3.Sum256(b) //nolint:govet // govet's inline suggestion; the value form is clearest here
 	return h[:]
 }
 
@@ -65,6 +73,17 @@ func blake2b160(b []byte) []byte {
 	if err != nil {
 		// Only fails on invalid size; 20 is always valid.
 		panic("hdwallet: blake2b-160 init failed: " + err.Error())
+	}
+	h.Write(b)
+	return h.Sum(nil)
+}
+
+// blake2bSize returns the BLAKE2b digest of b at the given size (1..64 bytes).
+// Used for the Filecoin address checksum (4-byte digest).
+func blake2bSize(size int, b []byte) []byte {
+	h, err := blake2b.New(size, nil)
+	if err != nil {
+		panic("hdwallet: blake2b init failed: " + err.Error())
 	}
 	h.Write(b)
 	return h.Sum(nil)

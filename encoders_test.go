@@ -28,11 +28,69 @@ var trustWalletVectors = map[string]string{
 	"BCH":  "bitcoincash:qz7eyzytkl5z6cg6nw20hd62pyyp22mcfuardfd2vn",
 	"DASH": "XsyCV5yojxF4y3bYeEiVYqarvRgsWFELZL",
 	"ZEC":  "t1b9xfAk3kZp5Qk3rinDPq7zzLkJGHTChDS",
-	"ETH":  "0x9d8A62f656a8d1615C1294fd71e9CFb3E4855A4F",
-	"TRX":  "TQLCsShbQNXMTVCjprY64qZmEA4rBarpQp",
-	"XRP":  "rJHMeqKu8Ep7Fazx8MQG6JunaafBXz93YQ",
-	"ATOM": "cosmos1hkfq3zahaqkkzx5mjnamwjsfpq2jk7z0emlrvp",
-	"OSMO": "osmo1hkfq3zahaqkkzx5mjnamwjsfpq2jk7z03qvn6n",
+	// secp256k1 — additional UTXO chains (segwit and base58check P2PKH).
+	"GRS":   "grs1qhkfq3zahaqkkzx5mjnamwjsfpq2jk7z0jsaf3d",
+	"DGB":   "dgb1qhkfq3zahaqkkzx5mjnamwjsfpq2jk7z0c69ssz",
+	"BTG":   "btg1qhkfq3zahaqkkzx5mjnamwjsfpq2jk7z0eg8day",
+	"SYS":   "sys1qhkfq3zahaqkkzx5mjnamwjsfpq2jk7z083sjh7",
+	"VIA":   "via1qhkfq3zahaqkkzx5mjnamwjsfpq2jk7z09y9mn2",
+	"QTUM":  "QdtLm8ccxhuJFF5zCgikpaghbM3thdaGsW",
+	"RVN":   "RSZYjMDCP4q3t7NAFXPPnqEGrMZn971pdB",
+	"KMD":   "RSZYjMDCP4q3t7NAFXPPnqEGrMZn971pdB",
+	"FIRO":  "aHzpPjmY132KseS4nkiQTbDahTEXqesY89",
+	"MONA":  "MRBWtGEKHGCHhmyJ1L4CwaWQZJzM5DnVcs",
+	"XVG":   "DNRTC6GZ5evmM7BZWwPqF54fyDqUqULMyu",
+	"PIVX":  "DNRTC6GZ5evmM7BZWwPqF54fyDqUqULMyu",
+	"NEBL":  "NdCKqb8BQoavA5PZ5b4APxKmSpmBA6yMSi",
+	"STRAX": "strax1qhkfq3zahaqkkzx5mjnamwjsfpq2jk7z0rvt20n",
+	"ZEN":   "zniNGeFxXRpY6RDGVdfdmbcvcFb1rrLdnFz",
+	"BCD":   "1JHMeqKunF2Up6zxnMQGhJu5667BXz98YQ",
+	"XEC":   "ecash:qz7eyzytkl5z6cg6nw20hd62pyyp22mcfuywezks2y",
+	"FLUX":  "t1b9xfAk3kZp5Qk3rinDPq7zzLkJGHTChDS",
+	"ETH":   "0x9d8A62f656a8d1615C1294fd71e9CFb3E4855A4F",
+	"TRX":   "TQLCsShbQNXMTVCjprY64qZmEA4rBarpQp",
+	"XRP":   "rJHMeqKu8Ep7Fazx8MQG6JunaafBXz93YQ",
+	"EOS":   "EOS5TrYnZP1RkDSUMzBY4GanCy6AP68kCMdkAb5EACkAwkdgRLShz",
+	"WAX":   "EOS5TrYnZP1RkDSUMzBY4GanCy6AP68kCMdkAb5EACkAwkdgRLShz",
+	"FIO":   "FIO5TrYnZP1RkDSUMzBY4GanCy6AP68kCMdkAb5EACkAwkdgRLShz",
+	"FIL":   "f1qsx7qwiojh5duxbxhbqgnlyx5hmpcf7mcz5oxsy",
+	// secp256k1 EVM — Ronin uses the "ronin:" prefix instead of "0x".
+	"RONIN": "ronin:9d8A62f656a8d1615C1294fd71e9CFb3E4855A4F",
+	"ATOM":  "cosmos1hkfq3zahaqkkzx5mjnamwjsfpq2jk7z0emlrvp",
+	"OSMO":  "osmo1hkfq3zahaqkkzx5mjnamwjsfpq2jk7z03qvn6n",
+	// secp256k1 — additional Cosmos chains (hash160 bech32).
+	"LUNA":      "terra1hkfq3zahaqkkzx5mjnamwjsfpq2jk7z0ll9rwp",
+	"KAVA":      "kava1hkfq3zahaqkkzx5mjnamwjsfpq2jk7z09wt76x",
+	"SCRT":      "secret1hkfq3zahaqkkzx5mjnamwjsfpq2jk7z0m7t23a",
+	"BAND":      "band1hkfq3zahaqkkzx5mjnamwjsfpq2jk7z0q5lp5f",
+	"RUNE":      "thor1hkfq3zahaqkkzx5mjnamwjsfpq2jk7z0luxce7",
+	"STARS":     "stars1hkfq3zahaqkkzx5mjnamwjsfpq2jk7z0d8g78s",
+	"AXL":       "axelar1hkfq3zahaqkkzx5mjnamwjsfpq2jk7z0a4ft8q",
+	"STRD":      "stride1hkfq3zahaqkkzx5mjnamwjsfpq2jk7z06sllcd",
+	"BLD":       "agoric1hkfq3zahaqkkzx5mjnamwjsfpq2jk7z0txauuh",
+	"CRE":       "cre1hkfq3zahaqkkzx5mjnamwjsfpq2jk7z0anvxev",
+	"KUJI":      "kujira1hkfq3zahaqkkzx5mjnamwjsfpq2jk7z0gnampt",
+	"CMDX":      "comdex1hkfq3zahaqkkzx5mjnamwjsfpq2jk7z075ap4k",
+	"NTRN":      "neutron1hkfq3zahaqkkzx5mjnamwjsfpq2jk7z0aykpkx",
+	"SOMM":      "somm1hkfq3zahaqkkzx5mjnamwjsfpq2jk7z048s0at",
+	"FET":       "fetch1hkfq3zahaqkkzx5mjnamwjsfpq2jk7z02xk8wk",
+	"MARS":      "mars1hkfq3zahaqkkzx5mjnamwjsfpq2jk7z0yxx6e6",
+	"UMEE":      "umee1hkfq3zahaqkkzx5mjnamwjsfpq2jk7z0tdzugn",
+	"COREUM":    "core1hkfq3zahaqkkzx5mjnamwjsfpq2jk7z0248ct6",
+	"QSR":       "quasar1hkfq3zahaqkkzx5mjnamwjsfpq2jk7z0hc97py",
+	"XPRT":      "persistence1hkfq3zahaqkkzx5mjnamwjsfpq2jk7z0hhesz9",
+	"AKT":       "akash1hkfq3zahaqkkzx5mjnamwjsfpq2jk7z05qjy4m",
+	"NOBLE":     "noble1hkfq3zahaqkkzx5mjnamwjsfpq2jk7z03c2t50",
+	"SEI":       "sei1hkfq3zahaqkkzx5mjnamwjsfpq2jk7z05hw42q",
+	"DYDX":      "dydx1hkfq3zahaqkkzx5mjnamwjsfpq2jk7z0sz38vk",
+	"BLZ":       "bluzelle1hkfq3zahaqkkzx5mjnamwjsfpq2jk7z0vrup2s",
+	"CRYPTOORG": "cro1hkfq3zahaqkkzx5mjnamwjsfpq2jk7z0pqh6ss",
+	// secp256k1 — Cosmos chains with EVM-style keys (keccak address, bech32).
+	"EVMOS": "evmos1nk9x9ajk4rgkzhqjjn7hr6w0k0jg2kj07me7uu",
+	"INJ":   "inj1nk9x9ajk4rgkzhqjjn7hr6w0k0jg2kj0knl55v",
+	"CANTO": "canto1nk9x9ajk4rgkzhqjjn7hr6w0k0jg2kj0wvfqju",
+	"ZETA":  "zeta1nk9x9ajk4rgkzhqjjn7hr6w0k0jg2kj027x9uy",
+	"ONE":   "one1nk9x9ajk4rgkzhqjjn7hr6w0k0jg2kj0nmx3dt",
 	// ed25519
 	"SOL":   "H4JcMPicKkHcxxDjkyyrLoQj7Kcibd9t815ak4UvTr9M",
 	"XLM":   "GDXJHJHWN6GRNOAZXON6XH74ZX6NYFAS5B7642RSJQVJTIPA4ZYUQLEB",
@@ -43,8 +101,19 @@ var trustWalletVectors = map[string]string{
 	"SUI":   "0x870deb25d5c0a4d7250d52d5cd58dacca2d51eb2a120a979b13384cd52e21e1b",
 	"APTOS": "0xce2fd04ac9efa74f17595e5785e847a2399d7e637f5e8179244f76191f653276",
 	"XTZ":   "tz1gcEWswVU6dxfNQWbhTgaZrUrNUFwrsT4z",
+	// ed25519 — additional chains
+	"EGLD": "erd1a6f6fan035ttsxdmn04ellxdlnwpgyhg0lhx5vjv92v6rc8xw9yq83344f",
+	"IOST": "H4JcMPicKkHcxxDjkyyrLoQj7Kcibd9t815ak4UvTr9M",
+	"HBAR": "0.0.302a300506032b6570032100ee93a4f66f8d16b819bb9beb9ffccdfcdc1412e87fee6a324c2a99a1e0e67148",
+	"ROSE": "oasis1qzw4h3wmyjtrttduqqrs8udggyy2emwdzqmuzwg4",
+	"KIN":  "GDXJHJHWN6GRNOAZXON6XH74ZX6NYFAS5B7642RSJQVJTIPA4ZYUQLEB",
+	"AE":   "ak_2p5878zbFhxnrm7meL7TmqwtvBaqcBddyp5eGzZbovZ5FeVfcw",
 	// nist256p1
 	"NEO": "AeicEjZyiXKgUeSBbYQHxsU1X3V5Buori5",
+	"ONT": "AeicEjZyiXKgUeSBbYQHxsU1X3V5Buori5",
+	// new-curve chains
+	"XNO":   "nano_1qepdf4k95dhb5gsmhmq3iddqsxiafwkihunm7irn48jdiwdtnn6pe93k3f6",
+	"WAVES": "3P2C786D6mBuvyf4WYr6K6Vch5uhi97nBHG",
 }
 
 func TestEncodersAgainstTrustWalletVectors(t *testing.T) {
@@ -75,7 +144,13 @@ func TestEncodersAgainstTrustWalletVectors(t *testing.T) {
 func TestEVMChainsMatchEthereum(t *testing.T) {
 	priv := dummyKey()
 	const wantETH = "0x9d8A62f656a8d1615C1294fd71e9CFb3E4855A4F"
-	for _, symbol := range []Symbol{BNB, MATIC, AVAX, ARB, OP, FTM, BASE, CRO, GNO, CELO} {
+	for _, symbol := range []Symbol{
+		BNB, MATIC, AVAX, ARB, OP, FTM, BASE, CRO, GNO, CELO,
+		ETC, ZKSYNC, LINEA, SCROLL, MANTLE, BLAST, KAIA, AURORA, GLMR, MOVR,
+		BOBA, METIS, OPBNB, POLZKEVM, MANTA, RBTC, HECO, OKT, KCS, WAN,
+		POA, CLO, GO, TT, VET, IOTX, THETA, NEON, MERLIN, LIGHT,
+		SONIC, ZENEON, ZETAEVM,
+	} {
 		coin := coins[symbol]
 		pub, err := publicKeyFromPriv(coin.Curve, priv)
 		if err != nil {

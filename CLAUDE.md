@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-`github.com/ranjbar-dev/hd-wallet` is a published, security-focused, **Trust Wallet–compatible** HD wallet library (single Go package `hdwallet`, plus a demo CLI in `cmd/hdwallet`). It derives addresses and signs digests/messages for 33 networks across 3 elliptic curves. **Correctness is fund-critical**: a wrong address or signature means permanently lost funds, so nothing in the derivation/encoder/signing paths ships without passing an authoritative test vector.
+`github.com/ranjbar-dev/hd-wallet` is a published, security-focused, **Trust Wallet–compatible** HD wallet library (single Go package `hdwallet`, plus a demo CLI in `cmd/hdwallet`). It derives addresses and signs digests/messages for **129 networks**; the registered coins span 5 elliptic curves (secp256k1, ed25519, nist256p1, ed25519-blake2b, curve25519) and the package implements 8 curve schemes total (also ed25519-extended/Cardano, starkex, sr25519 — present but not yet wired to a registered chain). On top of raw signing it provides **EVM tooling** (RLP, ABI, EIP-191, EIP-712), **protobuf transaction signing** for core families (`SignTransaction`; EVM/Tron/XRP/Cosmos/Solana — no broadcast), **secure private-key import/export**, and **address validation/parsing** (`AnyAddress`-style). **Correctness is fund-critical**: a wrong address or signature means permanently lost funds, so nothing in the derivation/encoder/signing paths ships without passing an authoritative test vector.
 
 ## Commands
 
@@ -43,6 +43,15 @@ The whole library is one flat package built around three concerns. Reading these
 
 ### The hashing asymmetry (don't break this)
 ECDSA chains (secp256k1, nist256p1) sign a **32-byte digest** — the *caller* pre-hashes with the chain's hash function. ed25519 signs the **raw message**. `Sign` validates 32-byte input for ECDSA (`ErrInvalidDigest`) and passes ed25519 messages through unchanged. This is inherent to the cryptography, not a style choice.
+
+### Feature layers built on top (Trust Wallet Core parity)
+These reuse the derive/sign/encoder layers without touching the secret-isolation core:
+- **Curves (`cardano.go`, `curve25519.go`, `ed25519_blake2b.go`, `starkex.go`, `sr25519.go`, `curve_helpers.go`):** the 5 curves beyond the original 3. Dispatched from `derive.go`/`sign.go`. Cardano needs BIP-39 *entropy* (not the seed) so its seed-path returns `errCardanoNeedsEntropy`; starkex seed→key and sr25519 are provisional/unverified — none is wired to a registered chain yet.
+- **Private-key mode (`privatekey.go`, key-only branch in `secret.go`/`hdwallet.go`):** `FromPrivateKeyBytes`/`FromPrivateKeyBuffer` build a key-only wallet; `WithPrivateKey(fn)` (wiped on return) and `PrivateKey()` (memguard buffer) export — mirroring `WithMnemonic`/`Mnemonic`. **The "keys never leave the package as a raw `[]byte`" invariant still holds**; there is no raw getter. `withCoin` was unified into `withLeafPrivateKey` (handles both seed and key-only modes).
+- **EVM tooling (`eth_rlp.go`, `eth_abi.go`, `eth_eip191.go`, `eth_eip712.go`, `eth_message.go`):** pure-Go RLP, contract ABI, EIP-191 `personal_sign`, EIP-712 typed data, and an `EthereumMessageSigner`-style API. No new deps; reuses `keccak256` + the secp256k1 signer.
+- **Transaction signing (`tx.go` dispatcher + `tx_evm.go`/`tx_tron.go`/`tx_ripple.go`/`tx_cosmos.go`/`tx_solana.go`, protos in `txproto/`):** `(*HDWallet).SignTransaction(symbol, index, proto.Message)` returns a signed, serialized raw tx (**no broadcast**). Bitcoin is `tx_roadmap.go` (deferred). Non-EVM wire formats are hand-built with `protowire` for byte-exactness.
+- **Address validation (`address_validate.go`):** `IsValidAddress`/`ValidateAddress`/`ParseAddress`/`AddressFromPublicKey` via a separate validator registry (reverse of the encoders) — keyed by `Symbol`, **not** stored on the `Coin` struct.
+- `crypto.go` is excluded from gosec via `-exclude-generated` only for the generated `txproto/*.pb.go`; three hand-written safe int→byte conversions carry narrow `#nosec G115` notes.
 
 ## How correctness is proven (extend this when adding chains)
 

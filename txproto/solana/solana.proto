@@ -1,0 +1,41 @@
+syntax = "proto3";
+
+package hdwallet.solana.proto;
+
+option go_package = "github.com/ranjbar-dev/hd-wallet/txproto/solana";
+
+// Native SOL transfer via the System Program.
+message Transfer {
+  string recipient = 1; // base58 address
+  uint64 value = 2;     // lamports
+}
+
+// SPL token transfer via the Token Program (checked transfer).
+message TokenTransfer {
+  string token_mint_address = 1;       // base58
+  string sender_token_address = 2;     // base58 (the source ATA)
+  string recipient_token_address = 3;  // base58 (the destination ATA)
+  uint64 amount = 4;
+  uint32 decimals = 5;
+}
+
+// SigningInput mirrors a minimal subset of TW.Solana.Proto.SigningInput.
+message SigningInput {
+  // Recent blockhash, base58.
+  string recent_blockhash = 1;
+
+  oneof transaction_type {
+    Transfer transfer_transaction = 2;
+    TokenTransfer token_transfer_transaction = 3;
+  }
+}
+
+// SigningOutput mirrors a minimal subset of TW.Solana.Proto.SigningOutput.
+message SigningOutput {
+  // base58 of the fully signed transaction.
+  string encoded = 1;
+  // raw signed transaction bytes.
+  bytes raw = 2;
+  // Error message, empty on success.
+  string error = 3;
+}
