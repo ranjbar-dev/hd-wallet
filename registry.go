@@ -237,6 +237,19 @@ const (
 	// new-curve chains (SLIP-0010 ed25519 leaf key, chain-specific signing).
 	XNO   Symbol = "XNO"   // Nano (ed25519-blake2b)
 	WAVES Symbol = "WAVES" // Waves (curve25519)
+
+	// Roadmap — Trust Wallet Core networks intentionally NOT registered yet (each
+	// needs more than a vector-verified encoder over the standard seed path, so
+	// adding one now would break AllAddresses or ship an unverified address):
+	//   - Cardano: needs BIP-39 ENTROPY (Icarus master), not the seed; the seed
+	//     path returns errCardanoNeedsEntropy, so a row would break AllAddresses.
+	//   - StarkNet/StarkEx: seed->key derivation is provisional/unverified.
+	//   - Zilliqa: requires a Schnorr scheme that is not implemented.
+	//   - TON: address is the hash of a v4r2 wallet StateInit cell (BoC); too
+	//     chain-specific to reproduce and vector-match safely here.
+	//   - ICON, Nervos, NULS, Nebulas, Nimiq, Polymesh, Pactus, Internet Computer,
+	//     Everscale, Aion: address scheme not yet reproduced against the TWC
+	//     expected vector; omitted until vector-verified.
 )
 
 // Coin describes a supported network: its curve, BIP-32 derivation path, and the
