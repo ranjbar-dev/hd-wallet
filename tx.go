@@ -43,9 +43,6 @@ var (
 	// ErrTxInput is returned when the SigningInput proto type does not match the
 	// family selected by symbol, or a required field is missing/invalid.
 	ErrTxInput = errors.New("hdwallet: invalid transaction signing input")
-	// ErrTxRoadmap is returned by families that are planned but not yet
-	// vector-verified; the corresponding builder is intentionally not shipped.
-	ErrTxRoadmap = errors.New("hdwallet: transaction signing for this coin is not yet implemented")
 )
 
 // txFamily groups coins that share a transaction-building scheme.

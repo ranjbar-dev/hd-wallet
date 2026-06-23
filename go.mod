@@ -11,6 +11,7 @@ require (
 	github.com/btcsuite/btcd v0.24.2
 	github.com/btcsuite/btcd/btcec/v2 v2.3.3
 	github.com/btcsuite/btcd/btcutil v1.1.5
+	github.com/btcsuite/btcd/chaincfg/chainhash v1.1.0
 	github.com/consensys/gnark-crypto v0.16.0
 	github.com/tyler-smith/go-bip39 v1.1.0
 	golang.org/x/crypto v0.48.0
@@ -20,9 +21,10 @@ require (
 require (
 	github.com/awnumar/memcall v0.4.0 // indirect
 	github.com/bits-and-blooms/bitset v1.20.0 // indirect
-	github.com/btcsuite/btcd/chaincfg/chainhash v1.1.0 // indirect
+	github.com/btcsuite/btclog v0.0.0-20170628155309-84c8d2346e9f // indirect
 	github.com/consensys/bavard v0.1.27 // indirect
 	github.com/cosmos/go-bip39 v0.0.0-20180819234021-555e2067c45d // indirect
+	github.com/decred/dcrd/crypto/blake256 v1.0.0 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.0.1 // indirect
 	github.com/gtank/merlin v0.1.1-0.20191105220539-8318aed1a79f // indirect
 	github.com/gtank/ristretto255 v0.1.2 // indirect

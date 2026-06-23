@@ -47,8 +47,10 @@ type addressValidator func(addr string) ([]byte, error)
 // mirroring how the encoders are shared in registry.go.
 var validators = map[Symbol]addressValidator{
 	// ---- secp256k1 : Bitcoin-style UTXO chains ----
-	BTC:  segwitValidator("bc", BTC),
-	LTC:  segwitValidator("ltc", LTC),
+	// BTC/LTC accept any of the four standard formats (P2PKH/P2SH/P2WPKH/P2TR);
+	// see bitcoinValidator in address_types.go.
+	BTC:  bitcoinValidator(BTC),
+	LTC:  bitcoinValidator(LTC),
 	DOGE: base58CheckValidator1(0x1e, DOGE),
 	DASH: base58CheckValidator1(0x4c, DASH),
 	ZEC:  base58CheckValidatorN(base58BTC, []byte{0x1c, 0xb8}, ZEC),
