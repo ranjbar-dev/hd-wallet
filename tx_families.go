@@ -39,6 +39,21 @@ var cosmosTxChains = symbolSet(
 	AKT, NOBLE, SEI, DYDX, BLZ, CRYPTOORG,
 )
 
+// ethermintTxChains is every Ethermint-keyed Cosmos chain whose direct-mode tx is
+// vector-verified. These sign with an eth_secp256k1 key: keccak256(SignDoc) digest
+// and the "/ethermint.crypto.v1.ethsecp256k1.PubKey" type URL (see
+// signCosmosEthermintTx). Only EVMOS is included because its Trust Wallet Core
+// vector is reproduced byte-for-byte (tx_cosmos_ethermint_test.go).
+//
+// Roadmap — the other Ethermint-keyed rows (CANTO, ZETA) and INJECTIVE are NOT
+// listed: unlike standard Cosmos chains (where only the caller-supplied HRP
+// differs and never enters the signed bytes), an Ethermint chain's pubkey type
+// URL DOES enter the signed bytes and is chain-specific — Injective uses
+// "/injective.crypto.v1beta1.ethsecp256k1.PubKey", not the ethermint URL. Each
+// therefore needs its own TWC vector before routing; until then they fall through
+// to ErrTxUnsupported rather than risk an on-chain-invalid signature.
+var ethermintTxChains = symbolSet(EVMOS)
+
 // symbolSet builds a set from a list of symbols.
 func symbolSet(symbols ...Symbol) map[Symbol]struct{} {
 	m := make(map[Symbol]struct{}, len(symbols))
