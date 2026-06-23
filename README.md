@@ -99,6 +99,22 @@ a1, _ := w.AddressIndex(hdwallet.BTC, 1) // bc1q...rkf9g — second receive addr
 sol1, _ := w.AddressIndex(hdwallet.SOL, 1) // account-based chains vary the hardened element
 ```
 
+### Bitcoin address types
+
+`Address`/`AddressIndex` return the chain default (native SegWit, BIP-84 for
+BTC/LTC). `BitcoinAddress` derives any of the four standard formats at its
+standard BIP path (arguments are `account, change, index`):
+
+```go
+legacy,  _ := w.BitcoinAddress(hdwallet.BTC, hdwallet.P2PKH, 0, 0, 0)      // 1…   (BIP-44)
+nested,  _ := w.BitcoinAddress(hdwallet.BTC, hdwallet.P2SHP2WPKH, 0, 0, 0) // 3…   (BIP-49)
+native,  _ := w.BitcoinAddress(hdwallet.BTC, hdwallet.P2WPKH, 0, 0, 0)     // bc1q… (BIP-84)
+taproot, _ := w.BitcoinAddress(hdwallet.BTC, hdwallet.P2TR, 0, 0, 0)       // bc1p… (BIP-86)
+```
+
+Available for BTC and LTC; verified against the official BIP-44/49/84/86 test
+vectors. `ValidateAddress`/`ParseAddress` accept all four formats.
+
 ### Error handling
 
 The package exports sentinel errors for use with `errors.Is`:
@@ -149,7 +165,16 @@ non-zero address indices. ECDSA inputs that are not 32 bytes return
 `SignTransaction` builds, serializes, and signs a **broadcast-ready raw
 transaction** from a protobuf `SigningInput`, mirroring Trust Wallet Core's
 `AnySigner`. It returns the signed bytes/hex — it does **not** broadcast.
-Verified byte-for-byte against Trust Wallet Core's signing vectors for:
+
+> **Coverage note:** address derivation/validation spans **all 129 networks**,
+> but transaction building covers only the families in the table below. For any
+> other chain you can derive and validate addresses but must assemble and sign
+> the transaction yourself (use the raw `Sign`/`SignIndex` primitive on the
+> chain's sighash). You also supply chain state — fees/gas, nonce/sequence,
+> recent blockhash, UTXOs — in the `SigningInput`; this library does no network
+> I/O.
+
+Verified against authoritative signing vectors for:
 
 | Family | Coverage |
 |---|---|
@@ -158,6 +183,7 @@ Verified byte-for-byte against Trust Wallet Core's signing vectors for:
 | **XRP** | Payment |
 | **Cosmos** | bank `MsgSend`, staking `MsgDelegate`/`MsgUndelegate`, `MsgWithdrawDelegatorReward`, multi-message (protobuf direct mode). All standard secp256k1 Cosmos chains, plus **EVMOS** (ethermint eth_secp256k1: keccak256 SignDoc + ethermint pubkey type URL). Other ethermint chains (INJ/CANTO/ZETA) stay roadmap — Injective uses a different pubkey type URL, so each needs its own vector. |
 | **Solana** | system transfer + SPL token transfer (TransferChecked) |
+| **Bitcoin** | BTC/LTC SegWit: spends **P2WPKH** (BIP-143) and **Taproot key-path** (BIP-341 / BIP-340 Schnorr) inputs; outputs to any address type; deterministic coin-selection + change. Verified against `btcd` (P2WPKH byte-identical; Taproot sighash + BIP-340 verify) and the BIP-143 spec vector. |
 
 ```go
 import ethpb "github.com/ranjbar-dev/hd-wallet/txproto/ethereum"
@@ -165,7 +191,8 @@ import ethpb "github.com/ranjbar-dev/hd-wallet/txproto/ethereum"
 out, _ := w.SignTransaction(hdwallet.ETH, 0, &ethpb.SigningInput{ /* … */ })
 ```
 
-> Bitcoin transaction building is on the roadmap (`tx_roadmap.go`).
+> Bitcoin spending currently covers P2WPKH and Taproot key-path inputs; legacy
+> P2PKH and nested P2SH-P2WPKH input spending remain on the roadmap.
 
 ### Ethereum message signing (EIP-191 / EIP-712)
 
@@ -347,11 +374,13 @@ because a fund-critical address must match an authoritative vector first:
 - **Zilliqa** (Schnorr), **TON**, **ICON**, and a handful of long-tail chains whose
   address scheme isn't reproduced against a vector yet (see `registry.go`).
 
-Deferred signing features (same reason — no authoritative vector yet): **Bitcoin
-transaction** building; the **ethermint-keyed Cosmos** chains beyond EVMOS
-(INJ/CANTO/ZETA — each needs its own vector since the pubkey type URL enters the
-signed bytes) — see `tx_families.go`/`tx_roadmap.go`; and **Cosmos ADR-36** message
-signing — see `message_cosmos_test.go`.
+Deferred signing features: Bitcoin transaction building now spends **P2WPKH** and
+**Taproot key-path** inputs (BTC/LTC); still deferred are **legacy P2PKH** and
+**nested P2SH-P2WPKH** input spending (pre-BIP-143 / wrapped-witness sighash). The
+**ethermint-keyed Cosmos** chains beyond EVMOS (INJ/CANTO/ZETA — each needs its
+own vector since the pubkey type URL enters the signed bytes) — see
+`tx_families.go`; and **Cosmos ADR-36** message signing — see
+`message_cosmos_test.go`.
 
 Contributions with test vectors welcome.
 
