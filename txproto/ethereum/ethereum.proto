@@ -42,6 +42,15 @@ message Transaction {
   }
 }
 
+// Access is one EIP-2930 access-list entry: an address plus the storage slots
+// the transaction intends to access under it.
+message Access {
+  // Address being accessed ("0x"-prefixed hex, 20 bytes).
+  string address = 1;
+  // Storage slots accessed under address; each is a 32-byte big-endian key.
+  repeated bytes stored_keys = 2;
+}
+
 // SigningInput mirrors a minimal subset of TW.Ethereum.Proto.SigningInput.
 message SigningInput {
   // Chain id, big-endian bytes (EIP-155).
@@ -50,7 +59,7 @@ message SigningInput {
   // Sender nonce, big-endian bytes.
   bytes nonce = 2;
 
-  // Transaction type: 0 = legacy, 2 = EIP-1559 (type-2).
+  // Transaction type: 0 = legacy, 1 = EIP-2930 (access list), 2 = EIP-1559.
   uint32 tx_mode = 3;
 
   // Legacy gas price, big-endian bytes (tx_mode == 0).
@@ -71,6 +80,11 @@ message SigningInput {
 
   // What to do.
   Transaction transaction = 9;
+
+  // Optional EIP-2930 access list. Carried in the signed bytes for tx_mode 1
+  // (EIP-2930) and tx_mode 2 (EIP-1559); ignored for legacy (tx_mode 0). An
+  // empty list reproduces the no-access-list encoding exactly.
+  repeated Access access_list = 10;
 }
 
 // SigningOutput mirrors a minimal subset of TW.Ethereum.Proto.SigningOutput.

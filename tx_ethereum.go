@@ -9,16 +9,24 @@ import (
 
 // Ethereum / EVM transaction signing.
 //
-// Two transaction formats are produced, selected by SigningInput.tx_mode:
+// Three transaction formats are produced, selected by SigningInput.tx_mode:
 //
 //   - tx_mode 0 — legacy (EIP-155). The signing preimage is
 //     keccak256(rlp([nonce, gasPrice, gasLimit, to, value, data, chainId, 0, 0]))
 //     and the encoded tx is rlp([nonce, gasPrice, gasLimit, to, value, data, v, r,
 //     s]) with v = recid + chainId*2 + 35.
+//   - tx_mode 1 — EIP-2930 (type-1, access list). The preimage is
+//     keccak256(0x01 || rlp([chainId, nonce, gasPrice, gasLimit, to, value, data,
+//     accessList])) and the encoded tx is 0x01 || rlp([..., v, r, s]) with v =
+//     recid (0/1).
 //   - tx_mode 2 — EIP-1559 (type-2). The preimage is
 //     keccak256(0x02 || rlp([chainId, nonce, maxPriority, maxFee, gasLimit, to,
 //     value, data, accessList])) and the encoded tx is
-//     0x02 || rlp([..., v, r, s]) with v = recid (0/1) and an empty accessList.
+//     0x02 || rlp([..., v, r, s]) with v = recid (0/1).
+//
+// The optional EIP-2930 access list (SigningInput.access_list) is carried in the
+// signed bytes for tx_mode 1 and 2; an empty list reproduces the no-access-list
+// encoding byte-for-byte (so the existing legacy/1559 vectors are unaffected).
 //
 // The destination/value/data triple is built from the Transaction payload:
 //   - Transfer: to = SigningInput.to_address, value = amount, data = data.
@@ -38,11 +46,37 @@ func (w *HDWallet) signEthereumTx(symbol Symbol, index uint32, in *txeth.Signing
 	switch in.GetTxMode() {
 	case 0:
 		return w.signEthereumLegacy(symbol, index, in, to, value, data)
+	case 1:
+		return w.signEthereumEIP2930(symbol, index, in, to, value, data)
 	case 2:
 		return w.signEthereumEIP1559(symbol, index, in, to, value, data)
 	default:
-		return nil, fmt.Errorf("%w: %s unsupported tx_mode %d (want 0 legacy or 2 eip-1559)", ErrTxInput, symbol, in.GetTxMode())
+		return nil, fmt.Errorf("%w: %s unsupported tx_mode %d (want 0 legacy, 1 eip-2930 or 2 eip-1559)", ErrTxInput, symbol, in.GetTxMode())
 	}
+}
+
+// ethAccessList builds the RLP item for an EIP-2930 access list:
+// [[address(20), [storageKey(32), ...]], ...]. An empty/absent list encodes as
+// the empty RLP list (0xc0), reproducing the no-access-list serialization. The
+// address is a 20-byte hex string; each storage key must be exactly 32 bytes
+// (storage keys are fixed-width, NOT quantity-minimized like integers).
+func ethAccessList(accesses []*txeth.Access) (RLPItem, error) {
+	entries := make([]RLPItem, 0, len(accesses))
+	for _, a := range accesses {
+		addr, err := hexToBytes(a.GetAddress())
+		if err != nil || len(addr) != 20 {
+			return RLPItem{}, fmt.Errorf("%w: ethereum: bad access-list address %q", ErrTxInput, a.GetAddress())
+		}
+		keys := make([]RLPItem, 0, len(a.GetStoredKeys()))
+		for _, k := range a.GetStoredKeys() {
+			if len(k) != 32 {
+				return RLPItem{}, fmt.Errorf("%w: ethereum: access-list storage key must be 32 bytes, got %d", ErrTxInput, len(k))
+			}
+			keys = append(keys, RLPString(k))
+		}
+		entries = append(entries, RLPList(RLPString(addr), RLPList(keys...)))
+	}
+	return RLPList(entries...), nil
 }
 
 // ethDestination resolves the (to, value, data) triple from the SigningInput's
@@ -140,21 +174,66 @@ func (w *HDWallet) signEthereumLegacy(symbol Symbol, index uint32, in *txeth.Sig
 	return ethOutput(encoded, r, s, v.Bytes()), nil
 }
 
+// signEthereumEIP2930 produces a type-1 (EIP-2930) access-list transaction. It
+// is a legacy-shaped tx (gasPrice, not the 1559 fee market) wrapped in the typed
+// 0x01 envelope, with the access list carried in the signed bytes and v as the
+// bare recovery id.
+func (w *HDWallet) signEthereumEIP2930(symbol Symbol, index uint32, in *txeth.SigningInput, to, value, data []byte) (*txeth.SigningOutput, error) {
+	accessList, err := ethAccessList(in.GetAccessList())
+	if err != nil {
+		return nil, err
+	}
+	// payload: [chainId, nonce, gasPrice, gasLimit, to, value, data, accessList].
+	fields := func(extra ...RLPItem) RLPItem {
+		base := make([]RLPItem, 0, 8+len(extra))
+		base = append(base,
+			ethQuantity(in.GetChainId()),
+			ethQuantity(in.GetNonce()),
+			ethQuantity(in.GetGasPrice()),
+			ethQuantity(in.GetGasLimit()),
+			RLPString(to),
+			ethQuantity(value),
+			RLPString(data),
+			accessList,
+		)
+		return RLPList(append(base, extra...)...)
+	}
+	preimage := append([]byte{0x01}, EncodeRLP(fields())...)
+	digest := keccak256(preimage)
+
+	r, s, recid, err := w.ethSign(symbol, index, digest)
+	if err != nil {
+		return nil, err
+	}
+	v := []byte{recid}
+	signed := fields(ethQuantity(v), RLPString(r), RLPString(s))
+	encoded := append([]byte{0x01}, EncodeRLP(signed)...)
+	return ethOutput(encoded, r, s, v), nil
+}
+
 // signEthereumEIP1559 produces a type-2 (EIP-1559) transaction.
 func (w *HDWallet) signEthereumEIP1559(symbol Symbol, index uint32, in *txeth.SigningInput, to, value, data []byte) (*txeth.SigningOutput, error) {
+	accessList, err := ethAccessList(in.GetAccessList())
+	if err != nil {
+		return nil, err
+	}
 	// payload: [chainId, nonce, maxPriority, maxFee, gasLimit, to, value, data, accessList].
-	payload := RLPList(
-		ethQuantity(in.GetChainId()),
-		ethQuantity(in.GetNonce()),
-		ethQuantity(in.GetMaxInclusionFeePerGas()),
-		ethQuantity(in.GetMaxFeePerGas()),
-		ethQuantity(in.GetGasLimit()),
-		RLPString(to),
-		ethQuantity(value),
-		RLPString(data),
-		RLPList(), // empty access list
-	)
-	preimage := append([]byte{0x02}, EncodeRLP(payload)...)
+	fields := func(extra ...RLPItem) RLPItem {
+		base := make([]RLPItem, 0, 9+len(extra))
+		base = append(base,
+			ethQuantity(in.GetChainId()),
+			ethQuantity(in.GetNonce()),
+			ethQuantity(in.GetMaxInclusionFeePerGas()),
+			ethQuantity(in.GetMaxFeePerGas()),
+			ethQuantity(in.GetGasLimit()),
+			RLPString(to),
+			ethQuantity(value),
+			RLPString(data),
+			accessList,
+		)
+		return RLPList(append(base, extra...)...)
+	}
+	preimage := append([]byte{0x02}, EncodeRLP(fields())...)
 	digest := keccak256(preimage)
 
 	r, s, recid, err := w.ethSign(symbol, index, digest)
@@ -164,20 +243,7 @@ func (w *HDWallet) signEthereumEIP1559(symbol Symbol, index uint32, in *txeth.Si
 
 	// type-2 v is the bare recovery id (0 or 1).
 	v := []byte{recid}
-	signed := RLPList(
-		ethQuantity(in.GetChainId()),
-		ethQuantity(in.GetNonce()),
-		ethQuantity(in.GetMaxInclusionFeePerGas()),
-		ethQuantity(in.GetMaxFeePerGas()),
-		ethQuantity(in.GetGasLimit()),
-		RLPString(to),
-		ethQuantity(value),
-		RLPString(data),
-		RLPList(),
-		ethQuantity(v),
-		RLPString(r),
-		RLPString(s),
-	)
+	signed := fields(ethQuantity(v), RLPString(r), RLPString(s))
 	encoded := append([]byte{0x02}, EncodeRLP(signed)...)
 	return ethOutput(encoded, r, s, v), nil
 }

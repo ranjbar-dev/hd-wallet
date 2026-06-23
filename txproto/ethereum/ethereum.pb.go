@@ -121,6 +121,62 @@ func (*Transaction_Erc20Transfer) isTransaction_TransactionOneof() {}
 
 func (*Transaction_ContractGeneric_) isTransaction_TransactionOneof() {}
 
+// Access is one EIP-2930 access-list entry: an address plus the storage slots
+// the transaction intends to access under it.
+type Access struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Address being accessed ("0x"-prefixed hex, 20 bytes).
+	Address string `protobuf:"bytes,1,opt,name=address,proto3" json:"address,omitempty"`
+	// Storage slots accessed under address; each is a 32-byte big-endian key.
+	StoredKeys    [][]byte `protobuf:"bytes,2,rep,name=stored_keys,json=storedKeys,proto3" json:"stored_keys,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Access) Reset() {
+	*x = Access{}
+	mi := &file_txproto_ethereum_ethereum_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Access) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Access) ProtoMessage() {}
+
+func (x *Access) ProtoReflect() protoreflect.Message {
+	mi := &file_txproto_ethereum_ethereum_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Access.ProtoReflect.Descriptor instead.
+func (*Access) Descriptor() ([]byte, []int) {
+	return file_txproto_ethereum_ethereum_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *Access) GetAddress() string {
+	if x != nil {
+		return x.Address
+	}
+	return ""
+}
+
+func (x *Access) GetStoredKeys() [][]byte {
+	if x != nil {
+		return x.StoredKeys
+	}
+	return nil
+}
+
 // SigningInput mirrors a minimal subset of TW.Ethereum.Proto.SigningInput.
 type SigningInput struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -128,7 +184,7 @@ type SigningInput struct {
 	ChainId []byte `protobuf:"bytes,1,opt,name=chain_id,json=chainId,proto3" json:"chain_id,omitempty"`
 	// Sender nonce, big-endian bytes.
 	Nonce []byte `protobuf:"bytes,2,opt,name=nonce,proto3" json:"nonce,omitempty"`
-	// Transaction type: 0 = legacy, 2 = EIP-1559 (type-2).
+	// Transaction type: 0 = legacy, 1 = EIP-2930 (access list), 2 = EIP-1559.
 	TxMode uint32 `protobuf:"varint,3,opt,name=tx_mode,json=txMode,proto3" json:"tx_mode,omitempty"`
 	// Legacy gas price, big-endian bytes (tx_mode == 0).
 	GasPrice []byte `protobuf:"bytes,4,opt,name=gas_price,json=gasPrice,proto3" json:"gas_price,omitempty"`
@@ -142,14 +198,18 @@ type SigningInput struct {
 	// address for ERC-20 transfer ("0x"-prefixed hex).
 	ToAddress string `protobuf:"bytes,8,opt,name=to_address,json=toAddress,proto3" json:"to_address,omitempty"`
 	// What to do.
-	Transaction   *Transaction `protobuf:"bytes,9,opt,name=transaction,proto3" json:"transaction,omitempty"`
+	Transaction *Transaction `protobuf:"bytes,9,opt,name=transaction,proto3" json:"transaction,omitempty"`
+	// Optional EIP-2930 access list. Carried in the signed bytes for tx_mode 1
+	// (EIP-2930) and tx_mode 2 (EIP-1559); ignored for legacy (tx_mode 0). An
+	// empty list reproduces the no-access-list encoding exactly.
+	AccessList    []*Access `protobuf:"bytes,10,rep,name=access_list,json=accessList,proto3" json:"access_list,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *SigningInput) Reset() {
 	*x = SigningInput{}
-	mi := &file_txproto_ethereum_ethereum_proto_msgTypes[1]
+	mi := &file_txproto_ethereum_ethereum_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -161,7 +221,7 @@ func (x *SigningInput) String() string {
 func (*SigningInput) ProtoMessage() {}
 
 func (x *SigningInput) ProtoReflect() protoreflect.Message {
-	mi := &file_txproto_ethereum_ethereum_proto_msgTypes[1]
+	mi := &file_txproto_ethereum_ethereum_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -174,7 +234,7 @@ func (x *SigningInput) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SigningInput.ProtoReflect.Descriptor instead.
 func (*SigningInput) Descriptor() ([]byte, []int) {
-	return file_txproto_ethereum_ethereum_proto_rawDescGZIP(), []int{1}
+	return file_txproto_ethereum_ethereum_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *SigningInput) GetChainId() []byte {
@@ -240,6 +300,13 @@ func (x *SigningInput) GetTransaction() *Transaction {
 	return nil
 }
 
+func (x *SigningInput) GetAccessList() []*Access {
+	if x != nil {
+		return x.AccessList
+	}
+	return nil
+}
+
 // SigningOutput mirrors a minimal subset of TW.Ethereum.Proto.SigningOutput.
 type SigningOutput struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -259,7 +326,7 @@ type SigningOutput struct {
 
 func (x *SigningOutput) Reset() {
 	*x = SigningOutput{}
-	mi := &file_txproto_ethereum_ethereum_proto_msgTypes[2]
+	mi := &file_txproto_ethereum_ethereum_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -271,7 +338,7 @@ func (x *SigningOutput) String() string {
 func (*SigningOutput) ProtoMessage() {}
 
 func (x *SigningOutput) ProtoReflect() protoreflect.Message {
-	mi := &file_txproto_ethereum_ethereum_proto_msgTypes[2]
+	mi := &file_txproto_ethereum_ethereum_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -284,7 +351,7 @@ func (x *SigningOutput) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SigningOutput.ProtoReflect.Descriptor instead.
 func (*SigningOutput) Descriptor() ([]byte, []int) {
-	return file_txproto_ethereum_ethereum_proto_rawDescGZIP(), []int{2}
+	return file_txproto_ethereum_ethereum_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *SigningOutput) GetEncoded() []byte {
@@ -342,7 +409,7 @@ type Transaction_Transfer struct {
 
 func (x *Transaction_Transfer) Reset() {
 	*x = Transaction_Transfer{}
-	mi := &file_txproto_ethereum_ethereum_proto_msgTypes[3]
+	mi := &file_txproto_ethereum_ethereum_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -354,7 +421,7 @@ func (x *Transaction_Transfer) String() string {
 func (*Transaction_Transfer) ProtoMessage() {}
 
 func (x *Transaction_Transfer) ProtoReflect() protoreflect.Message {
-	mi := &file_txproto_ethereum_ethereum_proto_msgTypes[3]
+	mi := &file_txproto_ethereum_ethereum_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -397,7 +464,7 @@ type Transaction_ERC20Transfer struct {
 
 func (x *Transaction_ERC20Transfer) Reset() {
 	*x = Transaction_ERC20Transfer{}
-	mi := &file_txproto_ethereum_ethereum_proto_msgTypes[4]
+	mi := &file_txproto_ethereum_ethereum_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -409,7 +476,7 @@ func (x *Transaction_ERC20Transfer) String() string {
 func (*Transaction_ERC20Transfer) ProtoMessage() {}
 
 func (x *Transaction_ERC20Transfer) ProtoReflect() protoreflect.Message {
-	mi := &file_txproto_ethereum_ethereum_proto_msgTypes[4]
+	mi := &file_txproto_ethereum_ethereum_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -456,7 +523,7 @@ type Transaction_ContractGeneric struct {
 
 func (x *Transaction_ContractGeneric) Reset() {
 	*x = Transaction_ContractGeneric{}
-	mi := &file_txproto_ethereum_ethereum_proto_msgTypes[5]
+	mi := &file_txproto_ethereum_ethereum_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -468,7 +535,7 @@ func (x *Transaction_ContractGeneric) String() string {
 func (*Transaction_ContractGeneric) ProtoMessage() {}
 
 func (x *Transaction_ContractGeneric) ProtoReflect() protoreflect.Message {
-	mi := &file_txproto_ethereum_ethereum_proto_msgTypes[5]
+	mi := &file_txproto_ethereum_ethereum_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -516,7 +583,11 @@ const file_txproto_ethereum_ethereum_proto_rawDesc = "" +
 	"\x0fContractGeneric\x12\x16\n" +
 	"\x06amount\x18\x01 \x01(\fR\x06amount\x12\x12\n" +
 	"\x04data\x18\x02 \x01(\fR\x04dataB\x13\n" +
-	"\x11transaction_oneof\"\xda\x02\n" +
+	"\x11transaction_oneof\"C\n" +
+	"\x06Access\x12\x18\n" +
+	"\aaddress\x18\x01 \x01(\tR\aaddress\x12\x1f\n" +
+	"\vstored_keys\x18\x02 \x03(\fR\n" +
+	"storedKeys\"\x9c\x03\n" +
 	"\fSigningInput\x12\x19\n" +
 	"\bchain_id\x18\x01 \x01(\fR\achainId\x12\x14\n" +
 	"\x05nonce\x18\x02 \x01(\fR\x05nonce\x12\x17\n" +
@@ -527,7 +598,10 @@ const file_txproto_ethereum_ethereum_proto_rawDesc = "" +
 	"\x0fmax_fee_per_gas\x18\a \x01(\fR\fmaxFeePerGas\x12\x1d\n" +
 	"\n" +
 	"to_address\x18\b \x01(\tR\ttoAddress\x12F\n" +
-	"\vtransaction\x18\t \x01(\v2$.hdwallet.ethereum.proto.TransactionR\vtransaction\"\x8a\x01\n" +
+	"\vtransaction\x18\t \x01(\v2$.hdwallet.ethereum.proto.TransactionR\vtransaction\x12@\n" +
+	"\vaccess_list\x18\n" +
+	" \x03(\v2\x1f.hdwallet.ethereum.proto.AccessR\n" +
+	"accessList\"\x8a\x01\n" +
 	"\rSigningOutput\x12\x18\n" +
 	"\aencoded\x18\x01 \x01(\fR\aencoded\x12\f\n" +
 	"\x01r\x18\x02 \x01(\fR\x01r\x12\f\n" +
@@ -549,25 +623,27 @@ func file_txproto_ethereum_ethereum_proto_rawDescGZIP() []byte {
 	return file_txproto_ethereum_ethereum_proto_rawDescData
 }
 
-var file_txproto_ethereum_ethereum_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
+var file_txproto_ethereum_ethereum_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
 var file_txproto_ethereum_ethereum_proto_goTypes = []any{
 	(*Transaction)(nil),                 // 0: hdwallet.ethereum.proto.Transaction
-	(*SigningInput)(nil),                // 1: hdwallet.ethereum.proto.SigningInput
-	(*SigningOutput)(nil),               // 2: hdwallet.ethereum.proto.SigningOutput
-	(*Transaction_Transfer)(nil),        // 3: hdwallet.ethereum.proto.Transaction.Transfer
-	(*Transaction_ERC20Transfer)(nil),   // 4: hdwallet.ethereum.proto.Transaction.ERC20Transfer
-	(*Transaction_ContractGeneric)(nil), // 5: hdwallet.ethereum.proto.Transaction.ContractGeneric
+	(*Access)(nil),                      // 1: hdwallet.ethereum.proto.Access
+	(*SigningInput)(nil),                // 2: hdwallet.ethereum.proto.SigningInput
+	(*SigningOutput)(nil),               // 3: hdwallet.ethereum.proto.SigningOutput
+	(*Transaction_Transfer)(nil),        // 4: hdwallet.ethereum.proto.Transaction.Transfer
+	(*Transaction_ERC20Transfer)(nil),   // 5: hdwallet.ethereum.proto.Transaction.ERC20Transfer
+	(*Transaction_ContractGeneric)(nil), // 6: hdwallet.ethereum.proto.Transaction.ContractGeneric
 }
 var file_txproto_ethereum_ethereum_proto_depIdxs = []int32{
-	3, // 0: hdwallet.ethereum.proto.Transaction.transfer:type_name -> hdwallet.ethereum.proto.Transaction.Transfer
-	4, // 1: hdwallet.ethereum.proto.Transaction.erc20_transfer:type_name -> hdwallet.ethereum.proto.Transaction.ERC20Transfer
-	5, // 2: hdwallet.ethereum.proto.Transaction.contract_generic:type_name -> hdwallet.ethereum.proto.Transaction.ContractGeneric
+	4, // 0: hdwallet.ethereum.proto.Transaction.transfer:type_name -> hdwallet.ethereum.proto.Transaction.Transfer
+	5, // 1: hdwallet.ethereum.proto.Transaction.erc20_transfer:type_name -> hdwallet.ethereum.proto.Transaction.ERC20Transfer
+	6, // 2: hdwallet.ethereum.proto.Transaction.contract_generic:type_name -> hdwallet.ethereum.proto.Transaction.ContractGeneric
 	0, // 3: hdwallet.ethereum.proto.SigningInput.transaction:type_name -> hdwallet.ethereum.proto.Transaction
-	4, // [4:4] is the sub-list for method output_type
-	4, // [4:4] is the sub-list for method input_type
-	4, // [4:4] is the sub-list for extension type_name
-	4, // [4:4] is the sub-list for extension extendee
-	0, // [0:4] is the sub-list for field type_name
+	1, // 4: hdwallet.ethereum.proto.SigningInput.access_list:type_name -> hdwallet.ethereum.proto.Access
+	5, // [5:5] is the sub-list for method output_type
+	5, // [5:5] is the sub-list for method input_type
+	5, // [5:5] is the sub-list for extension type_name
+	5, // [5:5] is the sub-list for extension extendee
+	0, // [0:5] is the sub-list for field type_name
 }
 
 func init() { file_txproto_ethereum_ethereum_proto_init() }
@@ -586,7 +662,7 @@ func file_txproto_ethereum_ethereum_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_txproto_ethereum_ethereum_proto_rawDesc), len(file_txproto_ethereum_ethereum_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   6,
+			NumMessages:   7,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
