@@ -2,7 +2,6 @@ package hdwallet
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"math/big"
 
@@ -72,7 +71,7 @@ func newSecret(mnemonic, passphrase []byte) (*secret, error) {
 // caller destroys its buffer). passphrase may be nil for the empty passphrase.
 func newSecretFromBuffer(buf *memguard.LockedBuffer, passphrase []byte) (*secret, error) {
 	if buf == nil || !buf.IsAlive() {
-		return nil, errors.New("hdwallet: mnemonic buffer is nil or destroyed")
+		return nil, fmt.Errorf("%w: mnemonic buffer is nil or destroyed", ErrDestroyed)
 	}
 
 	raw := buf.Bytes()
@@ -125,7 +124,7 @@ func newSecretFromPrivateKey(priv []byte, curve Curve) (*secret, error) {
 // ownership of buf and destroys it (mirrors newSecretFromBuffer).
 func newSecretFromPrivateKeyBuffer(buf *memguard.LockedBuffer, curve Curve) (*secret, error) {
 	if buf == nil || !buf.IsAlive() {
-		return nil, errors.New("hdwallet: private-key buffer is nil or destroyed")
+		return nil, fmt.Errorf("%w: private-key buffer is nil or destroyed", ErrDestroyed)
 	}
 
 	if err := validatePrivateKey(buf.Bytes(), curve); err != nil {

@@ -37,6 +37,15 @@ import (
 // (legacy native, legacy ERC-20, EIP-1559 ERC-20, EIP-1559 native+data); see
 // tx_ethereum_test.go.
 
+// EVM transaction modes, selecting the serialization format produced by
+// SignTransaction for an EVM chain. They are the values of
+// ethereum.SigningInput.tx_mode; use them instead of bare integers.
+const (
+	EthTxModeLegacy  uint32 = 0 // EIP-155 legacy
+	EthTxModeEIP2930 uint32 = 1 // type-1 access-list
+	EthTxModeEIP1559 uint32 = 2 // type-2 fee market
+)
+
 // signEthereumTx builds, signs and serializes an EVM transaction.
 func (w *HDWallet) signEthereumTx(symbol Symbol, index uint32, in *txeth.SigningInput) (*txeth.SigningOutput, error) {
 	to, value, data, err := ethDestination(in)
@@ -44,11 +53,11 @@ func (w *HDWallet) signEthereumTx(symbol Symbol, index uint32, in *txeth.Signing
 		return nil, err
 	}
 	switch in.GetTxMode() {
-	case 0:
+	case EthTxModeLegacy:
 		return w.signEthereumLegacy(symbol, index, in, to, value, data)
-	case 1:
+	case EthTxModeEIP2930:
 		return w.signEthereumEIP2930(symbol, index, in, to, value, data)
-	case 2:
+	case EthTxModeEIP1559:
 		return w.signEthereumEIP1559(symbol, index, in, to, value, data)
 	default:
 		return nil, fmt.Errorf("%w: %s unsupported tx_mode %d (want 0 legacy, 1 eip-2930 or 2 eip-1559)", ErrTxInput, symbol, in.GetTxMode())

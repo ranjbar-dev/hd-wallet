@@ -168,7 +168,7 @@ func FromMnemonicBufferWithPassphrase(buf, passphrase *memguard.LockedBuffer) (*
 	var pass []byte
 	if passphrase != nil {
 		if !passphrase.IsAlive() {
-			return nil, errors.New("hdwallet: passphrase buffer is destroyed")
+			return nil, fmt.Errorf("%w: passphrase buffer is destroyed", ErrDestroyed)
 		}
 		pass = passphrase.Bytes() // used transiently; destroyed below
 		defer passphrase.Destroy()
