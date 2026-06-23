@@ -153,10 +153,10 @@ Verified byte-for-byte against Trust Wallet Core's signing vectors for:
 
 | Family | Coverage |
 |---|---|
-| **EVM** | legacy (EIP-155) + EIP-2930 (access list) + EIP-1559, native + ERC-20 + arbitrary contract call + contract creation (deploy) + EIP-2930/1559 access lists. All registered EVM chains. |
+| **EVM** | legacy (EIP-155) + EIP-2930 (access list) + EIP-1559, native + ERC-20 + arbitrary contract call + contract creation (deploy) + EIP-2930/1559 access lists. Select the format with `tx_mode` (exported `hdwallet.EthTxModeLegacy`/`EthTxModeEIP2930`/`EthTxModeEIP1559`). All registered EVM chains. |
 | **Tron** | TRX transfer + TRC-20 token transfer (TriggerSmartContract) |
 | **XRP** | Payment |
-| **Cosmos** | bank `MsgSend`, staking `MsgDelegate`/`MsgUndelegate`, `MsgWithdrawDelegatorReward`, multi-message (protobuf direct mode). All standard secp256k1 Cosmos chains (ethermint-keyed chains, e.g. INJ/EVMOS, are not yet supported). |
+| **Cosmos** | bank `MsgSend`, staking `MsgDelegate`/`MsgUndelegate`, `MsgWithdrawDelegatorReward`, multi-message (protobuf direct mode). All standard secp256k1 Cosmos chains, plus **EVMOS** (ethermint eth_secp256k1: keccak256 SignDoc + ethermint pubkey type URL). Other ethermint chains (INJ/CANTO/ZETA) stay roadmap — Injective uses a different pubkey type URL, so each needs its own vector. |
 | **Solana** | system transfer + SPL token transfer (TransferChecked) |
 
 ```go
@@ -348,8 +348,10 @@ because a fund-critical address must match an authoritative vector first:
   address scheme isn't reproduced against a vector yet (see `registry.go`).
 
 Deferred signing features (same reason — no authoritative vector yet): **Bitcoin
-transaction** building and **ethermint-keyed Cosmos** tx (INJ/EVMOS/…) — see
-`tx_roadmap.go`; and **Cosmos ADR-36** message signing — see `message_cosmos_test.go`.
+transaction** building; the **ethermint-keyed Cosmos** chains beyond EVMOS
+(INJ/CANTO/ZETA — each needs its own vector since the pubkey type URL enters the
+signed bytes) — see `tx_families.go`/`tx_roadmap.go`; and **Cosmos ADR-36** message
+signing — see `message_cosmos_test.go`.
 
 Contributions with test vectors welcome.
 

@@ -34,10 +34,15 @@ func TestTxFamilyRouting(t *testing.T) {
 			t.Errorf("txFamilyOf(%s) = %v, want familyCosmos", s, got)
 		}
 	}
-	// Ethermint-keyed Cosmos chains are intentionally unrouted.
-	for _, s := range []Symbol{EVMOS, INJ, CANTO, ZETA, ONE} {
+	// EVMOS is the one vector-verified ethermint-keyed Cosmos chain.
+	if got := txFamilyOf(EVMOS); got != familyCosmosEthermint {
+		t.Errorf("txFamilyOf(EVMOS) = %v, want familyCosmosEthermint", got)
+	}
+	// The remaining ethermint-keyed chains stay unrouted pending their own vectors
+	// (Injective uses a different pubkey type URL; see tx_families.go).
+	for _, s := range []Symbol{INJ, CANTO, ZETA, ONE} {
 		if got := txFamilyOf(s); got != familyNone {
-			t.Errorf("txFamilyOf(%s) = %v, want familyNone (ethermint excluded)", s, got)
+			t.Errorf("txFamilyOf(%s) = %v, want familyNone (ethermint, no vector yet)", s, got)
 		}
 	}
 	// Single-chain families.

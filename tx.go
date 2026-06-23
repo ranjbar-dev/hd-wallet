@@ -57,6 +57,7 @@ const (
 	familyTron
 	familyRipple
 	familyCosmos
+	familyCosmosEthermint
 	familySolana
 	familyBitcoin
 )
@@ -71,6 +72,9 @@ func txFamilyOf(symbol Symbol) txFamily {
 	}
 	if _, ok := cosmosTxChains[symbol]; ok {
 		return familyCosmos
+	}
+	if _, ok := ethermintTxChains[symbol]; ok {
+		return familyCosmosEthermint
 	}
 	switch symbol {
 	case TRX:
@@ -124,6 +128,12 @@ func (w *HDWallet) SignTransaction(symbol Symbol, index uint32, input proto.Mess
 			return nil, fmt.Errorf("%w: %s expects *cosmos.SigningInput", ErrTxInput, symbol)
 		}
 		return w.signCosmosTx(symbol, index, in)
+	case familyCosmosEthermint:
+		in, ok := input.(*txcosmos.SigningInput)
+		if !ok {
+			return nil, fmt.Errorf("%w: %s expects *cosmos.SigningInput", ErrTxInput, symbol)
+		}
+		return w.signCosmosEthermintTx(symbol, index, in)
 	case familySolana:
 		in, ok := input.(*txsolana.SigningInput)
 		if !ok {

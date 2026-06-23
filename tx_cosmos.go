@@ -37,12 +37,34 @@ const (
 	cosmosMsgUndelegateTypeURL     = "/cosmos.staking.v1beta1.MsgUndelegate"
 	cosmosMsgWithdrawRewardTypeURL = "/cosmos.distribution.v1beta1.MsgWithdrawDelegatorReward"
 	cosmosPubKeyTypeURL            = "/cosmos.crypto.secp256k1.PubKey"
-	cosmosSignModeDirect           = 1 // SIGN_MODE_DIRECT
+	// ethermintPubKeyTypeURL is the eth_secp256k1 public-key type used by
+	// Ethermint-keyed Cosmos chains (Evmos and chains sharing its type URL).
+	ethermintPubKeyTypeURL = "/ethermint.crypto.v1.ethsecp256k1.PubKey"
+	cosmosSignModeDirect   = 1 // SIGN_MODE_DIRECT
 )
 
-// signCosmosTx builds, signs and serializes a Cosmos direct-mode transaction
-// (one or more bank/staking/distribution messages).
+// signCosmosTx builds, signs and serializes a standard Cosmos direct-mode
+// transaction (secp256k1 key, sha256(SignDoc) digest).
 func (w *HDWallet) signCosmosTx(symbol Symbol, index uint32, in *txcosmos.SigningInput) (*txcosmos.SigningOutput, error) {
+	return w.signCosmosDirect(symbol, index, in, cosmosPubKeyTypeURL, sha256Sum)
+}
+
+// signCosmosEthermintTx signs a Cosmos direct-mode tx for an Ethermint-keyed
+// chain (eth_secp256k1). It differs from the standard builder in exactly two
+// signed-byte–affecting ways: the signer's public key is announced under the
+// ethermint type URL, and the SignDoc is hashed with keccak256 (eth_secp256k1
+// hashes with keccak internally) rather than sha256. The recoverable secp256k1
+// signature (RFC-6979, canonical low-S) is the same scheme. Verified byte-for-byte
+// against Trust Wallet Core's Evmos vector (tx_cosmos_ethermint_test.go).
+func (w *HDWallet) signCosmosEthermintTx(symbol Symbol, index uint32, in *txcosmos.SigningInput) (*txcosmos.SigningOutput, error) {
+	return w.signCosmosDirect(symbol, index, in, ethermintPubKeyTypeURL, keccak256)
+}
+
+// signCosmosDirect builds, signs and serializes a Cosmos direct-mode transaction
+// (one or more bank/staking/distribution messages). pubKeyTypeURL announces the
+// signer key type in AuthInfo and hash computes the SignDoc digest — these are the
+// only points where the standard and Ethermint variants diverge.
+func (w *HDWallet) signCosmosDirect(symbol Symbol, index uint32, in *txcosmos.SigningInput, pubKeyTypeURL string, hash func([]byte) []byte) (*txcosmos.SigningOutput, error) {
 	fee := in.GetFee()
 	if fee == nil {
 		return nil, fmt.Errorf("%w: cosmos: missing fee", ErrTxInput)
@@ -62,11 +84,11 @@ func (w *HDWallet) signCosmosTx(symbol Symbol, index uint32, in *txcosmos.Signin
 	}
 
 	bodyBytes := cosmosTxBody(anyMsgs, in.GetMemo())
-	authInfoBytes := cosmosAuthInfo(fee, pub, in.GetSequence())
+	authInfoBytes := cosmosAuthInfo(fee, pub, in.GetSequence(), pubKeyTypeURL)
 
 	// SignDoc { body_bytes, auth_info_bytes, chain_id, account_number }.
 	signDoc := cosmosSignDoc(bodyBytes, authInfoBytes, in.GetChainId(), in.GetAccountNumber())
-	digest := sha256Sum(signDoc)
+	digest := hash(signDoc)
 
 	sig, err := w.SignIndex(symbol, index, digest)
 	if err != nil {
@@ -170,11 +192,13 @@ func cosmosWithdrawRewardBody(r *txcosmos.MsgWithdrawReward) []byte {
 }
 
 // cosmosAuthInfo serializes AuthInfo { 1: signer_infos[SignerInfo], 2: Fee }.
-func cosmosAuthInfo(fee *txcosmos.Fee, pub []byte, sequence uint64) []byte {
+// pubKeyTypeURL announces the signer key type (standard secp256k1 or ethermint
+// eth_secp256k1).
+func cosmosAuthInfo(fee *txcosmos.Fee, pub []byte, sequence uint64, pubKeyTypeURL string) []byte {
 	// PubKey Any: value is { 1: 33-byte key }.
 	var pubKeyInner []byte
 	pubKeyInner = appendBytesField(pubKeyInner, 1, pub)
-	pubKeyAny := cosmosAny(cosmosPubKeyTypeURL, pubKeyInner)
+	pubKeyAny := cosmosAny(pubKeyTypeURL, pubKeyInner)
 
 	// ModeInfo { 1: Single { 1: mode } }.
 	var single []byte
@@ -240,8 +264,14 @@ func appendStringField(dst []byte, field protowire.Number, value string) []byte 
 	return protowire.AppendString(dst, value)
 }
 
-// appendVarintField appends a varint (wire type 0) field.
+// appendVarintField appends a varint (wire type 0) field, omitting it when the
+// value is zero. proto3 never serializes a default-valued (zero) scalar, so a
+// zero sequence / account_number / gas must NOT appear on the wire — emitting it
+// would change the SignDoc bytes and therefore the signature (e.g. sequence 0).
 func appendVarintField(dst []byte, field protowire.Number, value uint64) []byte {
+	if value == 0 {
+		return dst
+	}
 	dst = protowire.AppendTag(dst, field, protowire.VarintType)
 	return protowire.AppendVarint(dst, value)
 }
