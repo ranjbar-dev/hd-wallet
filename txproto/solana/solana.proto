@@ -38,4 +38,7 @@ message SigningOutput {
   bytes raw = 2;
   // Error message, empty on success.
   string error = 3;
+  // Transaction id/signature: base58 of the fee-payer's ed25519 signature
+  // (the first signature). On Solana this signature IS the transaction id.
+  string tx_id = 4;
 }

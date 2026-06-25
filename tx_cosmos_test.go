@@ -2,6 +2,7 @@ package hdwallet
 
 import (
 	"encoding/hex"
+	"strings"
 	"testing"
 
 	txcosmos "github.com/ranjbar-dev/hd-wallet/txproto/cosmos"
@@ -61,5 +62,11 @@ func TestSignTxCosmosMsgSend(t *testing.T) {
 	}
 	if co.GetTxBytes() != wantTxBytes {
 		t.Fatalf("tx_bytes mismatch:\n got  %s\n want %s", co.GetTxBytes(), wantTxBytes)
+	}
+	// tx_id is the Cosmos tx hash: upper-case hex of sha256 over the (locked)
+	// TxRaw bytes. Derived from the pinned output to pin and wire-check the field.
+	wantTxID := strings.ToUpper(hex.EncodeToString(sha256Sum(co.GetEncoded())))
+	if co.GetTxId() != wantTxID {
+		t.Fatalf("tx_id mismatch:\n got  %s\n want %s", co.GetTxId(), wantTxID)
 	}
 }

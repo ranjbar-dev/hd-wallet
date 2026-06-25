@@ -3,6 +3,7 @@ package hdwallet
 import (
 	"encoding/binary"
 	"fmt"
+	"strings"
 
 	txripple "github.com/ranjbar-dev/hd-wallet/txproto/ripple"
 )
@@ -85,9 +86,14 @@ func (w *HDWallet) signRippleTx(symbol Symbol, index uint32, in *txripple.Signin
 	xrpSortFields(fields)
 	encoded := xrpSerialize(fields)
 
+	// XRP transaction hash: sha512Half over the serialized signed tx, upper-case
+	// hex (the form the XRP explorer / ledger display).
+	txID := strings.ToUpper(bytesToHex(sha512Half(encoded)))
+
 	return &txripple.SigningOutput{
 		Encoded:    encoded,
 		EncodedHex: bytesToHex(encoded),
+		TxId:       txID,
 	}, nil
 }
 

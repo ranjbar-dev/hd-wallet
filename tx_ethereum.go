@@ -282,7 +282,10 @@ func ethQuantity(b []byte) RLPItem {
 	return RLPString(b[i:])
 }
 
-// ethOutput assembles the SigningOutput for a signed EVM transaction.
+// ethOutput assembles the SigningOutput for a signed EVM transaction. The tx id
+// is the canonical Ethereum tx hash, "0x" + hex(keccak256(encoded)); for typed
+// (EIP-2930/1559) txs the keccak is over the type-prefixed encoded bytes, which
+// is exactly what `encoded` already holds.
 func ethOutput(encoded, r, s, v []byte) *txeth.SigningOutput {
 	return &txeth.SigningOutput{
 		Encoded:    encoded,
@@ -290,5 +293,6 @@ func ethOutput(encoded, r, s, v []byte) *txeth.SigningOutput {
 		S:          s,
 		V:          v,
 		EncodedHex: bytesToHex(encoded),
+		TxId:       "0x" + bytesToHex(keccak256(encoded)),
 	}
 }

@@ -102,4 +102,8 @@ message SigningOutput {
 
   // Error message, empty on success.
   string error = 6;
+
+  // Transaction id/hash: "0x" + lower-case hex of keccak256(encoded). This is
+  // the canonical Ethereum tx hash explorers display and broadcast tracks.
+  string tx_id = 7;
 }

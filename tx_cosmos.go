@@ -2,6 +2,7 @@ package hdwallet
 
 import (
 	"fmt"
+	"strings"
 
 	"google.golang.org/protobuf/encoding/protowire"
 
@@ -105,10 +106,15 @@ func (w *HDWallet) signCosmosDirect(symbol Symbol, index uint32, in *txcosmos.Si
 	txRaw = appendBytesField(txRaw, 2, authInfoBytes)
 	txRaw = appendBytesField(txRaw, 3, rs)
 
+	// Cosmos tx hash: upper-case hex of sha256 over the broadcast TxRaw bytes,
+	// the id explorers display (same for standard and Ethermint chains).
+	txID := strings.ToUpper(bytesToHex(sha256Sum(txRaw)))
+
 	return &txcosmos.SigningOutput{
 		Encoded:   txRaw,
 		TxBytes:   base64Std(txRaw),
 		Signature: rs,
+		TxId:      txID,
 	}, nil
 }
 

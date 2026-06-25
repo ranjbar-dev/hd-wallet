@@ -255,4 +255,11 @@ func assertEthSigned(t *testing.T, w *HDWallet, in *txeth.SigningInput, want str
 	if eo.GetEncodedHex() != want {
 		t.Fatalf("encoded_hex mismatch:\n got  %s\n want %s", eo.GetEncodedHex(), want)
 	}
+	// tx_id is the canonical Ethereum tx hash over the (already locked) encoded
+	// bytes: "0x" + hex(keccak256(encoded)). Derived from the pinned output, so
+	// it both pins the field and proves it is wired for every tx mode.
+	wantTxID := "0x" + hex.EncodeToString(keccak256(eo.GetEncoded()))
+	if eo.GetTxId() != wantTxID {
+		t.Fatalf("tx_id mismatch:\n got  %s\n want %s", eo.GetTxId(), wantTxID)
+	}
 }

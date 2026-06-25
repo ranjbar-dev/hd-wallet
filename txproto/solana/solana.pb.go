@@ -251,7 +251,10 @@ type SigningOutput struct {
 	// raw signed transaction bytes.
 	Raw []byte `protobuf:"bytes,2,opt,name=raw,proto3" json:"raw,omitempty"`
 	// Error message, empty on success.
-	Error         string `protobuf:"bytes,3,opt,name=error,proto3" json:"error,omitempty"`
+	Error string `protobuf:"bytes,3,opt,name=error,proto3" json:"error,omitempty"`
+	// Transaction id/signature: base58 of the fee-payer's ed25519 signature
+	// (the first signature). On Solana this signature IS the transaction id.
+	TxId          string `protobuf:"bytes,4,opt,name=tx_id,json=txId,proto3" json:"tx_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -307,6 +310,13 @@ func (x *SigningOutput) GetError() string {
 	return ""
 }
 
+func (x *SigningOutput) GetTxId() string {
+	if x != nil {
+		return x.TxId
+	}
+	return ""
+}
+
 var File_txproto_solana_solana_proto protoreflect.FileDescriptor
 
 const file_txproto_solana_solana_proto_rawDesc = "" +
@@ -325,11 +335,12 @@ const file_txproto_solana_solana_proto_rawDesc = "" +
 	"\x10recent_blockhash\x18\x01 \x01(\tR\x0frecentBlockhash\x12T\n" +
 	"\x14transfer_transaction\x18\x02 \x01(\v2\x1f.hdwallet.solana.proto.TransferH\x00R\x13transferTransaction\x12d\n" +
 	"\x1atoken_transfer_transaction\x18\x03 \x01(\v2$.hdwallet.solana.proto.TokenTransferH\x00R\x18tokenTransferTransactionB\x12\n" +
-	"\x10transaction_type\"Q\n" +
+	"\x10transaction_type\"f\n" +
 	"\rSigningOutput\x12\x18\n" +
 	"\aencoded\x18\x01 \x01(\tR\aencoded\x12\x10\n" +
 	"\x03raw\x18\x02 \x01(\fR\x03raw\x12\x14\n" +
-	"\x05error\x18\x03 \x01(\tR\x05errorB1Z/github.com/ranjbar-dev/hd-wallet/txproto/solanab\x06proto3"
+	"\x05error\x18\x03 \x01(\tR\x05error\x12\x13\n" +
+	"\x05tx_id\x18\x04 \x01(\tR\x04txIdB1Z/github.com/ranjbar-dev/hd-wallet/txproto/solanab\x06proto3"
 
 var (
 	file_txproto_solana_solana_proto_rawDescOnce sync.Once

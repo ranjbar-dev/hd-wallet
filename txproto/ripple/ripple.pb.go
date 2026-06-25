@@ -170,10 +170,14 @@ func (x *SigningInput) GetPayment() *Payment {
 
 // SigningOutput mirrors a minimal subset of TW.Ripple.Proto.SigningOutput.
 type SigningOutput struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Encoded       []byte                 `protobuf:"bytes,1,opt,name=encoded,proto3" json:"encoded,omitempty"` // serialized signed transaction
-	EncodedHex    string                 `protobuf:"bytes,2,opt,name=encoded_hex,json=encodedHex,proto3" json:"encoded_hex,omitempty"`
-	Error         string                 `protobuf:"bytes,3,opt,name=error,proto3" json:"error,omitempty"`
+	state      protoimpl.MessageState `protogen:"open.v1"`
+	Encoded    []byte                 `protobuf:"bytes,1,opt,name=encoded,proto3" json:"encoded,omitempty"` // serialized signed transaction
+	EncodedHex string                 `protobuf:"bytes,2,opt,name=encoded_hex,json=encodedHex,proto3" json:"encoded_hex,omitempty"`
+	Error      string                 `protobuf:"bytes,3,opt,name=error,proto3" json:"error,omitempty"`
+	// Transaction id/hash: upper-case hex of the first 32 bytes of SHA-512 over
+	// the serialized signed transaction (sha512Half), the form XRP explorers
+	// display.
+	TxId          string `protobuf:"bytes,4,opt,name=tx_id,json=txId,proto3" json:"tx_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -229,6 +233,13 @@ func (x *SigningOutput) GetError() string {
 	return ""
 }
 
+func (x *SigningOutput) GetTxId() string {
+	if x != nil {
+		return x.TxId
+	}
+	return ""
+}
+
 var File_txproto_ripple_ripple_proto protoreflect.FileDescriptor
 
 const file_txproto_ripple_ripple_proto_rawDesc = "" +
@@ -244,12 +255,13 @@ const file_txproto_ripple_ripple_proto_rawDesc = "" +
 	"\x14last_ledger_sequence\x18\x03 \x01(\rR\x12lastLedgerSequence\x12\x18\n" +
 	"\aaccount\x18\x04 \x01(\tR\aaccount\x12\x14\n" +
 	"\x05flags\x18\x05 \x01(\rR\x05flags\x128\n" +
-	"\apayment\x18\x06 \x01(\v2\x1e.hdwallet.ripple.proto.PaymentR\apayment\"`\n" +
+	"\apayment\x18\x06 \x01(\v2\x1e.hdwallet.ripple.proto.PaymentR\apayment\"u\n" +
 	"\rSigningOutput\x12\x18\n" +
 	"\aencoded\x18\x01 \x01(\fR\aencoded\x12\x1f\n" +
 	"\vencoded_hex\x18\x02 \x01(\tR\n" +
 	"encodedHex\x12\x14\n" +
-	"\x05error\x18\x03 \x01(\tR\x05errorB1Z/github.com/ranjbar-dev/hd-wallet/txproto/rippleb\x06proto3"
+	"\x05error\x18\x03 \x01(\tR\x05error\x12\x13\n" +
+	"\x05tx_id\x18\x04 \x01(\tR\x04txIdB1Z/github.com/ranjbar-dev/hd-wallet/txproto/rippleb\x06proto3"
 
 var (
 	file_txproto_ripple_ripple_proto_rawDescOnce sync.Once
