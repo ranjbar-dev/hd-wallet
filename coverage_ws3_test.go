@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/awnumar/memguard"
+
 	txcosmos "github.com/ranjbar-dev/hd-wallet/txproto/cosmos"
 )
 
