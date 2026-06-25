@@ -16,6 +16,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 	"sync"
 
 	"github.com/awnumar/memguard"
@@ -205,6 +206,27 @@ func GenerateMnemonicWithWordCount(words int) (string, error) {
 	}
 	defer wipe(mn)
 	return string(mn), nil
+}
+
+// ValidateMnemonic reports whether mnemonic is a valid BIP-39 seed phrase. It
+// returns nil if the phrase is valid and ErrInvalidMnemonic otherwise, applying
+// the same wordlist, word-count, and checksum checks FromMnemonic does — but
+// without constructing a wallet or retaining the phrase, so an import UI can
+// validate user input before building anything. Surrounding whitespace is
+// trimmed first, exactly as the constructors do.
+func ValidateMnemonic(mnemonic string) error {
+	if !bip39.IsMnemonicValid(strings.TrimSpace(mnemonic)) {
+		return ErrInvalidMnemonic
+	}
+	return nil
+}
+
+// ValidateMnemonicBytes is ValidateMnemonic for a mnemonic held in a byte slice,
+// mirroring the FromMnemonic/FromMnemonicBytes string/bytes pairing. Unlike the
+// constructors it neither wipes nor modifies the slice: this is a read-only
+// validity check, not a wallet entry point.
+func ValidateMnemonicBytes(mnemonic []byte) error {
+	return ValidateMnemonic(string(mnemonic))
 }
 
 // wordCountToEntropyBits maps a BIP-39 word count to its entropy size in bits.
