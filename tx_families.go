@@ -39,6 +39,15 @@ var cosmosTxChains = symbolSet(
 	AKT, NOBLE, SEI, DYDX, BLZ, CRYPTOORG,
 )
 
+// utxoTxChains is every additional Bitcoin-family UTXO chain (beyond BTC/LTC)
+// whose transaction is signed by the Bitcoin wire signer (signBitcoinTx /
+// signZcashTx). DOGE and DASH share Bitcoin's legacy SIGHASH_ALL P2PKH algorithm
+// (pinned via the btcd oracle); BCH signs with a BIP-143 preimage + SIGHASH_FORKID
+// (pinned to Trust Wallet Core's BitcoinCash vector); ZEC signs transparent inputs
+// with the Sapling v4 / ZIP-243 sighash (pinned to TWC's Zcash vector). All four
+// route to familyBitcoin (see txFamilyOf).
+var utxoTxChains = symbolSet(DOGE, DASH, BCH, ZEC)
+
 // ethermintTxChains is every Ethermint-keyed Cosmos chain whose direct-mode tx is
 // vector-verified. These sign with an eth_secp256k1 key: keccak256(SignDoc) digest
 // and the "/ethermint.crypto.v1.ethsecp256k1.PubKey" type URL (see

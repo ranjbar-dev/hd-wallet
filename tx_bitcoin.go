@@ -63,7 +63,12 @@ type btcOutput struct {
 // signBitcoinTx builds, signs and serializes a Bitcoin/Litecoin SegWit
 // transaction. All UTXOs are assumed controlled by the (symbol,index) key.
 func (w *HDWallet) signBitcoinTx(symbol Symbol, index uint32, in *txbtc.SigningInput) (*txbtc.SigningOutput, error) {
-	if _, ok := btcAddrParams[symbol]; !ok {
+	// Zcash uses an entirely different (Sapling v4 / ZIP-243) wire format and
+	// sighash, so it has its own builder rather than the standard Bitcoin path.
+	if symbol == ZEC {
+		return w.signZcashTx(index, in)
+	}
+	if !bitcoinTxSupported(symbol) {
 		return nil, fmt.Errorf("%w: %s", ErrTxUnsupported, symbol)
 	}
 	if len(in.GetUtxo()) == 0 {
@@ -91,10 +96,10 @@ func (w *HDWallet) signBitcoinTx(symbol Symbol, index uint32, in *txbtc.SigningI
 		return nil, err
 	}
 
-	const version uint32 = 2
+	version := btcTxVersion(symbol)
 	hashType := in.GetHashType()
 	if hashType == 0 {
-		hashType = 0x01 // SIGHASH_ALL
+		hashType = bitcoinDefaultHashType(symbol)
 	}
 	locktime := in.GetLockTime()
 
@@ -127,9 +132,18 @@ func (w *HDWallet) signBitcoinInput(symbol Symbol, index uint32, pub []byte, inp
 		if !bytesEqual(hash160(pub), keyhash) {
 			return fmt.Errorf("%w: bitcoin: utxo %d not controlled by key at index %d", ErrTxInput, i, index)
 		}
-		// Legacy sighash: scriptSig of this input = its scriptPubKey, all others
-		// empty; the resulting unlocking script is push(DER‖hashType) push(pubkey).
-		digest := legacySighash(inputs, outputs, i, script, version, locktime, hashType)
+		// Bitcoin Cash signs P2PKH inputs with a BIP-143 preimage carrying
+		// SIGHASH_FORKID (the hashType already includes 0x40); its scriptCode is the
+		// P2PKH scriptPubKey, length-prefixed. Every other chain (BTC/LTC/DOGE/DASH)
+		// uses the pre-segwit legacy sighash. Both produce a legacy unlocking script
+		// push(DER‖hashType) push(pubkey) with no witness.
+		var digest []byte
+		if symbol == BCH {
+			scriptCode := append(btcVarInt(uint64(len(script))), script...)
+			digest = bip143Sighash(inputs, outputs, i, scriptCode, version, locktime, hashType)
+		} else {
+			digest = legacySighash(inputs, outputs, i, script, version, locktime, hashType)
+		}
 		sigWithType, err := w.btcDERSig(symbol, index, digest, hashType)
 		if err != nil {
 			return err

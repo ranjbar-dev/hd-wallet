@@ -198,15 +198,19 @@ func bitcoinValidator(symbol Symbol) addressValidator {
 // symbol and returns its scriptPubKey, used to build transaction outputs to an
 // arbitrary destination/change address.
 func bitcoinDecodeScript(symbol Symbol, addr string) ([]byte, error) {
-	p, ok := btcAddrParams[symbol]
-	if !ok {
-		return nil, fmt.Errorf("%w: %s", ErrUnsupportedCoin, symbol)
+	if p, ok := btcAddrParams[symbol]; ok {
+		script, _, err := decodeBitcoinAddress(p, addr)
+		if err != nil {
+			return nil, fmt.Errorf("%w: %s: %v", ErrInvalidAddress, symbol, err)
+		}
+		return script, nil
 	}
-	script, _, err := decodeBitcoinAddress(p, addr)
-	if err != nil {
-		return nil, fmt.Errorf("%w: %s: %v", ErrInvalidAddress, symbol, err)
+	// The non-BTC/LTC UTXO chains (DOGE/DASH/BCH/ZEC) are base58check-only (plus
+	// CashAddr for BCH) with chain-specific version prefixes; see tx_utxo.go.
+	if up, ok := utxoOutParams[symbol]; ok {
+		return up.decodeScript(symbol, addr)
 	}
-	return script, nil
+	return nil, fmt.Errorf("%w: %s", ErrUnsupportedCoin, symbol)
 }
 
 // decodeBitcoinAddress decodes a Bitcoin address into its scriptPubKey and the
