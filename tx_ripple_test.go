@@ -1,6 +1,8 @@
 package hdwallet
 
 import (
+	"encoding/hex"
+	"strings"
 	"testing"
 
 	txripple "github.com/ranjbar-dev/hd-wallet/txproto/ripple"
@@ -46,5 +48,11 @@ func TestSignTxRipplePayment(t *testing.T) {
 	}
 	if ro.GetEncodedHex() != want {
 		t.Fatalf("encoded mismatch:\n got  %s\n want %s", ro.GetEncodedHex(), want)
+	}
+	// tx_id is the XRP tx hash: upper-case hex of sha512Half over the (locked)
+	// signed blob. Derived from the pinned output to pin and wire-check the field.
+	wantTxID := strings.ToUpper(hex.EncodeToString(sha512Half(ro.GetEncoded())))
+	if ro.GetTxId() != wantTxID {
+		t.Fatalf("tx_id mismatch:\n got  %s\n want %s", ro.GetTxId(), wantTxID)
 	}
 }

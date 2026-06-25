@@ -319,7 +319,10 @@ type SigningOutput struct {
 	// Hex of `encoded` (no "0x" prefix), for convenience.
 	EncodedHex string `protobuf:"bytes,5,opt,name=encoded_hex,json=encodedHex,proto3" json:"encoded_hex,omitempty"`
 	// Error message, empty on success.
-	Error         string `protobuf:"bytes,6,opt,name=error,proto3" json:"error,omitempty"`
+	Error string `protobuf:"bytes,6,opt,name=error,proto3" json:"error,omitempty"`
+	// Transaction id/hash: "0x" + lower-case hex of keccak256(encoded). This is
+	// the canonical Ethereum tx hash explorers display and broadcast tracks.
+	TxId          string `protobuf:"bytes,7,opt,name=tx_id,json=txId,proto3" json:"tx_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -392,6 +395,13 @@ func (x *SigningOutput) GetEncodedHex() string {
 func (x *SigningOutput) GetError() string {
 	if x != nil {
 		return x.Error
+	}
+	return ""
+}
+
+func (x *SigningOutput) GetTxId() string {
+	if x != nil {
+		return x.TxId
 	}
 	return ""
 }
@@ -601,7 +611,7 @@ const file_txproto_ethereum_ethereum_proto_rawDesc = "" +
 	"\vtransaction\x18\t \x01(\v2$.hdwallet.ethereum.proto.TransactionR\vtransaction\x12@\n" +
 	"\vaccess_list\x18\n" +
 	" \x03(\v2\x1f.hdwallet.ethereum.proto.AccessR\n" +
-	"accessList\"\x8a\x01\n" +
+	"accessList\"\x9f\x01\n" +
 	"\rSigningOutput\x12\x18\n" +
 	"\aencoded\x18\x01 \x01(\fR\aencoded\x12\f\n" +
 	"\x01r\x18\x02 \x01(\fR\x01r\x12\f\n" +
@@ -609,7 +619,8 @@ const file_txproto_ethereum_ethereum_proto_rawDesc = "" +
 	"\x01v\x18\x04 \x01(\fR\x01v\x12\x1f\n" +
 	"\vencoded_hex\x18\x05 \x01(\tR\n" +
 	"encodedHex\x12\x14\n" +
-	"\x05error\x18\x06 \x01(\tR\x05errorB3Z1github.com/ranjbar-dev/hd-wallet/txproto/ethereumb\x06proto3"
+	"\x05error\x18\x06 \x01(\tR\x05error\x12\x13\n" +
+	"\x05tx_id\x18\a \x01(\tR\x04txIdB3Z1github.com/ranjbar-dev/hd-wallet/txproto/ethereumb\x06proto3"
 
 var (
 	file_txproto_ethereum_ethereum_proto_rawDescOnce sync.Once

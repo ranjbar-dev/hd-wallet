@@ -498,7 +498,10 @@ type SigningOutput struct {
 	// 64-byte signature (R||S).
 	Signature []byte `protobuf:"bytes,3,opt,name=signature,proto3" json:"signature,omitempty"`
 	// Error message, empty on success.
-	Error         string `protobuf:"bytes,4,opt,name=error,proto3" json:"error,omitempty"`
+	Error string `protobuf:"bytes,4,opt,name=error,proto3" json:"error,omitempty"`
+	// Transaction id/hash: upper-case hex of sha256(encoded TxRaw bytes), the
+	// tx hash Cosmos explorers display and broadcast tracks.
+	TxId          string `protobuf:"bytes,5,opt,name=tx_id,json=txId,proto3" json:"tx_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -561,6 +564,13 @@ func (x *SigningOutput) GetError() string {
 	return ""
 }
 
+func (x *SigningOutput) GetTxId() string {
+	if x != nil {
+		return x.TxId
+	}
+	return ""
+}
+
 var File_txproto_cosmos_cosmos_proto protoreflect.FileDescriptor
 
 const file_txproto_cosmos_cosmos_proto_rawDesc = "" +
@@ -599,12 +609,13 @@ const file_txproto_cosmos_cosmos_proto_rawDesc = "" +
 	"\x04memo\x18\x04 \x01(\tR\x04memo\x12,\n" +
 	"\x03fee\x18\x05 \x01(\v2\x1a.hdwallet.cosmos.proto.FeeR\x03fee\x12;\n" +
 	"\x04send\x18\x06 \x01(\v2'.hdwallet.cosmos.proto.SendCoinsMessageR\x04send\x12:\n" +
-	"\bmessages\x18\a \x03(\v2\x1e.hdwallet.cosmos.proto.MessageR\bmessages\"x\n" +
+	"\bmessages\x18\a \x03(\v2\x1e.hdwallet.cosmos.proto.MessageR\bmessages\"\x8d\x01\n" +
 	"\rSigningOutput\x12\x18\n" +
 	"\aencoded\x18\x01 \x01(\fR\aencoded\x12\x19\n" +
 	"\btx_bytes\x18\x02 \x01(\tR\atxBytes\x12\x1c\n" +
 	"\tsignature\x18\x03 \x01(\fR\tsignature\x12\x14\n" +
-	"\x05error\x18\x04 \x01(\tR\x05errorB1Z/github.com/ranjbar-dev/hd-wallet/txproto/cosmosb\x06proto3"
+	"\x05error\x18\x04 \x01(\tR\x05error\x12\x13\n" +
+	"\x05tx_id\x18\x05 \x01(\tR\x04txIdB1Z/github.com/ranjbar-dev/hd-wallet/txproto/cosmosb\x06proto3"
 
 var (
 	file_txproto_cosmos_cosmos_proto_rawDescOnce sync.Once

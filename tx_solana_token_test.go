@@ -48,4 +48,10 @@ func TestSignTxSolanaTokenTransfer(t *testing.T) {
 	if so.GetEncoded() != want {
 		t.Fatalf("encoded mismatch:\n got  %s\n want %s", so.GetEncoded(), want)
 	}
+	// tx_id is base58 of the fee-payer's signature (raw[1:65]) — derived from the
+	// locked raw output to pin and wire-check the field.
+	wantTxID := base58Encode(base58BTC, so.GetRaw()[1:65])
+	if so.GetTxId() != wantTxID {
+		t.Fatalf("tx_id mismatch:\n got  %s\n want %s", so.GetTxId(), wantTxID)
+	}
 }

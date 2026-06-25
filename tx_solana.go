@@ -106,6 +106,8 @@ func (w *HDWallet) signSolanaSystemTransfer(symbol Symbol, index uint32, in *txs
 	return &txsolana.SigningOutput{
 		Encoded: encoded,
 		Raw:     tx,
+		// On Solana the fee-payer's signature IS the transaction id.
+		TxId: base58Encode(base58BTC, sigBytes),
 	}, nil
 }
 
@@ -169,6 +171,8 @@ func (w *HDWallet) signSolanaTokenTransfer(symbol Symbol, index uint32, in *txso
 	return &txsolana.SigningOutput{
 		Encoded: base58Encode(base58BTC, tx),
 		Raw:     tx,
+		// On Solana the fee-payer's signature IS the transaction id.
+		TxId: base58Encode(base58BTC, sigBytes),
 	}, nil
 }
 

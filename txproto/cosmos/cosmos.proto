@@ -71,4 +71,7 @@ message SigningOutput {
   bytes signature = 3;
   // Error message, empty on success.
   string error = 4;
+  // Transaction id/hash: upper-case hex of sha256(encoded TxRaw bytes), the
+  // tx hash Cosmos explorers display and broadcast tracks.
+  string tx_id = 5;
 }

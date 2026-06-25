@@ -58,4 +58,12 @@ func TestSignTxSolanaTransfer(t *testing.T) {
 	if so.GetEncoded() != want {
 		t.Fatalf("encoded mismatch:\n got  %s\n want %s", so.GetEncoded(), want)
 	}
+	// tx_id is base58 of the fee-payer's signature (the first signature) — on
+	// Solana the signature IS the transaction id. The signed tx is
+	// [compact-u16 count=1][64-byte signature][message], so the first signature
+	// is raw[1:65]; derive the expected id from the (locked) raw output.
+	wantTxID := base58Encode(base58BTC, so.GetRaw()[1:65])
+	if so.GetTxId() != wantTxID {
+		t.Fatalf("tx_id mismatch:\n got  %s\n want %s", so.GetTxId(), wantTxID)
+	}
 }

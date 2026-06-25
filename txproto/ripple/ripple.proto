@@ -27,4 +27,8 @@ message SigningOutput {
   bytes encoded = 1; // serialized signed transaction
   string encoded_hex = 2;
   string error = 3;
+  // Transaction id/hash: upper-case hex of the first 32 bytes of SHA-512 over
+  // the serialized signed transaction (sha512Half), the form XRP explorers
+  // display.
+  string tx_id = 4;
 }
