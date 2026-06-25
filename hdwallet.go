@@ -322,6 +322,56 @@ func (w *HDWallet) AllAddressesAt(index uint32) (map[Symbol]string, error) {
 	return out, nil
 }
 
+// AddressRange derives count consecutive addresses for a single coin symbol
+// starting at index start, varying the final element of the coin's BIP-32 path
+// (preserving its hardened flag) exactly as AddressIndex does. The returned
+// slice is in ascending index order: element i is the address at start+i. A
+// count of 0 returns an empty, non-nil slice.
+//
+// The seed enclave is opened exactly once and every address is derived inside
+// that single decryption window. start+count must not exceed 2^31 (0x80000000);
+// a larger range returns an out-of-range error, as does an unknown symbol
+// (wrapping ErrUnsupportedCoin). It is only available on seed-based wallets; a
+// key-only wallet (imported from a single private key) returns ErrKeyOnlyWallet.
+func (w *HDWallet) AddressRange(symbol Symbol, start, count uint32) ([]string, error) {
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+	if w.secret == nil {
+		return nil, ErrDestroyed
+	}
+	if w.secret.isKeyOnly() {
+		return nil, ErrKeyOnlyWallet
+	}
+	coin, ok := coins[symbol]
+	if !ok {
+		return nil, fmt.Errorf("%w: %s", ErrUnsupportedCoin, symbol)
+	}
+	if uint64(start)+uint64(count) > uint64(hardenedOffset) {
+		return nil, fmt.Errorf("address range out of range: start %d + count %d (must end <= %d)", start, count, hardenedOffset)
+	}
+	out := make([]string, 0, count)
+	err := w.secret.withSeed(func(seed []byte) error {
+		for i := start; i < start+count; i++ {
+			coinCopy := coin // copy; safe to rewrite its Path
+			path, err := withIndex(coin.Path, i)
+			if err != nil {
+				return fmt.Errorf("hdwallet: %s: %w", symbol, err)
+			}
+			coinCopy.Path = path
+			addr, err := addressFromSeed(seed, symbol, coinCopy)
+			if err != nil {
+				return err
+			}
+			out = append(out, addr)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // addressFromSeed derives and encodes a single coin's address from an already
 // open seed. Errors are wrapped with the symbol for context. It performs no
 // locking and assumes the caller holds w.mu and the seed buffer is live.

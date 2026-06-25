@@ -73,6 +73,9 @@ func txFamilyOf(symbol Symbol) txFamily {
 	if _, ok := ethermintTxChains[symbol]; ok {
 		return familyCosmosEthermint
 	}
+	if _, ok := utxoTxChains[symbol]; ok {
+		return familyBitcoin
+	}
 	switch symbol {
 	case TRX:
 		return familyTron
