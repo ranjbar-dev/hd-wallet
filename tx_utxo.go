@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/btcsuite/btcd/btcutil/base58"
 	"github.com/btcsuite/btcd/btcutil/bech32"
 )
 
@@ -39,16 +40,43 @@ type utxoOutParam struct {
 //   - DASH: P2PKH 0x4c, P2SH 0x10.
 //   - BCH:  legacy base58 P2PKH 0x00 / P2SH 0x05, or CashAddr ("bitcoincash").
 //   - ZEC:  transparent t-addr two-byte prefixes (P2PKH 0x1cb8, P2SH 0x1cbd).
+//
+// The legacy-P2PKH altcoins below sign with the exact same pre-segwit
+// double-SHA256 SIGHASH_ALL sighash as Bitcoin/DOGE/DASH (only the address
+// version bytes differ — they never enter the signed bytes), so the btcd oracle
+// proves each one byte-for-byte (tx_utxo_altcoins_test.go). Version bytes are
+// from Trust Wallet Core's registry.json.
+//
+// Deliberately NOT here (the engine would emit a wrong, fund-losing signature):
+//   - BCD (Bitcoin Diamond): appends a length-prefixed "sbtc" string to the
+//     sighash preimage for replay protection — not the standard legacy sighash.
+//   - XEC (eCash): a Bitcoin Cash ABC continuation that signs with the BIP-143 +
+//     SIGHASH_FORKID path; that branch lives in tx_bitcoin.go (owned elsewhere)
+//     and currently keys only off BCH, so XEC would fall through to the legacy
+//     sighash and produce an invalid FORKID signature.
+//   - KMD/ZEN/FLUX: Zcash-derived (ZIP-143/ZIP-243 BLAKE2b sighash, Overwinter/
+//     Sapling wire format; ZEN also has a CHECKBLOCKATHEIGHT scriptPubKey suffix).
+//   - NEBL/XVG: Peercoin-style PoS forks with an extra nTime field in the tx.
 var utxoOutParams = map[Symbol]utxoOutParam{
 	DOGE: {p2pkhVer: []byte{0x1e}, p2shVer: []byte{0x16}},
 	DASH: {p2pkhVer: []byte{0x4c}, p2shVer: []byte{0x10}},
 	BCH:  {p2pkhVer: []byte{0x00}, p2shVer: []byte{0x05}, cashHRP: "bitcoincash"},
 	ZEC:  {p2pkhVer: []byte{0x1c, 0xb8}, p2shVer: []byte{0x1c, 0xbd}},
+	// Legacy-P2PKH altcoins (standard double-SHA256 sighash, btcd-oracle-proven).
+	QTUM: {p2pkhVer: []byte{0x3a}, p2shVer: []byte{0x32}}, // Qtum: P2PKH 58, P2SH 50
+	RVN:  {p2pkhVer: []byte{0x3c}, p2shVer: []byte{0x7a}}, // Ravencoin: P2PKH 60, P2SH 122
+	FIRO: {p2pkhVer: []byte{0x52}, p2shVer: []byte{0x07}}, // Firo: P2PKH 82, P2SH 7
+	MONA: {p2pkhVer: []byte{0x32}, p2shVer: []byte{0x37}}, // MonaCoin: P2PKH 50, P2SH 55
+	PIVX: {p2pkhVer: []byte{0x1e}, p2shVer: []byte{0x0d}}, // PIVX: P2PKH 30, P2SH 13
 }
 
 // decodeScript decodes addr into its scriptPubKey for the chain described by p.
 // Bitcoin Cash CashAddr is tried first (when supported); base58check (P2PKH /
 // P2SH) covers the remaining cases, including BCH legacy addresses.
+//
+// Single-byte-version chains decode through btcd's base58.CheckDecode (which
+// returns version + 20-byte payload); two-byte-version chains (e.g. ZEC's
+// transparent t-addr) use the local multi-byte base58check decoder.
 func (p utxoOutParam) decodeScript(symbol Symbol, addr string) ([]byte, error) {
 	if p.cashHRP != "" {
 		if script, err := decodeCashAddrScript(p.cashHRP, addr); err == nil {
@@ -56,7 +84,7 @@ func (p utxoOutParam) decodeScript(symbol Symbol, addr string) ([]byte, error) {
 		}
 		// Not a CashAddr — fall through to legacy base58check (BCH accepts both).
 	}
-	body, err := base58CheckDecode(base58BTC, addr)
+	body, err := decodeBase58CheckBody(addr)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %s: %v", ErrInvalidAddress, symbol, err)
 	}
@@ -68,6 +96,18 @@ func (p utxoOutParam) decodeScript(symbol Symbol, addr string) ([]byte, error) {
 	default:
 		return nil, fmt.Errorf("%w: %s: unrecognized address version/length", ErrInvalidAddress, symbol)
 	}
+}
+
+// decodeBase58CheckBody decodes a base58check address and returns its
+// version+payload (the bytes before the 4-byte checksum). It uses btcd's
+// single-byte base58.CheckDecode first — the canonical decoder, correct for every
+// 1-byte-version chain — and falls back to the local multi-byte decoder for
+// addresses whose version prefix is longer than one byte (e.g. ZEC).
+func decodeBase58CheckBody(addr string) ([]byte, error) {
+	if payload, ver, err := base58.CheckDecode(addr); err == nil {
+		return append([]byte{ver}, payload...), nil
+	}
+	return base58CheckDecode(base58BTC, addr)
 }
 
 // p2pkhScript returns the 25-byte P2PKH scriptPubKey for a 20-byte key hash:
@@ -137,28 +177,30 @@ func decodeCashAddrScript(prefix, addr string) ([]byte, error) {
 // bitcoinTxSupported reports whether the standard Bitcoin-wire signer
 // (signBitcoinTx) handles symbol. ZEC is excluded — it has its own Sapling
 // builder (signZcashTx), dispatched ahead of this check.
+//
+// A symbol is supported when it is a native-SegWit chain (btcAddrParams: BTC,
+// LTC, DGB, SYS, VIA, STRAX) or one of the legacy/CashAddr chains that decode via
+// utxoOutParams (DOGE, DASH, BCH, QTUM, RVN, KMD, FIRO, MONA, XVG, PIVX, NEBL,
+// ZEN, FLUX). ZEC is also a utxoOutParams entry but is intercepted by signZcashTx
+// before this check, so its membership here is never reached.
 func bitcoinTxSupported(symbol Symbol) bool {
-	if _, ok := btcAddrParams[symbol]; ok { // BTC, LTC
+	if _, ok := btcAddrParams[symbol]; ok { // BTC, LTC, DGB, SYS, VIA, STRAX
 		return true
 	}
-	switch symbol {
-	case DOGE, DASH, BCH:
-		return true
-	default:
-		return false
-	}
+	_, ok := utxoOutParams[symbol]
+	return ok
 }
 
 // btcTxVersion returns the transaction version for a Bitcoin-family chain.
-// BTC/LTC use version 2; the legacy non-SegWit chains (DOGE/DASH/BCH) use version
-// 1, matching the reference signers their vectors come from.
+// Native-SegWit chains (BTC/LTC and the DGB/SYS/VIA/STRAX altcoins, all in
+// btcAddrParams) use version 2; the legacy non-SegWit chains (DOGE/DASH/BCH and
+// the base58-only altcoins) use version 1, matching the reference signers their
+// vectors come from.
 func btcTxVersion(symbol Symbol) uint32 {
-	switch symbol {
-	case BTC, LTC:
+	if _, ok := btcAddrParams[symbol]; ok { // BTC, LTC, DGB, SYS, VIA, STRAX
 		return 2
-	default:
-		return 1
 	}
+	return 1
 }
 
 // bitcoinDefaultHashType returns the SIGHASH byte used when the input leaves
