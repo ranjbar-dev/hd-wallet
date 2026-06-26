@@ -89,10 +89,13 @@ func withPrivateKey(seed []byte, c Coin, fn func(priv []byte) error) error {
 		return fn(node.key)
 	case Ed25519ExtendedCardano:
 		// Cardano's Icarus master secret is derived from the BIP-39 ENTROPY, not
-		// the BIP-39 seed that this function receives. The entropy is not available
-		// on this code path, so end-to-end Address/Sign wiring for a Cardano coin
-		// must call withCardanoPrivateKey(entropy, ...) directly (see cardano.go).
-		// Until a Cardano coin row exists, this guards against silent misuse.
+		// the BIP-39 seed that this function receives. The seed is the wrong input
+		// here, so the seed-based path is deliberately closed: the public Address/
+		// Sign APIs route Cardano through the entropy enclave instead
+		// (HDWallet.withLeafPrivateKey / withCardanoCombinedPublicKey, which call
+		// withCardanoPrivateKey(entropy, ...) in cardano.go). Reaching this branch
+		// means a Cardano coin was fed the seed directly, which would silently
+		// produce a wrong key, so it errors.
 		return errCardanoNeedsEntropy
 	case Starkex:
 		return withStarkexPrivateKey(seed, path, fn)

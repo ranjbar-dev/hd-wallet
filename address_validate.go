@@ -526,6 +526,35 @@ func algoValidator(symbol Symbol) addressValidator {
 	}
 }
 
+// cardanoValidator validates a Cardano mainnet base (addr1...) address, the
+// reverse of encodeCardano. Cardano addresses exceed bech32's 90-character cap,
+// so it uses DecodeNoLimit; it verifies the HRP ("addr"), the mainnet base header
+// byte (0x01), and the 57-byte payload (header + 28-byte payment hash + 28-byte
+// staking hash). It returns the 57-byte payload (header || paymentHash ||
+// stakingHash).
+func cardanoValidator(symbol Symbol) addressValidator {
+	return func(addr string) ([]byte, error) {
+		hrp, data, err := bech32.DecodeNoLimit(addr)
+		if err != nil {
+			return nil, addrErr(symbol, "bech32 decode failed: "+err.Error())
+		}
+		if hrp != cardanoHRP {
+			return nil, addrErr(symbol, fmt.Sprintf("wrong prefix %q (want %q)", hrp, cardanoHRP))
+		}
+		payload, err := bech32.ConvertBits(data, 5, 8, false)
+		if err != nil {
+			return nil, addrErr(symbol, "invalid payload: "+err.Error())
+		}
+		if len(payload) != 1+2*cardanoKeyHashLen {
+			return nil, addrErr(symbol, fmt.Sprintf("payload length %d (want %d)", len(payload), 1+2*cardanoKeyHashLen))
+		}
+		if payload[0] != cardanoBaseHeader {
+			return nil, addrErr(symbol, fmt.Sprintf("unsupported header byte 0x%02x (want 0x%02x)", payload[0], cardanoBaseHeader))
+		}
+		return payload, nil
+	}
+}
+
 // hexHashValidator validates a Sui/Aptos address: 0x followed by 64 hex
 // characters (a 32-byte account/object hash). These addresses carry no internal
 // checksum, so this verifies form and length only. Returns the 32-byte hash.

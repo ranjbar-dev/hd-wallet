@@ -61,6 +61,12 @@ var (
 	// valid BIP-39 word count (12, 15, 18, 21, or 24) or entropy size in bits
 	// (128, 160, 192, 224, or 256).
 	ErrInvalidWordCount = errors.New("hdwallet: invalid mnemonic word count")
+	// ErrNoEntropy is returned by Cardano (ADA) operations on a wallet that has no
+	// BIP-39 entropy to derive from. Cardano's Icarus master key is built from the
+	// mnemonic entropy, not the seed, so a wallet imported from a raw private key,
+	// WIF, or extended public key (which carry no mnemonic) cannot derive Cardano
+	// addresses or signatures.
+	ErrNoEntropy = errors.New("hdwallet: Cardano requires a mnemonic-derived wallet (no BIP-39 entropy available)")
 )
 
 // HDWallet is an HD wallet derived from a BIP-39 mnemonic. Its sensitive
@@ -303,6 +309,17 @@ func (w *HDWallet) AllAddressesAt(index uint32) (map[Symbol]string, error) {
 	err := w.secret.withSeed(func(seed []byte) error {
 		for _, symbol := range SupportedCoins() {
 			coin := coins[symbol] // copy; safe to rewrite its Path
+			if coin.Curve == Ed25519ExtendedCardano {
+				// Cardano derives from the BIP-39 entropy, not this seed; derive it
+				// in the same lock window via the entropy enclave so AllAddresses
+				// stays complete (see withCardanoAddressAt).
+				addr, aerr := w.cardanoAddressAt(symbol, index)
+				if aerr != nil {
+					return aerr
+				}
+				out[symbol] = addr
+				continue
+			}
 			path, err := withIndex(coin.Path, index)
 			if err != nil {
 				return fmt.Errorf("hdwallet: %s: %w", symbol, err)
@@ -320,6 +337,48 @@ func (w *HDWallet) AllAddressesAt(index uint32) (map[Symbol]string, error) {
 		return nil, err
 	}
 	return out, nil
+}
+
+// cardanoAddressAt derives and encodes the Cardano address for symbol at index
+// from the BIP-39 entropy enclave (Cardano's Icarus master comes from entropy,
+// not the seed). It assumes the caller already holds w.mu and has verified the
+// wallet is alive and seed-based; it opens only the entropy enclave (not the
+// seed). The combined payment+staking public key is wiped inside
+// withCardanoCombinedPublicKey.
+func (w *HDWallet) cardanoAddressAt(symbol Symbol, index uint32) (string, error) {
+	coin, ok := coins[symbol]
+	if !ok {
+		return "", fmt.Errorf("%w: %s", ErrUnsupportedCoin, symbol)
+	}
+	paymentPath, err := withIndex(coin.Path, index)
+	if err != nil {
+		return "", fmt.Errorf("hdwallet: %s: %w", symbol, err)
+	}
+	paymentIdx, err := parsePath(paymentPath)
+	if err != nil {
+		return "", fmt.Errorf("hdwallet: %s: %w", symbol, err)
+	}
+	stakingIdx, err := cardanoStakingPath(paymentIdx)
+	if err != nil {
+		return "", fmt.Errorf("hdwallet: %s: %w", symbol, err)
+	}
+	var addr string
+	err = w.secret.withEntropy(func(entropy []byte) error {
+		pub, perr := cardanoCombinedPublicKey(entropy, paymentIdx, stakingIdx)
+		if perr != nil {
+			return fmt.Errorf("hdwallet: %s: %w", symbol, perr)
+		}
+		a, aerr := coin.Encode(pub)
+		if aerr != nil {
+			return fmt.Errorf("hdwallet: %s: %w", symbol, aerr)
+		}
+		addr = a
+		return nil
+	})
+	if err != nil {
+		return "", err
+	}
+	return addr, nil
 }
 
 // AddressRange derives count consecutive addresses for a single coin symbol
@@ -350,6 +409,18 @@ func (w *HDWallet) AddressRange(symbol Symbol, start, count uint32) ([]string, e
 		return nil, fmt.Errorf("address range out of range: start %d + count %d (must end <= %d)", start, count, hardenedOffset)
 	}
 	out := make([]string, 0, count)
+	if coin.Curve == Ed25519ExtendedCardano {
+		// Cardano derives from the BIP-39 entropy, not the seed; derive each address
+		// from the entropy enclave (cardanoAddressAt opens it per call).
+		for i := start; i < start+count; i++ {
+			addr, err := w.cardanoAddressAt(symbol, i)
+			if err != nil {
+				return nil, err
+			}
+			out = append(out, addr)
+		}
+		return out, nil
+	}
 	err := w.secret.withSeed(func(seed []byte) error {
 		for i := start; i < start+count; i++ {
 			coinCopy := coin // copy; safe to rewrite its Path
@@ -425,6 +496,19 @@ func (w *HDWallet) withLeafPrivateKey(symbol Symbol, index uint32, fn func(priv 
 	if err != nil {
 		return fmt.Errorf("hdwallet: %s: %w", symbol, err)
 	}
+	if coin.Curve == Ed25519ExtendedCardano {
+		// Cardano derives from the BIP-39 entropy, not the seed. The leaf key handed
+		// to fn is the 96-byte payment extended key (the signing key); the address
+		// path uses withCardanoCombinedPublicKey, which also derives the staking key.
+		coin.Path = path
+		return w.secret.withEntropy(func(entropy []byte) error {
+			pathIdx, perr := parsePath(coin.Path)
+			if perr != nil {
+				return fmt.Errorf("hdwallet: %s: %w", symbol, perr)
+			}
+			return withCardanoPrivateKey(entropy, pathIdx, func(priv []byte) error { return fn(priv, coin) })
+		})
+	}
 	return w.deriveLeafSeedMode(coin, path, fn)
 }
 
@@ -468,10 +552,58 @@ func (w *HDWallet) withLeafPrivateKeyPath(symbol Symbol, path string, fn func(pr
 // public key, and runs fn with the public key bytes and resolved coin. The
 // private key is wiped before fn runs (it is consumed inside withLeafPrivateKey).
 func (w *HDWallet) withLeafPublicKey(symbol Symbol, index uint32, fn func(pub []byte, coin Coin) error) error {
+	if c, ok := coins[symbol]; ok && c.Curve == Ed25519ExtendedCardano {
+		// A Cardano base address is built from two keys — the payment key at the
+		// coin's role-0 path and the staking key at the role-2 path — so the encoder
+		// receives the 128-byte ED25519Cardano public key (payment point||chain ||
+		// staking point||chain), not the single-key form publicKeyFromPriv yields.
+		return w.withCardanoCombinedPublicKey(symbol, index, fn)
+	}
 	return w.withLeafPrivateKey(symbol, index, func(priv []byte, coin Coin) error {
 		pub, err := publicKeyFromPriv(coin.Curve, priv)
 		if err != nil {
 			return fmt.Errorf("hdwallet: %s: %w", symbol, err)
+		}
+		return fn(pub, coin)
+	})
+}
+
+// withCardanoCombinedPublicKey derives the Cardano payment key (role 0) and
+// staking key (role 2) for symbol at index, assembles the 128-byte
+// ED25519Cardano public key Trust Wallet Core's address encoder expects
+// (paymentPoint(32)||paymentChain(32)||stakingPoint(32)||stakingChain(32)), and
+// runs fn with it. Both extended private keys are wiped on return by
+// withCardanoPrivateKey. It is seed-mode only (Cardano needs BIP-39 entropy);
+// a wallet without entropy returns ErrNoEntropy via withEntropy.
+func (w *HDWallet) withCardanoCombinedPublicKey(symbol Symbol, index uint32, fn func(pub []byte, coin Coin) error) error {
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+	if w.secret == nil {
+		return ErrDestroyed
+	}
+	coin, ok := coins[symbol]
+	if !ok {
+		return fmt.Errorf("%w: %s", ErrUnsupportedCoin, symbol)
+	}
+	paymentPath, err := withIndex(coin.Path, index)
+	if err != nil {
+		return fmt.Errorf("hdwallet: %s: %w", symbol, err)
+	}
+	paymentIdx, err := parsePath(paymentPath)
+	if err != nil {
+		return fmt.Errorf("hdwallet: %s: %w", symbol, err)
+	}
+	// The staking path is the payment path with the role element (index 3) forced
+	// to 2 and the address element (index 4) forced to 0 — matching TWC's
+	// HDWallet.cpp stakingPath construction.
+	stakingIdx, err := cardanoStakingPath(paymentIdx)
+	if err != nil {
+		return fmt.Errorf("hdwallet: %s: %w", symbol, err)
+	}
+	return w.secret.withEntropy(func(entropy []byte) error {
+		pub, perr := cardanoCombinedPublicKey(entropy, paymentIdx, stakingIdx)
+		if perr != nil {
+			return fmt.Errorf("hdwallet: %s: %w", symbol, perr)
 		}
 		return fn(pub, coin)
 	})
