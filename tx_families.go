@@ -10,10 +10,11 @@ package hdwallet
 // for that routing; they mirror the registry in registry.go / address_validate.go.
 //
 // IMPORTANT — ethermint-keyed Cosmos chains (EVMOS, INJ, CANTO, ZETA, ONE; the
-// cosmosEvmEncoder rows) are deliberately NOT in cosmosTxChains: they sign with
-// an "/ethermint.crypto.v1.ethsecp256k1.PubKey" public-key type, so the standard
-// "/cosmos.crypto.secp256k1.PubKey" Cosmos builder would emit an on-chain-invalid
-// transaction for them. They remain unsupported until handled explicitly.
+// cosmosEvmEncoder rows) are deliberately NOT in cosmosTxChains: they sign with an
+// eth_secp256k1 public-key type (not the standard "/cosmos.crypto.secp256k1.PubKey"),
+// so the standard Cosmos builder would emit an on-chain-invalid transaction for
+// them. The vector-verified ones are routed via ethermintTxChains instead; the rest
+// remain unsupported until handled explicitly.
 
 // evmTxChains is every chain whose transaction is a standard Ethereum RLP tx
 // (the encodeETH / encodeRonin registry rows).
@@ -50,18 +51,20 @@ var utxoTxChains = symbolSet(DOGE, DASH, BCH, ZEC)
 
 // ethermintTxChains is every Ethermint-keyed Cosmos chain whose direct-mode tx is
 // vector-verified. These sign with an eth_secp256k1 key: keccak256(SignDoc) digest
-// and the "/ethermint.crypto.v1.ethsecp256k1.PubKey" type URL (see
-// signCosmosEthermintTx). Only EVMOS is included because its Trust Wallet Core
-// vector is reproduced byte-for-byte (tx_cosmos_ethermint_test.go).
+// and a chain-specific pubkey type URL (see signCosmosEthermintTx /
+// ethermintPubKeyTypeURLs). EVMOS and INJ are included because each is reproduced
+// byte-for-byte against its Trust Wallet Core vector — EVMOS uses
+// "/ethermint.crypto.v1.ethsecp256k1.PubKey" with a compressed key
+// (tx_cosmos_ethermint_test.go); INJ uses
+// "/injective.crypto.v1beta1.ethsecp256k1.PubKey" with an UNCOMPRESSED key
+// (tx_cosmos_injective_test.go).
 //
-// Roadmap — the other Ethermint-keyed rows (CANTO, ZETA) and INJECTIVE are NOT
-// listed: unlike standard Cosmos chains (where only the caller-supplied HRP
-// differs and never enters the signed bytes), an Ethermint chain's pubkey type
-// URL DOES enter the signed bytes and is chain-specific — Injective uses
-// "/injective.crypto.v1beta1.ethsecp256k1.PubKey", not the ethermint URL. Each
-// therefore needs its own TWC vector before routing; until then they fall through
-// to ErrTxUnsupported rather than risk an on-chain-invalid signature.
-var ethermintTxChains = symbolSet(EVMOS)
+// Roadmap — the other Ethermint-keyed rows (CANTO, ZETA, ONE) are NOT listed: an
+// Ethermint chain's pubkey type URL (and, for some, its compressed/uncompressed
+// encoding) DOES enter the signed bytes and is chain-specific, so each needs its
+// own TWC vector before routing. Until then they fall through to ErrTxUnsupported
+// rather than risk an on-chain-invalid signature.
+var ethermintTxChains = symbolSet(EVMOS, INJ)
 
 // symbolSet builds a set from a list of symbols.
 func symbolSet(symbols ...Symbol) map[Symbol]struct{} {
