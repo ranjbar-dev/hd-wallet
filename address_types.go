@@ -86,10 +86,26 @@ type btcParams struct {
 }
 
 // btcAddrParams maps a symbol to its address-encoding constants. BTC and LTC are
-// the wired/tested chains; other SegWit UTXO chains can be added here.
+// the wired/tested chains; the other native-SegWit UTXO altcoins below sign with
+// the same standard BIP-143 (double-SHA256) P2WPKH/legacy P2PKH sighash and are
+// proven by the btcd oracle (tx_utxo_altcoins_test.go). Per-coin version bytes are
+// taken from Trust Wallet Core's registry.json (and the chains' own
+// chainparams for STRAX).
+//
+// Deliberately NOT here (would emit a wrong, fund-losing signature with this
+// engine):
+//   - GRS (Groestlcoin): base58Hasher is groestl512d and its sighash is not the
+//     standard double-SHA256, so btcd cannot model it and it needs a Groestl dep.
+//   - BTG (Bitcoin Gold): signs with a BIP-143 SIGHASH_FORKID (ForkID 79) that the
+//     standard Bitcoin P2WPKH sighash does not match.
 var btcAddrParams = map[Symbol]btcParams{
 	BTC: {hrp: "bc", p2pkhVer: 0x00, p2shVer: 0x05},
 	LTC: {hrp: "ltc", p2pkhVer: 0x30, p2shVer: 0x32},
+	// Native-SegWit altcoins (standard BIP-143 sighash; btcd-oracle-proven).
+	DGB:   {hrp: "dgb", p2pkhVer: 0x1e, p2shVer: 0x3f},   // DigiByte: P2PKH 30, P2SH 63
+	SYS:   {hrp: "sys", p2pkhVer: 0x3f, p2shVer: 0x05},   // Syscoin: P2PKH 63, P2SH 5
+	VIA:   {hrp: "via", p2pkhVer: 0x47, p2shVer: 0x21},   // Viacoin: P2PKH 71, P2SH 33
+	STRAX: {hrp: "strax", p2pkhVer: 0x4b, p2shVer: 0x8c}, // Stratis: P2PKH 75, P2SH 140
 }
 
 // BitcoinAddress returns the address for symbol in the given Bitcoin address

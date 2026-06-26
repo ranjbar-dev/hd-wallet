@@ -44,9 +44,37 @@ var cosmosTxChains = symbolSet(
 // signZcashTx). DOGE and DASH share Bitcoin's legacy SIGHASH_ALL P2PKH algorithm
 // (pinned via the btcd oracle); BCH signs with a BIP-143 preimage + SIGHASH_FORKID
 // (pinned to Trust Wallet Core's BitcoinCash vector); ZEC signs transparent inputs
-// with the Sapling v4 / ZIP-243 sighash (pinned to TWC's Zcash vector). All four
+// with the Sapling v4 / ZIP-243 sighash (pinned to TWC's Zcash vector). All
 // route to familyBitcoin (see txFamilyOf).
-var utxoTxChains = symbolSet(DOGE, DASH, BCH, ZEC)
+//
+// The remaining members are additional Bitcoin-family altcoins that already
+// derive addresses and add NO new signing logic — only per-coin address params
+// (btcAddrParams / utxoOutParams). Each signs with a sighash byte-identical to
+// one BTC/LTC/DOGE/DASH already prove, and each is pinned by the btcd oracle in
+// tx_utxo_altcoins_test.go: native-SegWit (standard BIP-143) DGB/SYS/VIA/STRAX,
+// and legacy-P2PKH (standard pre-segwit double-SHA256) QTUM/RVN/FIRO/MONA/PIVX —
+// all straight Bitcoin-codebase forks with the unmodified legacy sighash and tx
+// wire format.
+//
+// Deliberately excluded (the engine would emit a wrong, fund-losing signature):
+//   - GRS  — Groestl-512 base58/sighash, not double-SHA256.
+//   - BTG  — BIP-143 SIGHASH_FORKID (ForkID 79).
+//   - BCD  — appends a length-prefixed "sbtc" string to the sighash preimage.
+//   - XEC  — Bitcoin Cash ABC continuation; signs with the BIP-143 + FORKID path
+//     that lives in tx_bitcoin.go (owned elsewhere) and keys only off BCH.
+//   - KMD, ZEN, FLUX — Zcash-derived: transparent inputs use the ZIP-143/ZIP-243
+//     BLAKE2b sighash and an Overwinter/Sapling wire format (ZEN also adds a
+//     CHECKBLOCKATHEIGHT replay suffix to its scriptPubKey), none of which the
+//     standard Bitcoin legacy sighash matches.
+//   - NEBL, XVG — Peercoin-style proof-of-stake forks whose transactions carry an
+//     extra nTime field, changing the serialization and sighash.
+//
+// See the per-coin notes in address_types.go / tx_utxo.go.
+var utxoTxChains = symbolSet(
+	DOGE, DASH, BCH, ZEC,
+	DGB, SYS, VIA, STRAX,
+	QTUM, RVN, FIRO, MONA, PIVX,
+)
 
 // ethermintTxChains is every Ethermint-keyed Cosmos chain whose direct-mode tx is
 // vector-verified. These sign with an eth_secp256k1 key: keccak256(SignDoc) digest
