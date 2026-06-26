@@ -238,11 +238,12 @@ const (
 	XNO   Symbol = "XNO"   // Nano (ed25519-blake2b)
 	WAVES Symbol = "WAVES" // Waves (curve25519)
 
+	// ed25519-extended (BIP32-Ed25519 / CIP-1852).
+	ADA Symbol = "ADA" // Cardano (Icarus master from BIP-39 entropy; addr1 base address)
+
 	// Roadmap — Trust Wallet Core networks intentionally NOT registered yet (each
 	// needs more than a vector-verified encoder over the standard seed path, so
 	// adding one now would break AllAddresses or ship an unverified address):
-	//   - Cardano: needs BIP-39 ENTROPY (Icarus master), not the seed; the seed
-	//     path returns errCardanoNeedsEntropy, so a row would break AllAddresses.
 	//   - StarkNet/StarkEx: seed->key derivation is provisional/unverified.
 	//   - Zilliqa: requires a Schnorr scheme that is not implemented.
 	//   - TON: address is the hash of a v4r2 wallet StateInit cell (BoC); too
@@ -463,6 +464,14 @@ var coins = map[Symbol]Coin{
 	// ---- new-curve chains ----
 	"XNO":   {"Nano", "XNO", Ed25519Blake2bNano, "m/44'/165'/0'", encodeNano, 30, 0}, // TWC: 30 decimals
 	"WAVES": {"Waves", "WAVES", Curve25519, "m/44'/5741564'/0'/0'/0'", encodeWaves, 8, 0},
+
+	// ---- ed25519-extended (BIP32-Ed25519 / CIP-1852) ----
+	// Cardano derives its Icarus master key from the BIP-39 ENTROPY (not the seed),
+	// so Address/Sign route through the entropy enclave (see hdwallet.go); a wallet
+	// with no mnemonic returns ErrNoEntropy. The encoder receives the 128-byte
+	// ED25519Cardano public key (payment + staking) and builds the addr1 base
+	// address.
+	"ADA": {"Cardano", "ADA", Ed25519ExtendedCardano, "m/1852'/1815'/0'/0/0", encodeCardano, 6, 0},
 }
 
 // init registers address validators for the networks added beyond the original
@@ -540,4 +549,7 @@ func init() {
 	// New-curve chains.
 	validators[XNO] = nanoValidator(XNO)      // nano_ base32 + blake2b-40 checksum
 	validators[WAVES] = wavesValidator(WAVES) // base58 secure-hash address
+
+	// Cardano base address (bech32 "addr", 57-byte payload, mainnet header 0x01).
+	validators[ADA] = cardanoValidator(ADA)
 }

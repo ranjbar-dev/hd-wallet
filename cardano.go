@@ -7,6 +7,7 @@ import (
 	"math/big"
 
 	"filippo.io/edwards25519"
+	"github.com/btcsuite/btcd/btcutil/bech32"
 	"golang.org/x/crypto/pbkdf2"
 )
 
@@ -164,6 +165,21 @@ func withCardanoPrivateKey(entropy []byte, path []uint32, fn func(priv []byte) e
 	return fn(ext)
 }
 
+// cardanoStakingPath returns the staking derivation path for a Cardano payment
+// path: a CIP-1852 5-element path (m/1852'/1815'/account'/role/index) with the
+// role element forced to 2 (the staking role) and the address element forced to
+// 0, matching Trust Wallet Core's HDWallet.cpp stakingPath construction. The
+// payment path must have exactly 5 elements.
+func cardanoStakingPath(payment []uint32) ([]uint32, error) {
+	if len(payment) != 5 {
+		return nil, errors.New("hdwallet: cardano: path must have 5 elements (m/1852'/1815'/account'/role/index)")
+	}
+	staking := append([]uint32(nil), payment...)
+	staking[3] = 2 // role = 2 (staking), non-hardened
+	staking[4] = 0 // address index = 0
+	return staking, nil
+}
+
 // cardanoPublicKey returns the 64-byte public key (A(32) || chainCode(32)) from a
 // 96-byte extended private key.
 func cardanoPublicKey(priv []byte) ([]byte, error) {
@@ -178,6 +194,73 @@ func cardanoPublicKey(priv []byte) ([]byte, error) {
 	copy(out[0:32], a)
 	copy(out[32:64], priv[64:96])
 	return out, nil
+}
+
+const (
+	// cardanoCombinedPubLen is the length of the TWC ED25519Cardano public key:
+	// paymentPoint(32)||paymentChain(32)||stakingPoint(32)||stakingChain(32).
+	cardanoCombinedPubLen = 128
+	// cardanoKeyHashLen is the BLAKE2b digest size (224 bits) for a Cardano
+	// payment/staking credential.
+	cardanoKeyHashLen = 28
+	// cardanoBaseHeader is the header byte of a mainnet base address:
+	// (Kind_Base(0) << 4) | Network_Production(1) == 0x01.
+	cardanoBaseHeader = 0x01
+	// cardanoHRP is the bech32 human-readable part of a mainnet payment address.
+	cardanoHRP = "addr"
+)
+
+// cardanoCombinedPublicKey derives the payment node (paymentIdx) and the staking
+// node (stakingIdx) from entropy and assembles the 128-byte ED25519Cardano public
+// key Trust Wallet Core's address encoder expects:
+// paymentPoint(32)||paymentChain(32)||stakingPoint(32)||stakingChain(32). Each
+// 96-byte extended private key is wiped on return by withCardanoPrivateKey.
+func cardanoCombinedPublicKey(entropy []byte, paymentIdx, stakingIdx []uint32) ([]byte, error) {
+	var paymentPub, stakingPub []byte
+	if err := withCardanoPrivateKey(entropy, paymentIdx, func(priv []byte) error {
+		p, e := cardanoPublicKey(priv) // 64-byte A||chain
+		paymentPub = p
+		return e
+	}); err != nil {
+		return nil, err
+	}
+	if err := withCardanoPrivateKey(entropy, stakingIdx, func(priv []byte) error {
+		p, e := cardanoPublicKey(priv) // 64-byte A||chain
+		stakingPub = p
+		return e
+	}); err != nil {
+		return nil, err
+	}
+	combined := make([]byte, 0, cardanoCombinedPubLen)
+	combined = append(combined, paymentPub...) // A(32) || chain(32)
+	combined = append(combined, stakingPub...) // A(32) || chain(32)
+	return combined, nil
+}
+
+// encodeCardano builds a Cardano mainnet base (addr1...) address from the
+// 128-byte ED25519Cardano public key (payment A||chain || staking A||chain). It
+// hashes the payment point (bytes 0:32) and the staking point (bytes 64:96) with
+// BLAKE2b-224 to 28-byte credentials, lays them out as
+// header(0x01) || paymentKeyHash(28) || stakingKeyHash(28), and bech32-encodes
+// the 57-byte payload with HRP "addr". Matches Trust Wallet Core's
+// Cardano::AddressV3 base-address construction.
+func encodeCardano(pub []byte) (string, error) {
+	if len(pub) != cardanoCombinedPubLen {
+		return "", errors.New("hdwallet: cardano: address requires a 128-byte ED25519Cardano public key")
+	}
+	paymentHash := blake2bSize(cardanoKeyHashLen, pub[0:32])
+	stakingHash := blake2bSize(cardanoKeyHashLen, pub[64:96])
+
+	payload := make([]byte, 0, 1+2*cardanoKeyHashLen)
+	payload = append(payload, cardanoBaseHeader)
+	payload = append(payload, paymentHash...)
+	payload = append(payload, stakingHash...)
+
+	conv, err := bech32.ConvertBits(payload, 8, 5, true)
+	if err != nil {
+		return "", err
+	}
+	return bech32.Encode(cardanoHRP, conv)
 }
 
 // signMessageCardano signs message with the BIP32-Ed25519 extended key. priv is

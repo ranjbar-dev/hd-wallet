@@ -153,6 +153,9 @@ var validAddrVectors = map[Symbol]string{
 	// new-curve chains
 	XNO:   "nano_1qepdf4k95dhb5gsmhmq3iddqsxiafwkihunm7irn48jdiwdtnn6pe93k3f6",
 	WAVES: "3P2C786D6mBuvyf4WYr6K6Vch5uhi97nBHG",
+	// ed25519-extended (Cardano) — TWC CoinAddressDerivationTests dummy-key base
+	// address; a well-formed mainnet addr1 the validator must accept.
+	ADA: "addr1qxzk4wqhh5qmzas4e26aghcvkz8feju6sa43nghfj5xxsly9d2up00gpk9mptj44630sevywnn9e4pmtrx3wn9gvdp7qjhvjl4",
 }
 
 // TestValidVectorsCoverRegistry guards that the valid-vector table stays in sync
@@ -398,6 +401,15 @@ func TestBCHWithoutPrefix(t *testing.T) {
 func TestAddressFromPublicKeyMatchesEncoder(t *testing.T) {
 	priv := dummyKey()
 	for sym, coin := range coins {
+		if coin.Curve == Ed25519ExtendedCardano {
+			// Cardano's public key is the 128-byte ED25519Cardano payment+staking
+			// form derived from a 96-byte extended key (built from BIP-39 entropy),
+			// not from a raw 32-byte dummy private key, so it cannot take part in
+			// this 32-byte-key sweep. Its address derivation is pinned byte-for-byte
+			// to TWC in cardano_vector_test.go and its validator round-trip is
+			// covered by TestCardanoAddressValidates.
+			continue
+		}
 		t.Run(sym.String(), func(t *testing.T) {
 			pub, err := publicKeyFromPriv(coin.Curve, priv)
 			if err != nil {
@@ -444,6 +456,9 @@ func TestParsePayloadLengths(t *testing.T) {
 	}
 	// EOS-family validators return the 33-byte compressed public key.
 	want33 := map[Symbol]bool{EOS: true, WAX: true, FIO: true}
+	// Cardano's validator returns the full 57-byte base-address payload
+	// (header(1) || payment key hash(28) || staking key hash(28)).
+	want57 := map[Symbol]bool{ADA: true}
 	for sym, addr := range validAddrVectors {
 		payload, err := ParseAddress(sym, addr)
 		if err != nil {
@@ -455,6 +470,8 @@ func TestParsePayloadLengths(t *testing.T) {
 			exp = 32
 		case want33[sym]:
 			exp = 33
+		case want57[sym]:
+			exp = 57
 		}
 		if len(payload) != exp {
 			t.Errorf("%s payload length %d, want %d", sym, len(payload), exp)
