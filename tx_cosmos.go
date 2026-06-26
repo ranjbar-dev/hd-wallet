@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/btcsuite/btcd/btcec/v2"
 	"google.golang.org/protobuf/encoding/protowire"
 
 	txcosmos "github.com/ranjbar-dev/hd-wallet/txproto/cosmos"
@@ -38,34 +39,59 @@ const (
 	cosmosMsgUndelegateTypeURL     = "/cosmos.staking.v1beta1.MsgUndelegate"
 	cosmosMsgWithdrawRewardTypeURL = "/cosmos.distribution.v1beta1.MsgWithdrawDelegatorReward"
 	cosmosPubKeyTypeURL            = "/cosmos.crypto.secp256k1.PubKey"
-	// ethermintPubKeyTypeURL is the eth_secp256k1 public-key type used by
-	// Ethermint-keyed Cosmos chains (Evmos and chains sharing its type URL).
-	ethermintPubKeyTypeURL = "/ethermint.crypto.v1.ethsecp256k1.PubKey"
-	cosmosSignModeDirect   = 1 // SIGN_MODE_DIRECT
+	cosmosSignModeDirect           = 1 // SIGN_MODE_DIRECT
 )
 
+// ethermintPubKeyTypeURLs maps each Ethermint-keyed (eth_secp256k1) Cosmos chain
+// to the public-key type URL it announces in AuthInfo. The URL enters the SIGNED
+// bytes, so it is chain-specific and must be exact — Evmos and Injective differ.
+// A symbol absent from this map is rejected by signCosmosEthermintTx (the routing
+// set ethermintTxChains keeps these in lockstep).
+var ethermintPubKeyTypeURLs = map[Symbol]string{
+	EVMOS: "/ethermint.crypto.v1.ethsecp256k1.PubKey",
+	INJ:   "/injective.crypto.v1beta1.ethsecp256k1.PubKey",
+}
+
+// ethermintUncompressedPubKey lists the Ethermint-keyed chains whose AuthInfo
+// announces the signer key in UNCOMPRESSED (65-byte 0x04‖X‖Y) form rather than
+// the usual 33-byte compressed form. This also enters the signed bytes, so it is
+// chain-specific: Injective uses the uncompressed encoding (pinned to TWC's
+// Injective vector); Evmos uses the compressed encoding (its default, absent here).
+var ethermintUncompressedPubKey = map[Symbol]struct{}{
+	INJ: {},
+}
+
 // signCosmosTx builds, signs and serializes a standard Cosmos direct-mode
-// transaction (secp256k1 key, sha256(SignDoc) digest).
+// transaction (secp256k1 key, sha256(SignDoc) digest, compressed pubkey).
 func (w *HDWallet) signCosmosTx(symbol Symbol, index uint32, in *txcosmos.SigningInput) (*txcosmos.SigningOutput, error) {
-	return w.signCosmosDirect(symbol, index, in, cosmosPubKeyTypeURL, sha256Sum)
+	return w.signCosmosDirect(symbol, index, in, cosmosPubKeyTypeURL, sha256Sum, false)
 }
 
 // signCosmosEthermintTx signs a Cosmos direct-mode tx for an Ethermint-keyed
-// chain (eth_secp256k1). It differs from the standard builder in exactly two
-// signed-byte–affecting ways: the signer's public key is announced under the
-// ethermint type URL, and the SignDoc is hashed with keccak256 (eth_secp256k1
-// hashes with keccak internally) rather than sha256. The recoverable secp256k1
-// signature (RFC-6979, canonical low-S) is the same scheme. Verified byte-for-byte
-// against Trust Wallet Core's Evmos vector (tx_cosmos_ethermint_test.go).
+// chain (eth_secp256k1). It differs from the standard builder in three
+// signed-byte–affecting ways, all chain-specific: the signer's public key is
+// announced under a per-chain type URL (ethermintPubKeyTypeURLs), the SignDoc is
+// hashed with keccak256 (eth_secp256k1 hashes with keccak internally) rather than
+// sha256, and some chains announce the key uncompressed (ethermintUncompressedPubKey).
+// The recoverable secp256k1 signature (RFC-6979, canonical low-S) is the same
+// scheme. Verified byte-for-byte against Trust Wallet Core's Evmos and Injective
+// vectors (tx_cosmos_ethermint_test.go, tx_cosmos_injective_test.go). An unmapped
+// symbol returns ErrTxUnsupported rather than risk an on-chain-invalid signature.
 func (w *HDWallet) signCosmosEthermintTx(symbol Symbol, index uint32, in *txcosmos.SigningInput) (*txcosmos.SigningOutput, error) {
-	return w.signCosmosDirect(symbol, index, in, ethermintPubKeyTypeURL, keccak256)
+	pubKeyTypeURL, ok := ethermintPubKeyTypeURLs[symbol]
+	if !ok {
+		return nil, fmt.Errorf("%w: %s", ErrTxUnsupported, symbol)
+	}
+	_, uncompressed := ethermintUncompressedPubKey[symbol]
+	return w.signCosmosDirect(symbol, index, in, pubKeyTypeURL, keccak256, uncompressed)
 }
 
 // signCosmosDirect builds, signs and serializes a Cosmos direct-mode transaction
 // (one or more bank/staking/distribution messages). pubKeyTypeURL announces the
-// signer key type in AuthInfo and hash computes the SignDoc digest — these are the
-// only points where the standard and Ethermint variants diverge.
-func (w *HDWallet) signCosmosDirect(symbol Symbol, index uint32, in *txcosmos.SigningInput, pubKeyTypeURL string, hash func([]byte) []byte) (*txcosmos.SigningOutput, error) {
+// signer key type in AuthInfo, hash computes the SignDoc digest, and uncompressed
+// selects the public-key encoding placed in AuthInfo — these are the only points
+// where the standard and Ethermint variants diverge.
+func (w *HDWallet) signCosmosDirect(symbol Symbol, index uint32, in *txcosmos.SigningInput, pubKeyTypeURL string, hash func([]byte) []byte, uncompressed bool) (*txcosmos.SigningOutput, error) {
 	fee := in.GetFee()
 	if fee == nil {
 		return nil, fmt.Errorf("%w: cosmos: missing fee", ErrTxInput)
@@ -82,6 +108,14 @@ func (w *HDWallet) signCosmosDirect(symbol Symbol, index uint32, in *txcosmos.Si
 	}
 	if len(pub) != 33 {
 		return nil, fmt.Errorf("%w: cosmos: expected 33-byte compressed key", ErrTxInput)
+	}
+	// Some Ethermint chains (Injective) announce the signer key uncompressed.
+	if uncompressed {
+		pk, perr := btcec.ParsePubKey(pub)
+		if perr != nil {
+			return nil, fmt.Errorf("%w: cosmos: bad public key: %v", ErrTxInput, perr)
+		}
+		pub = pk.SerializeUncompressed()
 	}
 
 	bodyBytes := cosmosTxBody(anyMsgs, in.GetMemo())

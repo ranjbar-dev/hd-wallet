@@ -34,13 +34,15 @@ func TestTxFamilyRouting(t *testing.T) {
 			t.Errorf("txFamilyOf(%s) = %v, want familyCosmos", s, got)
 		}
 	}
-	// EVMOS is the one vector-verified ethermint-keyed Cosmos chain.
-	if got := txFamilyOf(EVMOS); got != familyCosmosEthermint {
-		t.Errorf("txFamilyOf(EVMOS) = %v, want familyCosmosEthermint", got)
+	// EVMOS and INJ are the vector-verified ethermint-keyed Cosmos chains.
+	for _, s := range []Symbol{EVMOS, INJ} {
+		if got := txFamilyOf(s); got != familyCosmosEthermint {
+			t.Errorf("txFamilyOf(%s) = %v, want familyCosmosEthermint", s, got)
+		}
 	}
 	// The remaining ethermint-keyed chains stay unrouted pending their own vectors
-	// (Injective uses a different pubkey type URL; see tx_families.go).
-	for _, s := range []Symbol{INJ, CANTO, ZETA, ONE} {
+	// (each uses a chain-specific pubkey type URL; see tx_families.go).
+	for _, s := range []Symbol{CANTO, ZETA, ONE} {
 		if got := txFamilyOf(s); got != familyNone {
 			t.Errorf("txFamilyOf(%s) = %v, want familyNone (ethermint, no vector yet)", s, got)
 		}
@@ -123,18 +125,20 @@ func TestCosmosRoutingProducesIdenticalBytes(t *testing.T) {
 	}
 }
 
-// TestEthermintCosmosUnsupported confirms the deliberate exclusion: signing for
-// an ethermint-keyed Cosmos chain returns ErrTxUnsupported rather than emitting
-// an on-chain-invalid (wrong pubkey type) transaction.
+// TestEthermintCosmosUnsupported confirms the deliberate exclusion: signing for an
+// ethermint-keyed Cosmos chain that is NOT yet vector-verified returns
+// ErrTxUnsupported rather than emitting an on-chain-invalid (wrong pubkey type)
+// transaction. EVMOS and INJ are wired (each pinned to its TWC vector); CANTO
+// remains roadmap, so it stands in for the still-excluded set here.
 func TestEthermintCosmosUnsupported(t *testing.T) {
 	w := canonicalSeedWallet(t)
 	defer w.Destroy()
-	_, err := w.SignTransaction(INJ, 0, &txcosmos.SigningInput{
-		Fee:  &txcosmos.Fee{Amount: "1", Denom: "inj", Gas: 1},
-		Send: &txcosmos.SendCoinsMessage{FromAddress: "a", ToAddress: "b", Amount: "1", Denom: "inj"},
+	_, err := w.SignTransaction(CANTO, 0, &txcosmos.SigningInput{
+		Fee:  &txcosmos.Fee{Amount: "1", Denom: "acanto", Gas: 1},
+		Send: &txcosmos.SendCoinsMessage{FromAddress: "a", ToAddress: "b", Amount: "1", Denom: "acanto"},
 	})
 	if !errors.Is(err, ErrTxUnsupported) {
-		t.Fatalf("INJ SignTransaction error = %v, want ErrTxUnsupported", err)
+		t.Fatalf("CANTO SignTransaction error = %v, want ErrTxUnsupported", err)
 	}
 }
 
