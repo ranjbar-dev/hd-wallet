@@ -105,3 +105,47 @@ func TestGenerateMnemonicWithWordCount(t *testing.T) {
 		t.Error("generated mnemonic is not BIP-39 valid")
 	}
 }
+
+func TestValidateMnemonic(t *testing.T) {
+	const canonical = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about"
+	cases := []struct {
+		name    string
+		phrase  string
+		wantErr bool
+	}{
+		{"canonical valid", canonical, false},
+		{"whitespace padded", "  \t" + canonical + "\n ", false}, // trimming
+		{"invalid word", "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon zzzz", true},
+		{"truncated single word", "abandon", true},
+		{"bad checksum", "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon", true},
+		{"empty", "", true},
+		{"whitespace only", "   ", true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := ValidateMnemonic(tc.phrase)
+			if tc.wantErr {
+				if !errors.Is(err, ErrInvalidMnemonic) {
+					t.Fatalf("ValidateMnemonic(%q) err = %v, want ErrInvalidMnemonic", tc.phrase, err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("ValidateMnemonic(%q) = %v, want nil", tc.phrase, err)
+			}
+		})
+	}
+}
+
+func TestValidateMnemonicBytes(t *testing.T) {
+	const canonical = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about"
+	if err := ValidateMnemonicBytes([]byte("  " + canonical + "\n")); err != nil {
+		t.Errorf("ValidateMnemonicBytes(valid) = %v, want nil", err)
+	}
+	if err := ValidateMnemonicBytes([]byte("not a real mnemonic")); !errors.Is(err, ErrInvalidMnemonic) {
+		t.Errorf("ValidateMnemonicBytes(invalid) err = %v, want ErrInvalidMnemonic", err)
+	}
+	if err := ValidateMnemonicBytes(nil); !errors.Is(err, ErrInvalidMnemonic) {
+		t.Errorf("ValidateMnemonicBytes(nil) err = %v, want ErrInvalidMnemonic", err)
+	}
+}
