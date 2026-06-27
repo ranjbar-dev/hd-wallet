@@ -43,6 +43,12 @@ const btcDustThreshold int64 = 546
 // sequence unset (0); matches the proto's documented default.
 const btcDefaultSequence uint32 = 0xffffffff
 
+// BTCSequenceRBF is the BIP-125 opt-in sequence number. Set an input's
+// OutPointSequence to this value to signal that the spending transaction may
+// be replaced by fee (RBF). Any UTXO whose OutPointSequence is explicitly set
+// to 0xFFFFFFFD will carry that sequence through to the signed transaction.
+const BTCSequenceRBF uint32 = 0xFFFFFFFD
+
 // btcInput is one transaction input with the data needed to sign it.
 type btcInput struct {
 	txid      []byte // 32-byte txid in internal (little-endian) byte order

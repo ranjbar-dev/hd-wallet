@@ -151,6 +151,94 @@ func (w *HDWallet) SignTransaction(symbol Symbol, index uint32, input proto.Mess
 	}
 }
 
+// ValidateSigningInput performs a quick sanity check on the signing input for
+// symbol. Returns ErrTxInput with a descriptive message if a required field
+// appears missing. This does NOT validate chain-level correctness (nonce
+// sequence, balance) — only that structurally required proto fields are
+// non-zero.
+func ValidateSigningInput(symbol Symbol, input proto.Message) error {
+	switch txFamilyOf(symbol) {
+	case familyEthereum:
+		in, ok := input.(*txeth.SigningInput)
+		if !ok {
+			return fmt.Errorf("%w: %s expects *ethereum.SigningInput", ErrTxInput, symbol)
+		}
+		if len(in.GasLimit) == 0 || allZero(in.GasLimit) {
+			return fmt.Errorf("%w: %s: gas_limit is required", ErrTxInput, symbol)
+		}
+		hasFee := (len(in.GasPrice) > 0 && !allZero(in.GasPrice)) ||
+			(len(in.MaxFeePerGas) > 0 && !allZero(in.MaxFeePerGas))
+		if !hasFee {
+			return fmt.Errorf("%w: %s: gas_price or max_fee_per_gas is required", ErrTxInput, symbol)
+		}
+	case familyCosmos, familyCosmosEthermint:
+		in, ok := input.(*txcosmos.SigningInput)
+		if !ok {
+			return fmt.Errorf("%w: %s expects *cosmos.SigningInput", ErrTxInput, symbol)
+		}
+		if in.AccountNumber == 0 {
+			return fmt.Errorf("%w: %s: account_number is required", ErrTxInput, symbol)
+		}
+		if in.Fee == nil {
+			return fmt.Errorf("%w: %s: fee is required", ErrTxInput, symbol)
+		}
+	case familyBitcoin:
+		in, ok := input.(*txbtc.SigningInput)
+		if !ok {
+			return fmt.Errorf("%w: %s expects *bitcoin.SigningInput", ErrTxInput, symbol)
+		}
+		if len(in.Utxo) == 0 {
+			return fmt.Errorf("%w: %s: at least one utxo input is required", ErrTxInput, symbol)
+		}
+		if in.ByteFee <= 0 {
+			return fmt.Errorf("%w: %s: byte_fee is required", ErrTxInput, symbol)
+		}
+	case familySolana:
+		in, ok := input.(*txsolana.SigningInput)
+		if !ok {
+			return fmt.Errorf("%w: %s expects *solana.SigningInput", ErrTxInput, symbol)
+		}
+		if in.RecentBlockhash == "" {
+			return fmt.Errorf("%w: %s: recent_blockhash is required", ErrTxInput, symbol)
+		}
+	case familyTron:
+		in, ok := input.(*txtron.SigningInput)
+		if !ok {
+			return fmt.Errorf("%w: %s expects *tron.SigningInput", ErrTxInput, symbol)
+		}
+		if in.Transaction == nil || in.Transaction.BlockHeader == nil || in.Transaction.BlockHeader.Number == 0 {
+			return fmt.Errorf("%w: %s: transaction.block_header.number is required", ErrTxInput, symbol)
+		}
+		if in.Transaction.Expiration == 0 {
+			return fmt.Errorf("%w: %s: transaction.expiration is required", ErrTxInput, symbol)
+		}
+	case familyRipple:
+		in, ok := input.(*txripple.SigningInput)
+		if !ok {
+			return fmt.Errorf("%w: %s expects *ripple.SigningInput", ErrTxInput, symbol)
+		}
+		if in.Sequence == 0 {
+			return fmt.Errorf("%w: %s: sequence is required", ErrTxInput, symbol)
+		}
+		if in.Fee == 0 {
+			return fmt.Errorf("%w: %s: fee is required", ErrTxInput, symbol)
+		}
+	default:
+		return fmt.Errorf("%w: %s", ErrTxUnsupported, symbol)
+	}
+	return nil
+}
+
+// allZero reports whether every byte in b is zero.
+func allZero(b []byte) bool {
+	for _, v := range b {
+		if v != 0 {
+			return false
+		}
+	}
+	return true
+}
+
 // bytesToHex returns the lower-case hex of b with no "0x" prefix, the form used
 // by the SigningOutput *_hex convenience fields.
 func bytesToHex(b []byte) string {

@@ -1,55 +1,70 @@
 package hdwallet
 
-// "What am I signing?" decoder for XRP Ledger (Ripple) Payment transactions.
+// "What am I signing?" decoder for XRP Ledger transactions.
 //
 // DecodeRippleTx parses a canonical XRP binary blob (the SigningOutput.Encoded
 // the tx_ripple.go signer produces) back into its plain fields so a client can
-// render a confirmation screen WITHOUT touching a private key or any secret. It is
-// the inverse of xrpSerialize: each field is a type/field header followed by its
-// value, fields ordered by (type_code, field_code).
-//
-// Field set for a native Payment:
-//
-//	TransactionType (UInt16    1.2)
-//	Flags           (UInt32    2.2)
-//	Sequence        (UInt32    2.4)
-//	DestinationTag  (UInt32    2.14) — optional
-//	LastLedgerSeq   (UInt32    2.27) — optional
-//	Amount          (Amount    6.1)  drops, native
-//	Fee             (Amount    6.8)  drops, native
-//	SigningPubKey   (Blob      7.3)
-//	TxnSignature    (Blob      7.4)
-//	Account         (AccountID 8.1)
-//	Destination     (AccountID 8.3)
-//
-// It reuses base58CheckEncode (codec.go) to render the 20-byte account ids back to
-// their "r..." addresses (the reverse of encodeXRP). This file adds no
-// signer/registry/proto changes; it is display-only. Every read is bounds-checked:
-// malformed/truncated input returns ErrTxDecode and the decoder never panics.
+// render a confirmation screen WITHOUT touching a private key or any secret. It
+// is the inverse of xrpSerialize. Every read is bounds-checked: malformed or
+// truncated input returns ErrTxDecode and the decoder never panics.
 
 import (
 	"encoding/binary"
 	"fmt"
+	"strconv"
+	"strings"
 )
 
-// XrpTxFields holds the decoded, display-ready fields of an XRP Payment.
-// DestinationTag and LastLedgerSequence are pointers so absence (the field was
-// not on the wire) is distinguishable from a zero value.
+// XrpTxFields holds the decoded, display-ready fields of an XRP transaction.
+// Pointer fields are nil when the field was absent on the wire.
 type XrpTxFields struct {
 	TransactionType uint16
-	TransactionName string // "Payment" for type 0
+	TransactionName string
 	Account         string // "r..." address
-	Destination     string // "r..." address
-	Amount          uint64 // drops
-	Fee             uint64 // drops
 	Sequence        uint32
 	Flags           uint32
+	Fee             uint64 // drops
+	SigningPubKey   []byte
+	TxnSignature    []byte
 
-	DestinationTag     *uint32
 	LastLedgerSequence *uint32
+	DestinationTag     *uint32
 
-	SigningPubKey []byte
-	TxnSignature  []byte
+	// Payment / EscrowCreate
+	Destination string
+	Amount      uint64 // drops (Payment, EscrowCreate)
+
+	// TrustSet
+	LimitAmountCurrency string
+	LimitAmountIssuer   string
+	LimitAmountValue    string
+
+	// OfferCreate
+	TakerPaysCurrency string
+	TakerPaysIssuer   string
+	TakerPaysValue    string
+	TakerGetsCurrency string
+	TakerGetsIssuer   string
+	TakerGetsValue    string
+
+	// OfferCreate / OfferCancel / EscrowFinish
+	OfferSequence uint32
+
+	// EscrowCreate / EscrowFinish
+	Condition   []byte
+	CancelAfter *uint32
+	FinishAfter *uint32
+
+	// EscrowFinish
+	Owner       string
+	Fulfillment []byte
+
+	// AccountSet
+	SetFlag      *uint32
+	ClearFlag    *uint32
+	Domain       []byte
+	TransferRate *uint32
+	TickSize     *uint32
 }
 
 // xrpCursor is a bounds-checked forward reader over the serialized transaction.
@@ -89,13 +104,13 @@ func (c *xrpCursor) readFieldHeader() (typeCode, fieldCode int, err error) {
 	switch {
 	case hi != 0 && lo != 0:
 		return hi, lo, nil
-	case hi != 0: // small type, large field: next byte is the field code
+	case hi != 0: // small type, large field
 		fc, err := c.readByte()
 		if err != nil {
 			return 0, 0, err
 		}
 		return hi, int(fc), nil
-	case lo != 0: // large type, small field: next byte is the type code
+	case lo != 0: // large type, small field
 		tc, err := c.readByte()
 		if err != nil {
 			return 0, 0, err
@@ -145,8 +160,7 @@ func (c *xrpCursor) readVarLength() (int, error) {
 }
 
 // DecodeRippleTx decodes a serialized XRP transaction into its display fields.
-// Malformed or truncated input returns ErrTxDecode; the function never panics and
-// never reads past `raw`.
+// Malformed or truncated input returns ErrTxDecode; never panics.
 func DecodeRippleTx(raw []byte) (*XrpTxFields, error) {
 	c := &xrpCursor{b: raw}
 	f := &XrpTxFields{}
@@ -160,21 +174,26 @@ func DecodeRippleTx(raw []byte) (*XrpTxFields, error) {
 			return nil, err
 		}
 	}
-	// Every XRP transaction carries an Account; its absence means the input was
-	// empty or not a transaction.
 	if f.Account == "" {
 		return nil, fmt.Errorf("%w: ripple: missing Account field", ErrTxDecode)
 	}
 	return f, nil
 }
 
-// readXrpField reads one field's value (dispatched by type code) and assigns it to
-// the matching struct field. Recognised (type, field) pairs are surfaced; any
-// other field that can still be length-decoded by its type is consumed and
-// ignored, so the cursor stays aligned.
+// xrpAmt is the result of decoding an Amount field.
+type xrpAmt struct {
+	native uint64
+	// issued fields (all non-empty when the amount is an issued currency)
+	issuedCurrency string
+	issuedIssuer   string
+	issuedValue    string
+}
+
+// readXrpField reads one field and populates the matching XrpTxFields member.
+// Unknown fields within a known type are consumed to keep the cursor aligned.
 func (c *xrpCursor) readXrpField(f *XrpTxFields, typeCode, fieldCode int) error {
 	switch typeCode {
-	case 1: // UInt16
+	case 1: // UInt16 (2 bytes)
 		b, err := c.readBytes(2)
 		if err != nil {
 			return err
@@ -183,7 +202,8 @@ func (c *xrpCursor) readXrpField(f *XrpTxFields, typeCode, fieldCode int) error 
 			f.TransactionType = binary.BigEndian.Uint16(b)
 			f.TransactionName = xrpTransactionName(f.TransactionType)
 		}
-	case 2: // UInt32
+
+	case 2: // UInt32 (4 bytes)
 		b, err := c.readBytes(4)
 		if err != nil {
 			return err
@@ -194,25 +214,67 @@ func (c *xrpCursor) readXrpField(f *XrpTxFields, typeCode, fieldCode int) error 
 			f.Flags = v
 		case 4:
 			f.Sequence = v
-		case 14:
+		case 11: // TransferRate
+			vc := v
+			f.TransferRate = &vc
+		case 14: // DestinationTag
 			vc := v
 			f.DestinationTag = &vc
-		case 27:
+		case 16: // TickSize
+			vc := v
+			f.TickSize = &vc
+		case 25: // OfferSequence
+			f.OfferSequence = v
+		case 27: // LastLedgerSequence
 			vc := v
 			f.LastLedgerSequence = &vc
+		case 33: // SetFlag
+			vc := v
+			f.SetFlag = &vc
+		case 34: // ClearFlag
+			vc := v
+			f.ClearFlag = &vc
+		case 36: // CancelAfter
+			vc := v
+			f.CancelAfter = &vc
+		case 37: // FinishAfter
+			vc := v
+			f.FinishAfter = &vc
 		}
-	case 6: // Amount (native = 8 bytes; issued currency = 48 bytes)
-		drops, err := c.readXrpAmount()
+
+	case 6: // Amount (native 8 bytes or issued 48 bytes)
+		a, err := c.readXrpAmount()
 		if err != nil {
 			return err
 		}
 		switch fieldCode {
-		case 1:
-			f.Amount = drops
-		case 8:
-			f.Fee = drops
+		case 1: // Amount (Payment, EscrowCreate)
+			f.Amount = a.native
+		case 3: // LimitAmount (TrustSet)
+			f.LimitAmountCurrency = a.issuedCurrency
+			f.LimitAmountIssuer = a.issuedIssuer
+			f.LimitAmountValue = a.issuedValue
+		case 4: // TakerPays (OfferCreate)
+			f.TakerPaysCurrency = a.issuedCurrency
+			f.TakerPaysIssuer = a.issuedIssuer
+			if a.issuedCurrency == "" {
+				f.TakerPaysValue = strconv.FormatUint(a.native, 10)
+			} else {
+				f.TakerPaysValue = a.issuedValue
+			}
+		case 5: // TakerGets (OfferCreate)
+			f.TakerGetsCurrency = a.issuedCurrency
+			f.TakerGetsIssuer = a.issuedIssuer
+			if a.issuedCurrency == "" {
+				f.TakerGetsValue = strconv.FormatUint(a.native, 10)
+			} else {
+				f.TakerGetsValue = a.issuedValue
+			}
+		case 8: // Fee
+			f.Fee = a.native
 		}
-	case 7: // Blob
+
+	case 7: // Blob (variable length)
 		n, err := c.readVarLength()
 		if err != nil {
 			return err
@@ -226,8 +288,15 @@ func (c *xrpCursor) readXrpField(f *XrpTxFields, typeCode, fieldCode int) error 
 			f.SigningPubKey = append([]byte(nil), b...)
 		case 4:
 			f.TxnSignature = append([]byte(nil), b...)
+		case 7: // Domain
+			f.Domain = append([]byte(nil), b...)
+		case 16: // Fulfillment
+			f.Fulfillment = append([]byte(nil), b...)
+		case 24: // Condition
+			f.Condition = append([]byte(nil), b...)
 		}
-	case 8: // AccountID
+
+	case 8: // AccountID (variable length, always 20 bytes + 1-byte prefix)
 		n, err := c.readVarLength()
 		if err != nil {
 			return err
@@ -243,45 +312,112 @@ func (c *xrpCursor) readXrpField(f *XrpTxFields, typeCode, fieldCode int) error 
 		switch fieldCode {
 		case 1:
 			f.Account = addr
-		case 3:
+		case 2: // Owner (EscrowFinish)
+			f.Owner = addr
+		case 3: // Destination
 			f.Destination = addr
 		}
+
 	default:
 		return fmt.Errorf("%w: ripple: unsupported field type %d", ErrTxDecode, typeCode)
 	}
 	return nil
 }
 
-// readXrpAmount reads a native XRP drops amount (8 bytes) or skips a 48-byte
-// issued-currency amount. The high bit of the first byte distinguishes them: 0 =>
-// native XRP. For native amounts the two flag bits (native + sign) are masked off
-// to recover the drops value.
-func (c *xrpCursor) readXrpAmount() (uint64, error) {
+// readXrpAmount decodes an Amount field: 8 bytes for native XRP, 48 bytes for
+// issued currency. The high bit of the first byte distinguishes them.
+func (c *xrpCursor) readXrpAmount() (xrpAmt, error) {
 	first, err := c.readByte()
 	if err != nil {
-		return 0, err
+		return xrpAmt{}, err
 	}
-	if first&0x80 != 0 {
-		// Issued-currency amount: 48 bytes total, the first already consumed.
-		if _, err := c.readBytes(47); err != nil {
-			return 0, err
+
+	if first&0x80 == 0 {
+		// Native XRP: mask off the top two flag bits to recover drops.
+		rest, err := c.readBytes(7)
+		if err != nil {
+			return xrpAmt{}, err
 		}
-		return 0, nil
+		full := make([]byte, 8)
+		full[0] = first
+		copy(full[1:], rest)
+		drops := binary.BigEndian.Uint64(full) &^ (uint64(0xc0) << 56)
+		return xrpAmt{native: drops}, nil
 	}
-	rest, err := c.readBytes(7)
+
+	// Issued currency: 48 bytes total (first already consumed).
+	rest, err := c.readBytes(47)
 	if err != nil {
-		return 0, err
+		return xrpAmt{}, err
 	}
-	// Reconstruct the full 8-byte big-endian value then strip the top two flag
-	// bits (bit 63 native marker, bit 62 sign) to recover the drops.
-	full := make([]byte, 8)
-	full[0] = first
-	copy(full[1:], rest)
-	return binary.BigEndian.Uint64(full) &^ (uint64(0xc0) << 56), nil
+	all := make([]byte, 48)
+	all[0] = first
+	copy(all[1:], rest)
+
+	currency, issuer, value, err := xrpDecodeIssuedAmount(all)
+	if err != nil {
+		return xrpAmt{}, err
+	}
+	return xrpAmt{issuedCurrency: currency, issuedIssuer: issuer, issuedValue: value}, nil
 }
 
-// xrpRenderAccount renders a 20-byte account id as its "r..." base58check address
-// (the reverse of encodeXRP).
+// xrpDecodeIssuedAmount decodes a 48-byte issued-currency amount into its
+// human-readable parts. The reverse of xrpIssuedAmount.
+func xrpDecodeIssuedAmount(b []byte) (currency, issuer, value string, err error) {
+	if len(b) != 48 {
+		return "", "", "", fmt.Errorf("%w: ripple: issued amount must be 48 bytes", ErrTxDecode)
+	}
+	word := binary.BigEndian.Uint64(b[:8])
+
+	// Currency: bytes 8–27, 20-byte code.
+	var currBytes [20]byte
+	copy(currBytes[:], b[8:28])
+	if currBytes[0] == 0x00 {
+		// Standard 3-letter ASCII: bytes 12–14.
+		raw := strings.TrimRight(string(currBytes[12:15]), "\x00")
+		currency = raw
+	} else {
+		currency = bytesToHex(currBytes[:])
+	}
+
+	// Issuer: bytes 28–47.
+	issuer, err = xrpRenderAccount(b[28:48])
+	if err != nil {
+		return "", "", "", err
+	}
+
+	// Value from the 8-byte word.
+	mantissa := word & ((1 << 54) - 1)
+	if mantissa == 0 {
+		value = "0"
+		return
+	}
+	negative := (word>>62)&1 == 0
+	storedExp := int((word >> 54) & 0xFF)
+	actualExp := storedExp - 97
+
+	// Format: mantissa × 10^actualExp as a decimal string.
+	v := strconv.FormatUint(mantissa, 10)
+	pos := len(v) + actualExp // decimal point position from the left
+	if pos <= 0 {
+		value = "0." + strings.Repeat("0", -pos) + v
+	} else if pos >= len(v) {
+		value = v + strings.Repeat("0", pos-len(v))
+	} else {
+		value = v[:pos] + "." + v[pos:]
+	}
+	// Trim trailing zeros and a trailing decimal point.
+	if strings.ContainsRune(value, '.') {
+		value = strings.TrimRight(value, "0")
+		value = strings.TrimRight(value, ".")
+	}
+	if negative {
+		value = "-" + value
+	}
+	return
+}
+
+// xrpRenderAccount renders a 20-byte account id as its "r..." base58check address.
 func xrpRenderAccount(id []byte) (string, error) {
 	if len(id) != 20 {
 		return "", fmt.Errorf("%w: ripple: account id must be 20 bytes, got %d", ErrTxDecode, len(id))
@@ -289,11 +425,24 @@ func xrpRenderAccount(id []byte) (string, error) {
 	return base58CheckEncode(base58XRP, []byte{0x00}, id), nil
 }
 
-// xrpTransactionName maps the TransactionType code to a human name (only Payment
-// is produced by this library's signer).
+// xrpTransactionName maps the TransactionType code to a human name.
 func xrpTransactionName(t uint16) string {
-	if t == 0 {
+	switch t {
+	case 0:
 		return "Payment"
+	case 1:
+		return "EscrowCreate"
+	case 2:
+		return "EscrowFinish"
+	case 3:
+		return "AccountSet"
+	case 7:
+		return "OfferCreate"
+	case 8:
+		return "OfferCancel"
+	case 20:
+		return "TrustSet"
+	default:
+		return ""
 	}
-	return ""
 }

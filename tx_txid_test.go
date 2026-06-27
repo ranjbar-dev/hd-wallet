@@ -152,10 +152,10 @@ func TestTransactionID(t *testing.T) {
 			Sequence:           32268248,
 			LastLedgerSequence: 32268269,
 			Account:            "rfxdLwsZnoespnTDDb1Xhvbc8EFNdztaoq",
-			Payment: &txripple.Payment{
+			Transaction: &txripple.SigningInput_Payment{Payment: &txripple.Payment{
 				Amount:      10,
 				Destination: "rU893viamSnsfP3zjzM2KPxjqZjXSXK6VF",
-			},
+			}},
 		}
 		out, err := w.SignTransaction(XRP, 0, in)
 		if err != nil {

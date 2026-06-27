@@ -1,6 +1,7 @@
 package hdwallet
 
 import (
+	"crypto/ed25519"
 	"fmt"
 	"strconv"
 	"strings"
@@ -180,4 +181,129 @@ func (ww *WatchWallet) publicKey(change, index uint32) ([]byte, error) {
 		return nil, fmt.Errorf("hdwallet: watch-only pubkey: %w", err)
 	}
 	return pubKey.SerializeCompressed(), nil
+}
+
+// ---------------------------------------------------------------------------
+// xpub format detection and normalization
+// ---------------------------------------------------------------------------
+
+// XPubVersion describes the address type implied by an extended public key prefix.
+type XPubVersion int
+
+const (
+	XPubVersionUnknown    XPubVersion = iota
+	XPubVersionLegacy                 // xpub/tpub — BIP-44 P2PKH
+	XPubVersionP2SHP2WPKH             // ypub/upub — BIP-49 P2SH-P2WPKH
+	XPubVersionP2WPKH                 // zpub/vpub — BIP-84 native SegWit
+)
+
+// version byte arrays for BIP-32 extended key prefixes (mainnet + testnet)
+var (
+	xpubVer = []byte{0x04, 0x88, 0xB2, 0x1E} // xpub
+	ypubVer = []byte{0x04, 0x9D, 0x7C, 0xB2} // ypub
+	zpubVer = []byte{0x04, 0xB2, 0x47, 0x46} // zpub
+	tpubVer = []byte{0x04, 0x35, 0x87, 0xCF} // tpub (testnet xpub)
+	upubVer = []byte{0x04, 0x4A, 0x52, 0x62} // upub (testnet ypub)
+	vpubVer = []byte{0x04, 0x5F, 0x1C, 0xF6} // vpub (testnet zpub)
+)
+
+// DetectXPubVersion returns the address type implied by the extended key prefix.
+// Returns XPubVersionUnknown for unrecognized or malformed inputs.
+func DetectXPubVersion(extKey string) XPubVersion {
+	body, err := base58CheckDecode(base58BTC, strings.TrimSpace(extKey))
+	if err != nil || len(body) < 4 {
+		return XPubVersionUnknown
+	}
+	v := body[:4]
+	switch {
+	case bytesEqual(v, xpubVer) || bytesEqual(v, tpubVer):
+		return XPubVersionLegacy
+	case bytesEqual(v, ypubVer) || bytesEqual(v, upubVer):
+		return XPubVersionP2SHP2WPKH
+	case bytesEqual(v, zpubVer) || bytesEqual(v, vpubVer):
+		return XPubVersionP2WPKH
+	default:
+		return XPubVersionUnknown
+	}
+}
+
+// NormalizeXPub converts a ypub/zpub (or their testnet equivalents) to standard
+// xpub format so it can be passed to WatchOnlyFromXPub. xpub/tpub inputs are
+// returned unchanged. Returns an error for unrecognized prefixes.
+func NormalizeXPub(extKey string) (string, error) {
+	trimmed := strings.TrimSpace(extKey)
+	body, err := base58CheckDecode(base58BTC, trimmed)
+	if err != nil {
+		return "", fmt.Errorf("hdwallet: invalid extended key: %w", err)
+	}
+	if len(body) < 4 {
+		return "", fmt.Errorf("hdwallet: extended key too short")
+	}
+	v := body[:4]
+	switch {
+	case bytesEqual(v, xpubVer) || bytesEqual(v, tpubVer):
+		return trimmed, nil
+	case bytesEqual(v, ypubVer), bytesEqual(v, upubVer),
+		bytesEqual(v, zpubVer), bytesEqual(v, vpubVer):
+		// Replace version bytes with xpub and re-encode.
+		copy(body[:4], xpubVer)
+		return base58CheckEncode(base58BTC, nil, body), nil
+	default:
+		return "", fmt.Errorf("hdwallet: unrecognized extended key prefix")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Ed25519 account-level public key export
+// ---------------------------------------------------------------------------
+
+// AccountEd25519PubKey returns the SLIP-0010 ed25519 public key (32 bytes) and
+// chain code (32 bytes) at the account level (m/purpose'/coin'/account') for
+// symbol.
+//
+// SLIP-0010 ed25519 does not support public child key derivation — all path
+// elements must be hardened and no WatchWallet equivalent exists. This method
+// exports the account-level public key for external signing or identity use;
+// child address derivation still requires the full seed. symbol must be an
+// Ed25519 coin.
+func (w *HDWallet) AccountEd25519PubKey(symbol Symbol, account uint32) (pubKey, chainCode []byte, err error) {
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+	if w.secret == nil {
+		return nil, nil, ErrDestroyed
+	}
+	if w.secret.isKeyOnly() {
+		return nil, nil, fmt.Errorf("%w: AccountEd25519PubKey", ErrKeyOnlyWallet)
+	}
+	coin, ok := coins[symbol]
+	if !ok {
+		return nil, nil, fmt.Errorf("%w: %s", ErrUnsupportedCoin, symbol)
+	}
+	if coin.Curve != Ed25519 {
+		return nil, nil, fmt.Errorf("hdwallet: AccountEd25519PubKey requires an Ed25519 coin; %s uses %s", symbol, coin.Curve)
+	}
+	apath, apErr := accountPathIndices(coin.Path, account)
+	if apErr != nil {
+		return nil, nil, fmt.Errorf("hdwallet: %s: %w", symbol, apErr)
+	}
+	var pub, chain []byte
+	err = w.secret.withSeed(func(seed []byte) error {
+		node, derErr := deriveEd25519(seed, apath)
+		if derErr != nil {
+			return derErr
+		}
+		priv := ed25519.NewKeyFromSeed(node.key)
+		pub = make([]byte, ed25519.PublicKeySize)
+		copy(pub, priv[ed25519.SeedSize:])
+		wipe(priv)
+		chain = make([]byte, 32)
+		copy(chain, node.chain)
+		wipe(node.key)
+		wipe(node.chain)
+		return nil
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+	return pub, chain, nil
 }

@@ -41,6 +41,9 @@ var validAddrVectors = map[Symbol]string{
 	ETH: "0x9d8A62f656a8d1615C1294fd71e9CFb3E4855A4F",
 	TRX: "TQLCsShbQNXMTVCjprY64qZmEA4rBarpQp",
 	XRP: "rJHMeqKu8Ep7Fazx8MQG6JunaafBXz93YQ",
+	ICX: "hx9d8a62f656a8d1615c1294fd71e9cfb3e4855a4f",
+	CKB: "ckb1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqfzayeck2k4hlcqu40lwpzv0nqqkqs5lncej05rm",
+	ZIL: "zil1j2cvtd7j9n7fnxfv2r3neucjw8tp4xz9sp07v4",
 	// secp256k1 — EOS-family public-key strings
 	EOS: "EOS5TrYnZP1RkDSUMzBY4GanCy6AP68kCMdkAb5EACkAwkdgRLShz",
 	WAX: "EOS5TrYnZP1RkDSUMzBY4GanCy6AP68kCMdkAb5EACkAwkdgRLShz",
@@ -156,6 +159,11 @@ var validAddrVectors = map[Symbol]string{
 	// ed25519-extended (Cardano) — TWC CoinAddressDerivationTests dummy-key base
 	// address; a well-formed mainnet addr1 the validator must accept.
 	ADA: "addr1qxzk4wqhh5qmzas4e26aghcvkz8feju6sa43nghfj5xxsly9d2up00gpk9mptj44630sevywnn9e4pmtrx3wn9gvdp7qjhvjl4",
+	// Starkex — the TWC signing test key (0139fe4d…) public key x-coordinate.
+	// The dummy key 0x4646…46 is above the STARK group order so it cannot be used
+	// directly; this is the address derived from the canonical TWC starkex test key
+	// and is verified byte-for-byte in TestStarknetAddressVector.
+	STRK: "0x02c5dbad71c92a45cc4b40573ae661f8147869a91d57b8d9b8f48c8af7f83159",
 }
 
 // TestValidVectorsCoverRegistry guards that the valid-vector table stays in sync
@@ -246,7 +254,9 @@ func TestValidateAddressRejectsCorruptedChecksum(t *testing.T) {
 	// Chains with no internal checksum: a single-char flip yields a different but
 	// still well-formed payload, so corruption is undetectable by design. They
 	// are exercised by the length/prefix negative tests instead.
-	noChecksum := map[Symbol]bool{SOL: true, SUI: true, APTOS: true, NEAR: true, IOST: true, HBAR: true}
+	// ICX (ICON) is also checksum-free: "hx" + 40 raw hex chars, no embedded CRC.
+	// STRK: "0x" + 64 raw hex chars, no embedded CRC.
+	noChecksum := map[Symbol]bool{SOL: true, SUI: true, APTOS: true, NEAR: true, IOST: true, HBAR: true, ICX: true, STRK: true}
 	for sym, addr := range validAddrVectors {
 		if noChecksum[sym] {
 			continue
@@ -410,6 +420,13 @@ func TestAddressFromPublicKeyMatchesEncoder(t *testing.T) {
 			// covered by TestCardanoAddressValidates.
 			continue
 		}
+		if coin.Curve == Starkex {
+			// The STARK curve's group order is ~2^251; the dummy key 0x4646...46
+			// (~2^252) is above it, so publicKeyFromPriv would fail. STRK address
+			// derivation is pinned to TWC in TestStarknetAddressVector and
+			// TestStarkexDerivationVector (curves_twc_test.go).
+			continue
+		}
 		t.Run(sym.String(), func(t *testing.T) {
 			pub, err := publicKeyFromPriv(coin.Curve, priv)
 			if err != nil {
@@ -453,6 +470,8 @@ func TestParsePayloadLengths(t *testing.T) {
 		ALGO: true, SUI: true, APTOS: true,
 		// additional 32-byte-payload chains
 		IOST: true, KIN: true, EGLD: true, HBAR: true, AE: true, XNO: true,
+		// StarkNet: 32-byte STARK field element (x-coordinate of public key).
+		STRK: true,
 	}
 	// EOS-family validators return the 33-byte compressed public key.
 	want33 := map[Symbol]bool{EOS: true, WAX: true, FIO: true}

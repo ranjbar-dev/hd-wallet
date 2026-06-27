@@ -82,8 +82,453 @@ func (x *Payment) GetDestinationTag() int64 {
 	return 0
 }
 
-// SigningInput mirrors a minimal subset of TW.Ripple.Proto.SigningInput for a
-// native XRP Payment.
+// TrustSet — create/modify a trust line for an issued currency.
+type TrustSet struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	LimitAmountCurrency string                 `protobuf:"bytes,1,opt,name=limit_amount_currency,json=limitAmountCurrency,proto3" json:"limit_amount_currency,omitempty"` // 3-letter or 40-hex currency code
+	LimitAmountIssuer   string                 `protobuf:"bytes,2,opt,name=limit_amount_issuer,json=limitAmountIssuer,proto3" json:"limit_amount_issuer,omitempty"`       // base58check XRP address
+	LimitAmountValue    string                 `protobuf:"bytes,3,opt,name=limit_amount_value,json=limitAmountValue,proto3" json:"limit_amount_value,omitempty"`          // decimal string, e.g. "1000000"
+	Flags               uint32                 `protobuf:"varint,4,opt,name=flags,proto3" json:"flags,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+func (x *TrustSet) Reset() {
+	*x = TrustSet{}
+	mi := &file_txproto_ripple_ripple_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TrustSet) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TrustSet) ProtoMessage() {}
+
+func (x *TrustSet) ProtoReflect() protoreflect.Message {
+	mi := &file_txproto_ripple_ripple_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TrustSet.ProtoReflect.Descriptor instead.
+func (*TrustSet) Descriptor() ([]byte, []int) {
+	return file_txproto_ripple_ripple_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *TrustSet) GetLimitAmountCurrency() string {
+	if x != nil {
+		return x.LimitAmountCurrency
+	}
+	return ""
+}
+
+func (x *TrustSet) GetLimitAmountIssuer() string {
+	if x != nil {
+		return x.LimitAmountIssuer
+	}
+	return ""
+}
+
+func (x *TrustSet) GetLimitAmountValue() string {
+	if x != nil {
+		return x.LimitAmountValue
+	}
+	return ""
+}
+
+func (x *TrustSet) GetFlags() uint32 {
+	if x != nil {
+		return x.Flags
+	}
+	return 0
+}
+
+// OfferCreate — place a DEX order.
+type OfferCreate struct {
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	TakerPaysCurrency string                 `protobuf:"bytes,1,opt,name=taker_pays_currency,json=takerPaysCurrency,proto3" json:"taker_pays_currency,omitempty"` // empty/"XRP" = native drops
+	TakerPaysIssuer   string                 `protobuf:"bytes,2,opt,name=taker_pays_issuer,json=takerPaysIssuer,proto3" json:"taker_pays_issuer,omitempty"`
+	TakerPaysValue    string                 `protobuf:"bytes,3,opt,name=taker_pays_value,json=takerPaysValue,proto3" json:"taker_pays_value,omitempty"` // drops string if native, decimal if issued
+	TakerGetsCurrency string                 `protobuf:"bytes,4,opt,name=taker_gets_currency,json=takerGetsCurrency,proto3" json:"taker_gets_currency,omitempty"`
+	TakerGetsIssuer   string                 `protobuf:"bytes,5,opt,name=taker_gets_issuer,json=takerGetsIssuer,proto3" json:"taker_gets_issuer,omitempty"`
+	TakerGetsValue    string                 `protobuf:"bytes,6,opt,name=taker_gets_value,json=takerGetsValue,proto3" json:"taker_gets_value,omitempty"`
+	Flags             uint32                 `protobuf:"varint,7,opt,name=flags,proto3" json:"flags,omitempty"`
+	OfferSequence     uint32                 `protobuf:"varint,8,opt,name=offer_sequence,json=offerSequence,proto3" json:"offer_sequence,omitempty"` // sequence of an existing offer to replace (0 = new)
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *OfferCreate) Reset() {
+	*x = OfferCreate{}
+	mi := &file_txproto_ripple_ripple_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *OfferCreate) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*OfferCreate) ProtoMessage() {}
+
+func (x *OfferCreate) ProtoReflect() protoreflect.Message {
+	mi := &file_txproto_ripple_ripple_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use OfferCreate.ProtoReflect.Descriptor instead.
+func (*OfferCreate) Descriptor() ([]byte, []int) {
+	return file_txproto_ripple_ripple_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *OfferCreate) GetTakerPaysCurrency() string {
+	if x != nil {
+		return x.TakerPaysCurrency
+	}
+	return ""
+}
+
+func (x *OfferCreate) GetTakerPaysIssuer() string {
+	if x != nil {
+		return x.TakerPaysIssuer
+	}
+	return ""
+}
+
+func (x *OfferCreate) GetTakerPaysValue() string {
+	if x != nil {
+		return x.TakerPaysValue
+	}
+	return ""
+}
+
+func (x *OfferCreate) GetTakerGetsCurrency() string {
+	if x != nil {
+		return x.TakerGetsCurrency
+	}
+	return ""
+}
+
+func (x *OfferCreate) GetTakerGetsIssuer() string {
+	if x != nil {
+		return x.TakerGetsIssuer
+	}
+	return ""
+}
+
+func (x *OfferCreate) GetTakerGetsValue() string {
+	if x != nil {
+		return x.TakerGetsValue
+	}
+	return ""
+}
+
+func (x *OfferCreate) GetFlags() uint32 {
+	if x != nil {
+		return x.Flags
+	}
+	return 0
+}
+
+func (x *OfferCreate) GetOfferSequence() uint32 {
+	if x != nil {
+		return x.OfferSequence
+	}
+	return 0
+}
+
+// OfferCancel — cancel an existing DEX order.
+type OfferCancel struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	OfferSequence uint32                 `protobuf:"varint,1,opt,name=offer_sequence,json=offerSequence,proto3" json:"offer_sequence,omitempty"` // sequence number of the offer to cancel
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *OfferCancel) Reset() {
+	*x = OfferCancel{}
+	mi := &file_txproto_ripple_ripple_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *OfferCancel) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*OfferCancel) ProtoMessage() {}
+
+func (x *OfferCancel) ProtoReflect() protoreflect.Message {
+	mi := &file_txproto_ripple_ripple_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use OfferCancel.ProtoReflect.Descriptor instead.
+func (*OfferCancel) Descriptor() ([]byte, []int) {
+	return file_txproto_ripple_ripple_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *OfferCancel) GetOfferSequence() uint32 {
+	if x != nil {
+		return x.OfferSequence
+	}
+	return 0
+}
+
+// EscrowCreate — time-locked payment.
+type EscrowCreate struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Amount         string                 `protobuf:"bytes,1,opt,name=amount,proto3" json:"amount,omitempty"`                                        // drops
+	Destination    string                 `protobuf:"bytes,2,opt,name=destination,proto3" json:"destination,omitempty"`                              // XRP address
+	DestinationTag uint32                 `protobuf:"varint,3,opt,name=destination_tag,json=destinationTag,proto3" json:"destination_tag,omitempty"` // 0 = not set
+	CancelAfter    uint32                 `protobuf:"varint,4,opt,name=cancel_after,json=cancelAfter,proto3" json:"cancel_after,omitempty"`          // Ripple epoch; 0 = not set
+	FinishAfter    uint32                 `protobuf:"varint,5,opt,name=finish_after,json=finishAfter,proto3" json:"finish_after,omitempty"`          // Ripple epoch; 0 = not set
+	Condition      []byte                 `protobuf:"bytes,6,opt,name=condition,proto3" json:"condition,omitempty"`                                  // PREIMAGE-SHA-256 condition bytes; empty = not set
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *EscrowCreate) Reset() {
+	*x = EscrowCreate{}
+	mi := &file_txproto_ripple_ripple_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EscrowCreate) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EscrowCreate) ProtoMessage() {}
+
+func (x *EscrowCreate) ProtoReflect() protoreflect.Message {
+	mi := &file_txproto_ripple_ripple_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EscrowCreate.ProtoReflect.Descriptor instead.
+func (*EscrowCreate) Descriptor() ([]byte, []int) {
+	return file_txproto_ripple_ripple_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *EscrowCreate) GetAmount() string {
+	if x != nil {
+		return x.Amount
+	}
+	return ""
+}
+
+func (x *EscrowCreate) GetDestination() string {
+	if x != nil {
+		return x.Destination
+	}
+	return ""
+}
+
+func (x *EscrowCreate) GetDestinationTag() uint32 {
+	if x != nil {
+		return x.DestinationTag
+	}
+	return 0
+}
+
+func (x *EscrowCreate) GetCancelAfter() uint32 {
+	if x != nil {
+		return x.CancelAfter
+	}
+	return 0
+}
+
+func (x *EscrowCreate) GetFinishAfter() uint32 {
+	if x != nil {
+		return x.FinishAfter
+	}
+	return 0
+}
+
+func (x *EscrowCreate) GetCondition() []byte {
+	if x != nil {
+		return x.Condition
+	}
+	return nil
+}
+
+// EscrowFinish — release an escrow.
+type EscrowFinish struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Owner         string                 `protobuf:"bytes,1,opt,name=owner,proto3" json:"owner,omitempty"`                                       // address of escrow creator
+	OfferSequence uint32                 `protobuf:"varint,2,opt,name=offer_sequence,json=offerSequence,proto3" json:"offer_sequence,omitempty"` // sequence of the EscrowCreate tx
+	Condition     []byte                 `protobuf:"bytes,3,opt,name=condition,proto3" json:"condition,omitempty"`                               // PREIMAGE-SHA-256 condition; empty if no condition
+	Fulfillment   []byte                 `protobuf:"bytes,4,opt,name=fulfillment,proto3" json:"fulfillment,omitempty"`                           // preimage bytes; empty if no condition
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *EscrowFinish) Reset() {
+	*x = EscrowFinish{}
+	mi := &file_txproto_ripple_ripple_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EscrowFinish) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EscrowFinish) ProtoMessage() {}
+
+func (x *EscrowFinish) ProtoReflect() protoreflect.Message {
+	mi := &file_txproto_ripple_ripple_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EscrowFinish.ProtoReflect.Descriptor instead.
+func (*EscrowFinish) Descriptor() ([]byte, []int) {
+	return file_txproto_ripple_ripple_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *EscrowFinish) GetOwner() string {
+	if x != nil {
+		return x.Owner
+	}
+	return ""
+}
+
+func (x *EscrowFinish) GetOfferSequence() uint32 {
+	if x != nil {
+		return x.OfferSequence
+	}
+	return 0
+}
+
+func (x *EscrowFinish) GetCondition() []byte {
+	if x != nil {
+		return x.Condition
+	}
+	return nil
+}
+
+func (x *EscrowFinish) GetFulfillment() []byte {
+	if x != nil {
+		return x.Fulfillment
+	}
+	return nil
+}
+
+// AccountSet — modify account flags/domain.
+type AccountSet struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	SetFlag       uint32                 `protobuf:"varint,1,opt,name=set_flag,json=setFlag,proto3" json:"set_flag,omitempty"`                // AccountSetFlag to enable (0 = not set)
+	ClearFlag     uint32                 `protobuf:"varint,2,opt,name=clear_flag,json=clearFlag,proto3" json:"clear_flag,omitempty"`          // AccountSetFlag to disable (0 = not set)
+	Domain        []byte                 `protobuf:"bytes,3,opt,name=domain,proto3" json:"domain,omitempty"`                                  // domain name as bytes; empty = not set
+	TransferRate  uint32                 `protobuf:"varint,4,opt,name=transfer_rate,json=transferRate,proto3" json:"transfer_rate,omitempty"` // 1000000000–2000000000; 0 = not set
+	TickSize      uint32                 `protobuf:"varint,5,opt,name=tick_size,json=tickSize,proto3" json:"tick_size,omitempty"`             // 3–15; 0 = not set
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AccountSet) Reset() {
+	*x = AccountSet{}
+	mi := &file_txproto_ripple_ripple_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AccountSet) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AccountSet) ProtoMessage() {}
+
+func (x *AccountSet) ProtoReflect() protoreflect.Message {
+	mi := &file_txproto_ripple_ripple_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AccountSet.ProtoReflect.Descriptor instead.
+func (*AccountSet) Descriptor() ([]byte, []int) {
+	return file_txproto_ripple_ripple_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *AccountSet) GetSetFlag() uint32 {
+	if x != nil {
+		return x.SetFlag
+	}
+	return 0
+}
+
+func (x *AccountSet) GetClearFlag() uint32 {
+	if x != nil {
+		return x.ClearFlag
+	}
+	return 0
+}
+
+func (x *AccountSet) GetDomain() []byte {
+	if x != nil {
+		return x.Domain
+	}
+	return nil
+}
+
+func (x *AccountSet) GetTransferRate() uint32 {
+	if x != nil {
+		return x.TransferRate
+	}
+	return 0
+}
+
+func (x *AccountSet) GetTickSize() uint32 {
+	if x != nil {
+		return x.TickSize
+	}
+	return 0
+}
+
+// SigningInput for XRP Ledger transactions.
 type SigningInput struct {
 	state              protoimpl.MessageState `protogen:"open.v1"`
 	Fee                int64                  `protobuf:"varint,1,opt,name=fee,proto3" json:"fee,omitempty"`
@@ -91,14 +536,23 @@ type SigningInput struct {
 	LastLedgerSequence uint32                 `protobuf:"varint,3,opt,name=last_ledger_sequence,json=lastLedgerSequence,proto3" json:"last_ledger_sequence,omitempty"`
 	Account            string                 `protobuf:"bytes,4,opt,name=account,proto3" json:"account,omitempty"` // sender r... address
 	Flags              uint32                 `protobuf:"varint,5,opt,name=flags,proto3" json:"flags,omitempty"`
-	Payment            *Payment               `protobuf:"bytes,6,opt,name=payment,proto3" json:"payment,omitempty"`
-	unknownFields      protoimpl.UnknownFields
-	sizeCache          protoimpl.SizeCache
+	// Types that are valid to be assigned to Transaction:
+	//
+	//	*SigningInput_Payment
+	//	*SigningInput_TrustSet
+	//	*SigningInput_OfferCreate
+	//	*SigningInput_OfferCancel
+	//	*SigningInput_EscrowCreate
+	//	*SigningInput_EscrowFinish
+	//	*SigningInput_AccountSet
+	Transaction   isSigningInput_Transaction `protobuf_oneof:"transaction"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *SigningInput) Reset() {
 	*x = SigningInput{}
-	mi := &file_txproto_ripple_ripple_proto_msgTypes[1]
+	mi := &file_txproto_ripple_ripple_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -110,7 +564,7 @@ func (x *SigningInput) String() string {
 func (*SigningInput) ProtoMessage() {}
 
 func (x *SigningInput) ProtoReflect() protoreflect.Message {
-	mi := &file_txproto_ripple_ripple_proto_msgTypes[1]
+	mi := &file_txproto_ripple_ripple_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -123,7 +577,7 @@ func (x *SigningInput) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SigningInput.ProtoReflect.Descriptor instead.
 func (*SigningInput) Descriptor() ([]byte, []int) {
-	return file_txproto_ripple_ripple_proto_rawDescGZIP(), []int{1}
+	return file_txproto_ripple_ripple_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *SigningInput) GetFee() int64 {
@@ -161,12 +615,121 @@ func (x *SigningInput) GetFlags() uint32 {
 	return 0
 }
 
-func (x *SigningInput) GetPayment() *Payment {
+func (x *SigningInput) GetTransaction() isSigningInput_Transaction {
 	if x != nil {
-		return x.Payment
+		return x.Transaction
 	}
 	return nil
 }
+
+func (x *SigningInput) GetPayment() *Payment {
+	if x != nil {
+		if x, ok := x.Transaction.(*SigningInput_Payment); ok {
+			return x.Payment
+		}
+	}
+	return nil
+}
+
+func (x *SigningInput) GetTrustSet() *TrustSet {
+	if x != nil {
+		if x, ok := x.Transaction.(*SigningInput_TrustSet); ok {
+			return x.TrustSet
+		}
+	}
+	return nil
+}
+
+func (x *SigningInput) GetOfferCreate() *OfferCreate {
+	if x != nil {
+		if x, ok := x.Transaction.(*SigningInput_OfferCreate); ok {
+			return x.OfferCreate
+		}
+	}
+	return nil
+}
+
+func (x *SigningInput) GetOfferCancel() *OfferCancel {
+	if x != nil {
+		if x, ok := x.Transaction.(*SigningInput_OfferCancel); ok {
+			return x.OfferCancel
+		}
+	}
+	return nil
+}
+
+func (x *SigningInput) GetEscrowCreate() *EscrowCreate {
+	if x != nil {
+		if x, ok := x.Transaction.(*SigningInput_EscrowCreate); ok {
+			return x.EscrowCreate
+		}
+	}
+	return nil
+}
+
+func (x *SigningInput) GetEscrowFinish() *EscrowFinish {
+	if x != nil {
+		if x, ok := x.Transaction.(*SigningInput_EscrowFinish); ok {
+			return x.EscrowFinish
+		}
+	}
+	return nil
+}
+
+func (x *SigningInput) GetAccountSet() *AccountSet {
+	if x != nil {
+		if x, ok := x.Transaction.(*SigningInput_AccountSet); ok {
+			return x.AccountSet
+		}
+	}
+	return nil
+}
+
+type isSigningInput_Transaction interface {
+	isSigningInput_Transaction()
+}
+
+type SigningInput_Payment struct {
+	Payment *Payment `protobuf:"bytes,10,opt,name=payment,proto3,oneof"`
+}
+
+type SigningInput_TrustSet struct {
+	TrustSet *TrustSet `protobuf:"bytes,11,opt,name=trust_set,json=trustSet,proto3,oneof"`
+}
+
+type SigningInput_OfferCreate struct {
+	OfferCreate *OfferCreate `protobuf:"bytes,12,opt,name=offer_create,json=offerCreate,proto3,oneof"`
+}
+
+type SigningInput_OfferCancel struct {
+	OfferCancel *OfferCancel `protobuf:"bytes,13,opt,name=offer_cancel,json=offerCancel,proto3,oneof"`
+}
+
+type SigningInput_EscrowCreate struct {
+	EscrowCreate *EscrowCreate `protobuf:"bytes,14,opt,name=escrow_create,json=escrowCreate,proto3,oneof"`
+}
+
+type SigningInput_EscrowFinish struct {
+	EscrowFinish *EscrowFinish `protobuf:"bytes,15,opt,name=escrow_finish,json=escrowFinish,proto3,oneof"`
+}
+
+type SigningInput_AccountSet struct {
+	AccountSet *AccountSet `protobuf:"bytes,16,opt,name=account_set,json=accountSet,proto3,oneof"`
+}
+
+func (*SigningInput_Payment) isSigningInput_Transaction() {}
+
+func (*SigningInput_TrustSet) isSigningInput_Transaction() {}
+
+func (*SigningInput_OfferCreate) isSigningInput_Transaction() {}
+
+func (*SigningInput_OfferCancel) isSigningInput_Transaction() {}
+
+func (*SigningInput_EscrowCreate) isSigningInput_Transaction() {}
+
+func (*SigningInput_EscrowFinish) isSigningInput_Transaction() {}
+
+func (*SigningInput_AccountSet) isSigningInput_Transaction() {}
 
 // SigningOutput mirrors a minimal subset of TW.Ripple.Proto.SigningOutput.
 type SigningOutput struct {
@@ -175,8 +738,7 @@ type SigningOutput struct {
 	EncodedHex string                 `protobuf:"bytes,2,opt,name=encoded_hex,json=encodedHex,proto3" json:"encoded_hex,omitempty"`
 	Error      string                 `protobuf:"bytes,3,opt,name=error,proto3" json:"error,omitempty"`
 	// Transaction id/hash: upper-case hex of the first 32 bytes of SHA-512 over
-	// the serialized signed transaction (sha512Half), the form XRP explorers
-	// display.
+	// the serialized signed transaction (sha512Half).
 	TxId          string `protobuf:"bytes,4,opt,name=tx_id,json=txId,proto3" json:"tx_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -184,7 +746,7 @@ type SigningOutput struct {
 
 func (x *SigningOutput) Reset() {
 	*x = SigningOutput{}
-	mi := &file_txproto_ripple_ripple_proto_msgTypes[2]
+	mi := &file_txproto_ripple_ripple_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -196,7 +758,7 @@ func (x *SigningOutput) String() string {
 func (*SigningOutput) ProtoMessage() {}
 
 func (x *SigningOutput) ProtoReflect() protoreflect.Message {
-	mi := &file_txproto_ripple_ripple_proto_msgTypes[2]
+	mi := &file_txproto_ripple_ripple_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -209,7 +771,7 @@ func (x *SigningOutput) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SigningOutput.ProtoReflect.Descriptor instead.
 func (*SigningOutput) Descriptor() ([]byte, []int) {
-	return file_txproto_ripple_ripple_proto_rawDescGZIP(), []int{2}
+	return file_txproto_ripple_ripple_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *SigningOutput) GetEncoded() []byte {
@@ -248,14 +810,59 @@ const file_txproto_ripple_ripple_proto_rawDesc = "" +
 	"\aPayment\x12\x16\n" +
 	"\x06amount\x18\x01 \x01(\x03R\x06amount\x12 \n" +
 	"\vdestination\x18\x02 \x01(\tR\vdestination\x12'\n" +
-	"\x0fdestination_tag\x18\x03 \x01(\x03R\x0edestinationTag\"\xd8\x01\n" +
+	"\x0fdestination_tag\x18\x03 \x01(\x03R\x0edestinationTag\"\xb2\x01\n" +
+	"\bTrustSet\x122\n" +
+	"\x15limit_amount_currency\x18\x01 \x01(\tR\x13limitAmountCurrency\x12.\n" +
+	"\x13limit_amount_issuer\x18\x02 \x01(\tR\x11limitAmountIssuer\x12,\n" +
+	"\x12limit_amount_value\x18\x03 \x01(\tR\x10limitAmountValue\x12\x14\n" +
+	"\x05flags\x18\x04 \x01(\rR\x05flags\"\xd6\x02\n" +
+	"\vOfferCreate\x12.\n" +
+	"\x13taker_pays_currency\x18\x01 \x01(\tR\x11takerPaysCurrency\x12*\n" +
+	"\x11taker_pays_issuer\x18\x02 \x01(\tR\x0ftakerPaysIssuer\x12(\n" +
+	"\x10taker_pays_value\x18\x03 \x01(\tR\x0etakerPaysValue\x12.\n" +
+	"\x13taker_gets_currency\x18\x04 \x01(\tR\x11takerGetsCurrency\x12*\n" +
+	"\x11taker_gets_issuer\x18\x05 \x01(\tR\x0ftakerGetsIssuer\x12(\n" +
+	"\x10taker_gets_value\x18\x06 \x01(\tR\x0etakerGetsValue\x12\x14\n" +
+	"\x05flags\x18\a \x01(\rR\x05flags\x12%\n" +
+	"\x0eoffer_sequence\x18\b \x01(\rR\rofferSequence\"4\n" +
+	"\vOfferCancel\x12%\n" +
+	"\x0eoffer_sequence\x18\x01 \x01(\rR\rofferSequence\"\xd5\x01\n" +
+	"\fEscrowCreate\x12\x16\n" +
+	"\x06amount\x18\x01 \x01(\tR\x06amount\x12 \n" +
+	"\vdestination\x18\x02 \x01(\tR\vdestination\x12'\n" +
+	"\x0fdestination_tag\x18\x03 \x01(\rR\x0edestinationTag\x12!\n" +
+	"\fcancel_after\x18\x04 \x01(\rR\vcancelAfter\x12!\n" +
+	"\ffinish_after\x18\x05 \x01(\rR\vfinishAfter\x12\x1c\n" +
+	"\tcondition\x18\x06 \x01(\fR\tcondition\"\x8b\x01\n" +
+	"\fEscrowFinish\x12\x14\n" +
+	"\x05owner\x18\x01 \x01(\tR\x05owner\x12%\n" +
+	"\x0eoffer_sequence\x18\x02 \x01(\rR\rofferSequence\x12\x1c\n" +
+	"\tcondition\x18\x03 \x01(\fR\tcondition\x12 \n" +
+	"\vfulfillment\x18\x04 \x01(\fR\vfulfillment\"\xa0\x01\n" +
+	"\n" +
+	"AccountSet\x12\x19\n" +
+	"\bset_flag\x18\x01 \x01(\rR\asetFlag\x12\x1d\n" +
+	"\n" +
+	"clear_flag\x18\x02 \x01(\rR\tclearFlag\x12\x16\n" +
+	"\x06domain\x18\x03 \x01(\fR\x06domain\x12#\n" +
+	"\rtransfer_rate\x18\x04 \x01(\rR\ftransferRate\x12\x1b\n" +
+	"\ttick_size\x18\x05 \x01(\rR\btickSize\"\x99\x05\n" +
 	"\fSigningInput\x12\x10\n" +
 	"\x03fee\x18\x01 \x01(\x03R\x03fee\x12\x1a\n" +
 	"\bsequence\x18\x02 \x01(\rR\bsequence\x120\n" +
 	"\x14last_ledger_sequence\x18\x03 \x01(\rR\x12lastLedgerSequence\x12\x18\n" +
 	"\aaccount\x18\x04 \x01(\tR\aaccount\x12\x14\n" +
-	"\x05flags\x18\x05 \x01(\rR\x05flags\x128\n" +
-	"\apayment\x18\x06 \x01(\v2\x1e.hdwallet.ripple.proto.PaymentR\apayment\"u\n" +
+	"\x05flags\x18\x05 \x01(\rR\x05flags\x12:\n" +
+	"\apayment\x18\n" +
+	" \x01(\v2\x1e.hdwallet.ripple.proto.PaymentH\x00R\apayment\x12>\n" +
+	"\ttrust_set\x18\v \x01(\v2\x1f.hdwallet.ripple.proto.TrustSetH\x00R\btrustSet\x12G\n" +
+	"\foffer_create\x18\f \x01(\v2\".hdwallet.ripple.proto.OfferCreateH\x00R\vofferCreate\x12G\n" +
+	"\foffer_cancel\x18\r \x01(\v2\".hdwallet.ripple.proto.OfferCancelH\x00R\vofferCancel\x12J\n" +
+	"\rescrow_create\x18\x0e \x01(\v2#.hdwallet.ripple.proto.EscrowCreateH\x00R\fescrowCreate\x12J\n" +
+	"\rescrow_finish\x18\x0f \x01(\v2#.hdwallet.ripple.proto.EscrowFinishH\x00R\fescrowFinish\x12D\n" +
+	"\vaccount_set\x18\x10 \x01(\v2!.hdwallet.ripple.proto.AccountSetH\x00R\n" +
+	"accountSetB\r\n" +
+	"\vtransaction\"u\n" +
 	"\rSigningOutput\x12\x18\n" +
 	"\aencoded\x18\x01 \x01(\fR\aencoded\x12\x1f\n" +
 	"\vencoded_hex\x18\x02 \x01(\tR\n" +
@@ -275,19 +882,31 @@ func file_txproto_ripple_ripple_proto_rawDescGZIP() []byte {
 	return file_txproto_ripple_ripple_proto_rawDescData
 }
 
-var file_txproto_ripple_ripple_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
+var file_txproto_ripple_ripple_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
 var file_txproto_ripple_ripple_proto_goTypes = []any{
 	(*Payment)(nil),       // 0: hdwallet.ripple.proto.Payment
-	(*SigningInput)(nil),  // 1: hdwallet.ripple.proto.SigningInput
-	(*SigningOutput)(nil), // 2: hdwallet.ripple.proto.SigningOutput
+	(*TrustSet)(nil),      // 1: hdwallet.ripple.proto.TrustSet
+	(*OfferCreate)(nil),   // 2: hdwallet.ripple.proto.OfferCreate
+	(*OfferCancel)(nil),   // 3: hdwallet.ripple.proto.OfferCancel
+	(*EscrowCreate)(nil),  // 4: hdwallet.ripple.proto.EscrowCreate
+	(*EscrowFinish)(nil),  // 5: hdwallet.ripple.proto.EscrowFinish
+	(*AccountSet)(nil),    // 6: hdwallet.ripple.proto.AccountSet
+	(*SigningInput)(nil),  // 7: hdwallet.ripple.proto.SigningInput
+	(*SigningOutput)(nil), // 8: hdwallet.ripple.proto.SigningOutput
 }
 var file_txproto_ripple_ripple_proto_depIdxs = []int32{
 	0, // 0: hdwallet.ripple.proto.SigningInput.payment:type_name -> hdwallet.ripple.proto.Payment
-	1, // [1:1] is the sub-list for method output_type
-	1, // [1:1] is the sub-list for method input_type
-	1, // [1:1] is the sub-list for extension type_name
-	1, // [1:1] is the sub-list for extension extendee
-	0, // [0:1] is the sub-list for field type_name
+	1, // 1: hdwallet.ripple.proto.SigningInput.trust_set:type_name -> hdwallet.ripple.proto.TrustSet
+	2, // 2: hdwallet.ripple.proto.SigningInput.offer_create:type_name -> hdwallet.ripple.proto.OfferCreate
+	3, // 3: hdwallet.ripple.proto.SigningInput.offer_cancel:type_name -> hdwallet.ripple.proto.OfferCancel
+	4, // 4: hdwallet.ripple.proto.SigningInput.escrow_create:type_name -> hdwallet.ripple.proto.EscrowCreate
+	5, // 5: hdwallet.ripple.proto.SigningInput.escrow_finish:type_name -> hdwallet.ripple.proto.EscrowFinish
+	6, // 6: hdwallet.ripple.proto.SigningInput.account_set:type_name -> hdwallet.ripple.proto.AccountSet
+	7, // [7:7] is the sub-list for method output_type
+	7, // [7:7] is the sub-list for method input_type
+	7, // [7:7] is the sub-list for extension type_name
+	7, // [7:7] is the sub-list for extension extendee
+	0, // [0:7] is the sub-list for field type_name
 }
 
 func init() { file_txproto_ripple_ripple_proto_init() }
@@ -295,13 +914,22 @@ func file_txproto_ripple_ripple_proto_init() {
 	if File_txproto_ripple_ripple_proto != nil {
 		return
 	}
+	file_txproto_ripple_ripple_proto_msgTypes[7].OneofWrappers = []any{
+		(*SigningInput_Payment)(nil),
+		(*SigningInput_TrustSet)(nil),
+		(*SigningInput_OfferCreate)(nil),
+		(*SigningInput_OfferCancel)(nil),
+		(*SigningInput_EscrowCreate)(nil),
+		(*SigningInput_EscrowFinish)(nil),
+		(*SigningInput_AccountSet)(nil),
+	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_txproto_ripple_ripple_proto_rawDesc), len(file_txproto_ripple_ripple_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   3,
+			NumMessages:   9,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

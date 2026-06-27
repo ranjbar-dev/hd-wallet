@@ -11,24 +11,82 @@ message Payment {
   int64 destination_tag = 3;
 }
 
-// SigningInput mirrors a minimal subset of TW.Ripple.Proto.SigningInput for a
-// native XRP Payment.
+// TrustSet — create/modify a trust line for an issued currency.
+message TrustSet {
+  string limit_amount_currency = 1; // 3-letter or 40-hex currency code
+  string limit_amount_issuer   = 2; // base58check XRP address
+  string limit_amount_value    = 3; // decimal string, e.g. "1000000"
+  uint32 flags                 = 4;
+}
+
+// OfferCreate — place a DEX order.
+message OfferCreate {
+  string taker_pays_currency = 1; // empty/"XRP" = native drops
+  string taker_pays_issuer   = 2;
+  string taker_pays_value    = 3; // drops string if native, decimal if issued
+  string taker_gets_currency = 4;
+  string taker_gets_issuer   = 5;
+  string taker_gets_value    = 6;
+  uint32 flags               = 7;
+  uint32 offer_sequence      = 8; // sequence of an existing offer to replace (0 = new)
+}
+
+// OfferCancel — cancel an existing DEX order.
+message OfferCancel {
+  uint32 offer_sequence = 1; // sequence number of the offer to cancel
+}
+
+// EscrowCreate — time-locked payment.
+message EscrowCreate {
+  string amount          = 1; // drops
+  string destination     = 2; // XRP address
+  uint32 destination_tag = 3; // 0 = not set
+  uint32 cancel_after    = 4; // Ripple epoch; 0 = not set
+  uint32 finish_after    = 5; // Ripple epoch; 0 = not set
+  bytes  condition       = 6; // PREIMAGE-SHA-256 condition bytes; empty = not set
+}
+
+// EscrowFinish — release an escrow.
+message EscrowFinish {
+  string owner          = 1; // address of escrow creator
+  uint32 offer_sequence = 2; // sequence of the EscrowCreate tx
+  bytes  condition      = 3; // PREIMAGE-SHA-256 condition; empty if no condition
+  bytes  fulfillment    = 4; // preimage bytes; empty if no condition
+}
+
+// AccountSet — modify account flags/domain.
+message AccountSet {
+  uint32 set_flag      = 1; // AccountSetFlag to enable (0 = not set)
+  uint32 clear_flag    = 2; // AccountSetFlag to disable (0 = not set)
+  bytes  domain        = 3; // domain name as bytes; empty = not set
+  uint32 transfer_rate = 4; // 1000000000–2000000000; 0 = not set
+  uint32 tick_size     = 5; // 3–15; 0 = not set
+}
+
+// SigningInput for XRP Ledger transactions.
 message SigningInput {
-  int64 fee = 1;
-  uint32 sequence = 2;
+  int64  fee                  = 1;
+  uint32 sequence             = 2;
   uint32 last_ledger_sequence = 3;
-  string account = 4; // sender r... address
-  uint32 flags = 5;
-  Payment payment = 6;
+  string account              = 4; // sender r... address
+  uint32 flags                = 5;
+  oneof transaction {
+    Payment      payment      = 10;
+    TrustSet     trust_set    = 11;
+    OfferCreate  offer_create = 12;
+    OfferCancel  offer_cancel = 13;
+    EscrowCreate escrow_create = 14;
+    EscrowFinish escrow_finish = 15;
+    AccountSet   account_set  = 16;
+  }
 }
 
 // SigningOutput mirrors a minimal subset of TW.Ripple.Proto.SigningOutput.
 message SigningOutput {
-  bytes encoded = 1; // serialized signed transaction
+  bytes  encoded     = 1; // serialized signed transaction
   string encoded_hex = 2;
-  string error = 3;
+  string error       = 3;
   // Transaction id/hash: upper-case hex of the first 32 bytes of SHA-512 over
-  // the serialized signed transaction (sha512Half), the form XRP explorers
-  // display.
+  // the serialized signed transaction (sha512Half).
   string tx_id = 4;
 }

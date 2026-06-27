@@ -2,16 +2,19 @@ package hdwallet
 
 import (
 	"bytes"
+	"encoding/binary"
 	"testing"
 
 	txsolana "github.com/ranjbar-dev/hd-wallet/txproto/solana"
 )
 
 // "What am I signing?" Solana decoder, proven by:
-//   - round-trip: sign the TWC Solana transfer vector with the EXISTING signer and
-//     assert DecodeSolanaTx recovers the header, account keys, blockhash and the
-//     decoded system-transfer lamports;
-//   - an SPL TransferChecked round-trip to exercise the token-transfer branch;
+//   - round-trip: sign the TWC Solana transfer vector with the EXISTING signer
+//     and assert DecodeSolanaTx recovers the header, account keys, blockhash and
+//     the decoded system-transfer lamports;
+//   - SPL TransferChecked round-trip: exercises the token-transfer branch and
+//     verifies SourceToken/TokenMint/DestToken account resolution;
+//   - Compute Budget: manually constructed tx asserts SetComputeUnitLimit decoding;
 //   - malformed: truncated/garbage bytes return ErrTxDecode, never a panic.
 
 const solSystemProgramB58 = "11111111111111111111111111111111"
@@ -77,11 +80,20 @@ func TestDecodeSolanaRoundTripTransfer(t *testing.T) {
 		t.Fatalf("instructions = %d, want 1", len(f.Instructions))
 	}
 	ins := f.Instructions[0]
-	if ins.Type != "systemTransfer" || ins.Lamports != 42 {
-		t.Fatalf("instruction = %s lamports %d, want systemTransfer 42", ins.Type, ins.Lamports)
+	if ins.Kind != SolanaInstructionSystemTransfer {
+		t.Fatalf("kind = %v, want SolanaInstructionSystemTransfer", ins.Kind)
+	}
+	if ins.LamportAmount != 42 {
+		t.Fatalf("lamports = %d, want 42", ins.LamportAmount)
 	}
 	if ins.ProgramID != solSystemProgramB58 {
 		t.Fatalf("program id = %s, want system program", ins.ProgramID)
+	}
+	if ins.FromAccount != sender {
+		t.Fatalf("from = %s, want %s", ins.FromAccount, sender)
+	}
+	if ins.ToAccount != recipient {
+		t.Fatalf("to = %s, want %s", ins.ToAccount, recipient)
 	}
 }
 
@@ -125,11 +137,79 @@ func TestDecodeSolanaRoundTripTokenTransfer(t *testing.T) {
 		t.Fatalf("instructions = %d, want 1", len(f.Instructions))
 	}
 	ins := f.Instructions[0]
-	if ins.Type != "tokenTransferChecked" || ins.Amount != 12345 || ins.Decimals != 6 {
-		t.Fatalf("instruction = %s amount %d decimals %d, want tokenTransferChecked 12345 6", ins.Type, ins.Amount, ins.Decimals)
+	if ins.Kind != SolanaInstructionSPLTransferChecked {
+		t.Fatalf("kind = %v, want SolanaInstructionSPLTransferChecked", ins.Kind)
+	}
+	if ins.TokenAmount != 12345 {
+		t.Fatalf("amount = %d, want 12345", ins.TokenAmount)
+	}
+	if ins.Decimals != 6 {
+		t.Fatalf("decimals = %d, want 6", ins.Decimals)
+	}
+	// accounts[0]=source, accounts[1]=mint, accounts[2]=dest in TransferChecked order
+	if ins.SourceToken != sender {
+		t.Fatalf("source = %s, want %s", ins.SourceToken, sender)
+	}
+	if ins.TokenMint != mint {
+		t.Fatalf("mint = %s, want %s", ins.TokenMint, mint)
+	}
+	if ins.DestToken != recipient {
+		t.Fatalf("dest = %s, want %s", ins.DestToken, recipient)
 	}
 	if ins.ProgramID != solanaTokenProgramID {
 		t.Fatalf("program id = %s, want token program", ins.ProgramID)
+	}
+}
+
+// TestDecodeSolanaComputeBudget builds a minimal Solana tx containing a
+// SetComputeUnitLimit instruction and asserts it decodes correctly.
+func TestDecodeSolanaComputeBudget(t *testing.T) {
+	fromKey := make([]byte, 32)
+	fromKey[0] = 0x01
+
+	cbKey, err := base58DecodeFixed(solanaComputeBudgetProgramID, 32)
+	if err != nil {
+		t.Fatalf("base58DecodeFixed compute budget: %v", err)
+	}
+
+	// Instruction data: SetComputeUnitLimit = [0x02][LE-u32(200000)]
+	data := make([]byte, 5)
+	data[0] = 2
+	binary.LittleEndian.PutUint32(data[1:5], 200000)
+
+	var msg []byte
+	msg = append(msg, 1, 0, 1)                 // header: 1 signer, 0 readonly signed, 1 readonly unsigned
+	msg = append(msg, solanaCompactU16(2)...)   // 2 account keys
+	msg = append(msg, fromKey...)
+	msg = append(msg, cbKey...)
+	msg = append(msg, make([]byte, 32)...)      // recent blockhash (zeros)
+	msg = append(msg, solanaCompactU16(1)...)   // 1 instruction
+	msg = append(msg, 1)                        // programIdIndex = 1 (compute budget)
+	msg = append(msg, solanaCompactU16(0)...)   // 0 accounts
+	msg = append(msg, solanaCompactU16(5)...)   // 5 bytes data
+	msg = append(msg, data...)
+
+	var tx []byte
+	tx = append(tx, solanaCompactU16(1)...)     // 1 signature
+	tx = append(tx, make([]byte, 64)...)        // fake signature (zeros)
+	tx = append(tx, msg...)
+
+	f, err := DecodeSolanaTx(tx)
+	if err != nil {
+		t.Fatalf("DecodeSolanaTx: %v", err)
+	}
+	if len(f.Instructions) != 1 {
+		t.Fatalf("instructions = %d, want 1", len(f.Instructions))
+	}
+	ins := f.Instructions[0]
+	if ins.Kind != SolanaInstructionComputeBudgetSetLimit {
+		t.Fatalf("kind = %v, want SolanaInstructionComputeBudgetSetLimit", ins.Kind)
+	}
+	if ins.ComputeUnits != 200000 {
+		t.Fatalf("compute units = %d, want 200000", ins.ComputeUnits)
+	}
+	if ins.ProgramID != solanaComputeBudgetProgramID {
+		t.Fatalf("program id = %s, want %s", ins.ProgramID, solanaComputeBudgetProgramID)
 	}
 }
 

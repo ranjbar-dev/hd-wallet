@@ -13,6 +13,7 @@
 package hdwallet
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"slices"
@@ -187,13 +188,39 @@ func FromMnemonicBufferWithPassphrase(buf, passphrase *memguard.LockedBuffer) (*
 	return &HDWallet{secret: s}, nil
 }
 
-// GenerateMnemonic returns a fresh 12-word BIP-39 mnemonic as a string.
+// GenerateMnemonic returns a fresh 12-word BIP-39 mnemonic as a Go string.
 //
-// The returned string cannot be securely wiped; for sensitive use derive a
-// wallet with NewHDWallet (which keeps the mnemonic in protected memory) and
-// read it back via Mnemonic or WithMnemonic only when required.
+// Security note: Go strings are GC-managed and cannot be reliably wiped from
+// memory. For security-sensitive applications (hardware wallets, HSMs) prefer
+// [GenerateMnemonicBuffer], which returns the phrase in a page-locked enclave
+// that is wiped on Destroy. If you use this function, call [FromMnemonicBytes]
+// immediately and discard the string rather than storing it.
 func GenerateMnemonic() (string, error) {
 	return GenerateMnemonicWithWordCount(12)
+}
+
+// GenerateMnemonicBuffer returns a fresh 12-word BIP-39 mnemonic in a
+// page-locked, encrypted-at-rest memguard buffer. The caller must call Destroy
+// on the returned buffer when finished. This is the secure alternative to
+// [GenerateMnemonic] for applications where the phrase must not linger on the
+// Go heap.
+func GenerateMnemonicBuffer() (*memguard.LockedBuffer, error) {
+	return GenerateMnemonicBufferWithWordCount(12)
+}
+
+// GenerateMnemonicBufferWithWordCount returns a fresh BIP-39 mnemonic of the
+// given length (12, 15, 18, 21, or 24 words) in a page-locked memguard buffer.
+// An unsupported word count returns ErrInvalidWordCount.
+func GenerateMnemonicBufferWithWordCount(words int) (*memguard.LockedBuffer, error) {
+	bits, err := wordCountToEntropyBits(words)
+	if err != nil {
+		return nil, err
+	}
+	mn, err := generateMnemonicBytes(bits)
+	if err != nil {
+		return nil, err
+	}
+	return memguard.NewBufferFromBytes(mn), nil // NewBufferFromBytes wipes mn
 }
 
 // GenerateMnemonicWithWordCount returns a fresh BIP-39 mnemonic of the given
@@ -269,6 +296,11 @@ func generateMnemonicBytes(bits int) ([]byte, error) {
 
 // Address returns the first receive address (index 0) for a coin symbol,
 // e.g. "BTC", "ETH", "SOL", "ATOM". Use SupportedCoins to list every symbol.
+//
+// Privacy note: calling Address repeatedly returns the same address. For
+// privacy-sensitive applications (receiving from multiple sources) use
+// [AddressIndex] with incrementing indices or [AddressRange] for gap-limit
+// discovery.
 //
 // It is exactly equivalent to AddressIndex(symbol, 0).
 func (w *HDWallet) Address(symbol Symbol) (string, error) {
@@ -359,6 +391,129 @@ func (w *HDWallet) AllAddressesAt(index uint32) (map[Symbol]string, error) {
 		return nil, err
 	}
 	return out, nil
+}
+
+// AllAddressesCtx is like AllAddresses but respects the context's cancellation.
+// Returns partial results and ctx.Err() if cancelled.
+func (w *HDWallet) AllAddressesCtx(ctx context.Context) (map[Symbol]string, error) {
+	return w.AllAddressesAtCtx(ctx, 0)
+}
+
+// AllAddressesAtCtx is like AllAddressesAt but respects cancellation.
+// Returns partial results and ctx.Err() if cancelled.
+func (w *HDWallet) AllAddressesAtCtx(ctx context.Context, index uint32) (map[Symbol]string, error) {
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+	if w.secret == nil {
+		return nil, ErrDestroyed
+	}
+	if w.secret.isKeyOnly() {
+		return nil, ErrKeyOnlyWallet
+	}
+	out := make(map[Symbol]string, len(coins))
+	var ctxErr error
+	err := w.secret.withSeed(func(seed []byte) error {
+		for _, symbol := range SupportedCoins() {
+			if err := ctx.Err(); err != nil {
+				ctxErr = err
+				return nil
+			}
+			coin := coins[symbol]
+			if coin.Curve == Ed25519ExtendedCardano {
+				addr, aerr := w.cardanoAddressAt(symbol, index)
+				if aerr != nil {
+					return aerr
+				}
+				out[symbol] = addr
+				continue
+			}
+			path, err := withIndex(coin.Path, index)
+			if err != nil {
+				return fmt.Errorf("hdwallet: %s: %w", symbol, err)
+			}
+			coin.Path = path
+			addr, err := addressFromSeed(seed, symbol, coin)
+			if err != nil {
+				return err
+			}
+			out[symbol] = addr
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return out, ctxErr
+}
+
+// AddressResult is the result of deriving one coin address.
+type AddressResult struct {
+	Address string
+	Err     error
+}
+
+// AllAddressResults derives all coins at index and returns per-coin results.
+// Does not stop on error — all coins are attempted.
+func (w *HDWallet) AllAddressResults(index uint32) map[Symbol]AddressResult {
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+	out := make(map[Symbol]AddressResult, len(coins))
+	if w.secret == nil {
+		for _, s := range SupportedCoins() {
+			out[s] = AddressResult{Err: ErrDestroyed}
+		}
+		return out
+	}
+	if w.secret.isKeyOnly() {
+		_ = w.secret.withImportedKey(func(priv []byte) error {
+			for _, symbol := range SupportedCoins() {
+				coin := coins[symbol]
+				if coin.Curve == Ed25519ExtendedCardano {
+					// cardanoAddressAt→withEntropy returns ErrNoEntropy for key-only wallets.
+					_, aerr := w.cardanoAddressAt(symbol, index)
+					out[symbol] = AddressResult{Err: aerr}
+					continue
+				}
+				if coin.Curve != w.secret.curve {
+					out[symbol] = AddressResult{Err: fmt.Errorf("%w: coin %s is %s, key is %s", ErrCurveMismatch, symbol, coin.Curve, w.secret.curve)}
+					continue
+				}
+				if index != 0 {
+					out[symbol] = AddressResult{Err: fmt.Errorf("%w: %s index %d", ErrKeyOnlyIndex, symbol, index)}
+					continue
+				}
+				pub, perr := publicKeyFromPriv(coin.Curve, priv)
+				if perr != nil {
+					out[symbol] = AddressResult{Err: fmt.Errorf("hdwallet: %s: %w", symbol, perr)}
+					continue
+				}
+				addr, aerr := coin.Encode(pub)
+				out[symbol] = AddressResult{Address: addr, Err: aerr}
+			}
+			return nil
+		})
+		return out
+	}
+	_ = w.secret.withSeed(func(seed []byte) error {
+		for _, symbol := range SupportedCoins() {
+			coin := coins[symbol]
+			if coin.Curve == Ed25519ExtendedCardano {
+				addr, aerr := w.cardanoAddressAt(symbol, index)
+				out[symbol] = AddressResult{Address: addr, Err: aerr}
+				continue
+			}
+			path, perr := withIndex(coin.Path, index)
+			if perr != nil {
+				out[symbol] = AddressResult{Err: fmt.Errorf("hdwallet: %s: %w", symbol, perr)}
+				continue
+			}
+			coin.Path = path
+			addr, aerr := addressFromSeed(seed, symbol, coin)
+			out[symbol] = AddressResult{Address: addr, Err: aerr}
+		}
+		return nil
+	})
+	return out
 }
 
 // cardanoAddressAt derives and encodes the Cardano address for symbol at index
@@ -659,6 +814,9 @@ func (w *HDWallet) Sign(symbol Symbol, data []byte) (*Signature, error) {
 // The derived private key is wiped immediately after signing and never leaves
 // the package.
 func (w *HDWallet) SignIndex(symbol Symbol, index uint32, data []byte) (*Signature, error) {
+	if data == nil {
+		return nil, fmt.Errorf("%w: nil data", ErrInvalidDigest)
+	}
 	var sig *Signature
 	err := w.withLeafPrivateKey(symbol, index, func(priv []byte, coin Coin) error {
 		s, err := signDigest(coin.Curve, priv, data)
@@ -731,8 +889,13 @@ func (w *HDWallet) WithMnemonic(fn func(mnemonic []byte) error) error {
 	return fn(buf.Bytes())
 }
 
-// Destroy wipes the wallet's secret material from memory. The wallet is unusable
-// afterwards. It is safe to call multiple times.
+// Destroy wipes the wallet's secret material from memory. After Destroy
+// returns, all methods that require secret material return [ErrDestroyed]. Safe
+// to call multiple times; subsequent calls are no-ops.
+//
+// Destroy does not wait for in-flight Sign or Address operations to complete.
+// If concurrent goroutines may be using the wallet, callers must coordinate
+// shutdown before calling Destroy.
 func (w *HDWallet) Destroy() {
 	w.mu.Lock()
 	defer w.mu.Unlock()

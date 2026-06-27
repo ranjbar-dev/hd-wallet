@@ -1,6 +1,9 @@
 package hdwallet
 
-import "strconv"
+import (
+	"slices"
+	"strconv"
+)
 
 // Curve identifies the elliptic curve a coin derives keys on. Each curve has a
 // distinct derivation scheme (BIP-32 for secp256k1, SLIP-0010 for the others).
@@ -241,16 +244,24 @@ const (
 	// ed25519-extended (BIP32-Ed25519 / CIP-1852).
 	ADA Symbol = "ADA" // Cardano (Icarus master from BIP-39 entropy; addr1 base address)
 
+	// secp256k1 — additional account-based chains.
+	ICX Symbol = "ICX" // ICON (hx-prefixed keccak20)
+	CKB Symbol = "CKB" // Nervos CKB (bech32m full address, RFC 0021)
+	ZIL Symbol = "ZIL" // Zilliqa (bech32 of sha256(pubkey)[12:])
+
+	// Starkex curve — StarkNet.
+	STRK Symbol = "STRK" // StarkNet (EIP-2645, STARK curve; address = "0x"+hex(pub_x))
+
 	// Roadmap — Trust Wallet Core networks intentionally NOT registered yet (each
 	// needs more than a vector-verified encoder over the standard seed path, so
 	// adding one now would break AllAddresses or ship an unverified address):
-	//   - StarkNet/StarkEx: seed->key derivation is provisional/unverified.
-	//   - Zilliqa: requires a Schnorr scheme that is not implemented.
 	//   - TON: address is the hash of a v4r2 wallet StateInit cell (BoC); too
 	//     chain-specific to reproduce and vector-match safely here.
-	//   - ICON, Nervos, NULS, Nebulas, Nimiq, Polymesh, Pactus, Internet Computer,
+	//   - NULS, Nebulas, Nimiq, Polymesh, Pactus, Internet Computer,
 	//     Everscale, Aion: address scheme not yet reproduced against the TWC
 	//     expected vector; omitted until vector-verified.
+	//   - Zilliqa tx: Schnorr-on-secp256k1 signing variant (RFC 6979 nonce,
+	//     Pedersen hash) differs from BIP-340; not yet implemented.
 )
 
 // Coin describes a supported network: its curve, BIP-32 derivation path, and the
@@ -335,6 +346,12 @@ var coins = map[Symbol]Coin{
 	"ETH": {"Ethereum", "ETH", Secp256k1, "m/44'/60'/0'/0/0", encodeETH, 18, 1},
 	"TRX": {"Tron", "TRX", Secp256k1, "m/44'/195'/0'/0/0", encodeTRX, 6, 0},
 	"XRP": {"XRP Ledger", "XRP", Secp256k1, "m/44'/144'/0'/0/0", encodeXRP, 6, 0},
+	// ICON uses the same keccak20 as Ethereum but lowercased with an "hx" prefix.
+	"ICX": {"ICON", "ICX", Secp256k1, "m/44'/60'/0'/0/0", encodeICX, 18, 0},
+	// Nervos CKB: bech32m full-address (RFC 0021), blake2b-160 args.
+	"CKB": {"Nervos CKB", "CKB", Secp256k1, "m/44'/309'/0'/0/0", encodeCKB, 8, 0},
+	// Zilliqa: bech32("zil", sha256(compressed_pub)[12:]).
+	"ZIL": {"Zilliqa", "ZIL", Secp256k1, "m/44'/313'/0'/0/0", encodeZIL, 12, 0},
 
 	// ---- secp256k1 : EOS-family public-key strings ----
 	"EOS": {"EOS", "EOS", Secp256k1, "m/44'/194'/0'/0/0", eosEncoder("EOS"), 4, 0},
@@ -465,6 +482,13 @@ var coins = map[Symbol]Coin{
 	"XNO":   {"Nano", "XNO", Ed25519Blake2bNano, "m/44'/165'/0'", encodeNano, 30, 0}, // TWC: 30 decimals
 	"WAVES": {"Waves", "WAVES", Curve25519, "m/44'/5741564'/0'/0'/0'", encodeWaves, 8, 0},
 
+	// ---- Starkex (EIP-2645) ----
+	// StarkNet: secp256k1 leaf key derived from m/2645'/…, then EIP-2645 grind to
+	// a valid STARK scalar. Address is the x-coordinate of d*G on the STARK curve,
+	// 0x-prefixed 64-char hex. EIP-2645 path per Trust Wallet Core StarkNet config.
+	// Vector anchor: TWC sign key 0139fe4d… → pub 02c5dbad… verified in curves_twc_test.go.
+	"STRK": {"StarkNet", "STRK", Starkex, "m/2645'/1195502025'/1148870696'/0'/0'/0", encodeStarknet, 18, 0},
+
 	// ---- ed25519-extended (BIP32-Ed25519 / CIP-1852) ----
 	// Cardano derives its Icarus master key from the BIP-39 ENTROPY (not the seed),
 	// so Address/Sign route through the entropy enclave (see hdwallet.go); a wallet
@@ -552,4 +576,106 @@ func init() {
 
 	// Cardano base address (bech32 "addr", 57-byte payload, mainnet header 0x01).
 	validators[ADA] = cardanoValidator(ADA)
+
+	// StarkNet: "0x" + hex of 32-byte STARK public-key x-coordinate.
+	validators[STRK] = starknetValidator(STRK)
+}
+
+// CoinFamily returns a string identifying the chain family for routing purposes.
+// Values: "evm", "cosmos", "bitcoin-utxo", "solana", "tron", "ripple", "cardano",
+// "stellar", "near", "polkadot", "tezos", "nano", "waves", or "unknown".
+func CoinFamily(symbol Symbol) string {
+	if _, ok := evmTxChains[symbol]; ok {
+		return "evm"
+	}
+	if _, ok := cosmosTxChains[symbol]; ok {
+		return "cosmos"
+	}
+	if _, ok := ethermintTxChains[symbol]; ok {
+		return "cosmos"
+	}
+	if IsUTXO(symbol) {
+		return "bitcoin-utxo"
+	}
+	switch symbol {
+	case TRX:
+		return "tron"
+	case XRP:
+		return "ripple"
+	case SOL:
+		return "solana"
+	case XLM, KIN:
+		return "stellar"
+	case NEAR:
+		return "near"
+	case DOT, KSM:
+		return "polkadot"
+	case XTZ:
+		return "tezos"
+	case XNO:
+		return "nano"
+	case WAVES:
+		return "waves"
+	case ADA:
+		return "cardano"
+	case CANTO, ZETA, ONE:
+		return "cosmos"
+	default:
+		return "unknown"
+	}
+}
+
+// IsEVM returns true if symbol is an EVM-compatible chain (Ethereum, BNB, Polygon, etc.)
+func IsEVM(symbol Symbol) bool { _, ok := evmTxChains[symbol]; return ok }
+
+// IsCosmosSDK returns true if symbol uses the Cosmos SDK signing path.
+func IsCosmosSDK(symbol Symbol) bool {
+	_, ok1 := cosmosTxChains[symbol]
+	_, ok2 := ethermintTxChains[symbol]
+	return ok1 || ok2
+}
+
+// IsUTXO returns true if symbol uses Bitcoin-style UTXO transaction model.
+func IsUTXO(symbol Symbol) bool {
+	if _, ok := utxoTxChains[symbol]; ok {
+		return true
+	}
+	return symbol == BTC || symbol == LTC
+}
+
+// CoinDecimals returns the number of decimal places for the base unit of symbol.
+// Returns 0 if symbol is not registered.
+func CoinDecimals(symbol Symbol) int {
+	c, ok := coins[symbol]
+	if !ok {
+		return 0
+	}
+	return int(c.Decimals)
+}
+
+// SupportedTxCoins returns symbols for which SignTransaction is implemented,
+// sorted alphabetically.
+func SupportedTxCoins() []Symbol {
+	set := make(map[Symbol]struct{})
+	for s := range evmTxChains {
+		set[s] = struct{}{}
+	}
+	for s := range cosmosTxChains {
+		set[s] = struct{}{}
+	}
+	for s := range ethermintTxChains {
+		set[s] = struct{}{}
+	}
+	for s := range utxoTxChains {
+		set[s] = struct{}{}
+	}
+	for _, s := range []Symbol{BTC, LTC, TRX, XRP, SOL} {
+		set[s] = struct{}{}
+	}
+	out := make([]Symbol, 0, len(set))
+	for s := range set {
+		out = append(out, s)
+	}
+	slices.Sort(out)
+	return out
 }

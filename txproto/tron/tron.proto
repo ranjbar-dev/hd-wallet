@@ -20,6 +20,68 @@ message TransferTRC20Contract {
   bytes amount = 4;            // big-endian uint256
 }
 
+// TRC-10 token transfer (TransferAssetContract). Addresses are base58check (T...).
+message TransferAssetContract {
+  string asset_name = 1;    // TRC-10 asset ID string, e.g. "1000001"
+  string owner_address = 2; // base58check (T...)
+  string to_address = 3;    // base58check (T...)
+  int64 amount = 4;         // token units
+}
+
+// ResourceCode for Stake 2.0 operations.
+enum ResourceCode {
+  BANDWIDTH = 0;
+  ENERGY = 1;
+}
+
+// Stake 2.0: freeze TRX to obtain resources (BANDWIDTH or ENERGY).
+message FreezeBalanceV2Contract {
+  string owner_address = 1;  // base58check (T...)
+  int64 frozen_balance = 2;  // SUN (1 TRX = 1,000,000 SUN)
+  ResourceCode resource = 3;
+}
+
+// Stake 2.0: unfreeze previously frozen TRX.
+message UnfreezeBalanceV2Contract {
+  string owner_address = 1;   // base58check (T...)
+  int64 unfreeze_balance = 2; // SUN
+  ResourceCode resource = 3;
+}
+
+// Stake 2.0: delegate resources to another account.
+message DelegateResourceContract {
+  string owner_address = 1;    // base58check (T...)
+  ResourceCode resource = 2;
+  int64 balance = 3;           // SUN
+  string receiver_address = 4; // base58check (T...)
+  bool lock = 5;               // true = lock delegation for 3 days
+}
+
+// Stake 2.0: revoke delegated resources.
+message UndelegateResourceContract {
+  string owner_address = 1;    // base58check (T...)
+  ResourceCode resource = 2;
+  int64 balance = 3;           // SUN
+  string receiver_address = 4; // base58check (T...)
+}
+
+// Stake 2.0: withdraw unfrozen TRX after the 14-day unbonding period.
+message WithdrawExpireUnfreezeContract {
+  string owner_address = 1; // base58check (T...)
+}
+
+// One vote in a VoteWitnessContract.
+message Vote {
+  string vote_address = 1; // base58check (T...) of the Super Representative
+  int64 vote_count = 2;
+}
+
+// Vote for Super Representatives.
+message VoteWitnessContract {
+  string owner_address = 1; // base58check (T...)
+  repeated Vote votes = 2;
+}
+
 // Block header reference values, used to compute ref_block_bytes / ref_block_hash.
 message BlockHeader {
   int64 timestamp = 1;
@@ -40,6 +102,13 @@ message Transaction {
   oneof contract_oneof {
     TransferContract transfer = 5;
     TransferTRC20Contract transfer_trc20 = 6;
+    TransferAssetContract transfer_asset = 7;
+    FreezeBalanceV2Contract freeze_balance_v2 = 8;
+    UnfreezeBalanceV2Contract unfreeze_balance_v2 = 9;
+    DelegateResourceContract delegate_resource = 10;
+    UndelegateResourceContract undelegate_resource = 11;
+    VoteWitnessContract vote_witness = 12;
+    WithdrawExpireUnfreezeContract withdraw_expire_unfreeze = 13;
   }
 }
 

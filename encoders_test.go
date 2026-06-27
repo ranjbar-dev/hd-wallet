@@ -56,8 +56,18 @@ var trustWalletVectors = map[string]string{
 	"FIL":   "f1qsx7qwiojh5duxbxhbqgnlyx5hmpcf7mcz5oxsy",
 	// secp256k1 EVM — Ronin uses the "ronin:" prefix instead of "0x".
 	"RONIN": "ronin:9d8A62f656a8d1615C1294fd71e9CFb3E4855A4F",
-	"ATOM":  "cosmos1hkfq3zahaqkkzx5mjnamwjsfpq2jk7z0emlrvp",
-	"OSMO":  "osmo1hkfq3zahaqkkzx5mjnamwjsfpq2jk7z03qvn6n",
+	// ICON: same keccak20 as ETH but lowercase with "hx" prefix (no EIP-55 checksum).
+	// TWC CoinAddressDerivationTests: ICON address for dummyKey().
+	"ICX": "hx9d8a62f656a8d1615c1294fd71e9cfb3e4855a4f",
+	// Nervos CKB: bech32m full address (RFC 0021); code_hash=secp256k1-sighash-all,
+	// hash_type=0x01 (type), args=blake2b-160(compressed pubkey).
+	// TWC CoinAddressDerivationTests: CKB address for dummyKey().
+	"CKB": "ckb1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqfzayeck2k4hlcqu40lwpzv0nqqkqs5lncej05rm",
+	// Zilliqa: bech32("zil", sha256(compressed_pub)[12:]).
+	// TWC CoinAddressDerivationTests: ZIL address for dummyKey().
+	"ZIL":  "zil1j2cvtd7j9n7fnxfv2r3neucjw8tp4xz9sp07v4",
+	"ATOM": "cosmos1hkfq3zahaqkkzx5mjnamwjsfpq2jk7z0emlrvp",
+	"OSMO": "osmo1hkfq3zahaqkkzx5mjnamwjsfpq2jk7z03qvn6n",
 	// secp256k1 — additional Cosmos chains (hash160 bech32).
 	"LUNA":      "terra1hkfq3zahaqkkzx5mjnamwjsfpq2jk7z0ll9rwp",
 	"KAVA":      "kava1hkfq3zahaqkkzx5mjnamwjsfpq2jk7z09wt76x",

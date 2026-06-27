@@ -21,6 +21,53 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+// ResourceCode for Stake 2.0 operations.
+type ResourceCode int32
+
+const (
+	ResourceCode_BANDWIDTH ResourceCode = 0
+	ResourceCode_ENERGY    ResourceCode = 1
+)
+
+// Enum value maps for ResourceCode.
+var (
+	ResourceCode_name = map[int32]string{
+		0: "BANDWIDTH",
+		1: "ENERGY",
+	}
+	ResourceCode_value = map[string]int32{
+		"BANDWIDTH": 0,
+		"ENERGY":    1,
+	}
+)
+
+func (x ResourceCode) Enum() *ResourceCode {
+	p := new(ResourceCode)
+	*p = x
+	return p
+}
+
+func (x ResourceCode) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (ResourceCode) Descriptor() protoreflect.EnumDescriptor {
+	return file_txproto_tron_tron_proto_enumTypes[0].Descriptor()
+}
+
+func (ResourceCode) Type() protoreflect.EnumType {
+	return &file_txproto_tron_tron_proto_enumTypes[0]
+}
+
+func (x ResourceCode) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use ResourceCode.Descriptor instead.
+func (ResourceCode) EnumDescriptor() ([]byte, []int) {
+	return file_txproto_tron_tron_proto_rawDescGZIP(), []int{0}
+}
+
 // TRX transfer (TransferContract).
 type TransferContract struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -152,6 +199,494 @@ func (x *TransferTRC20Contract) GetAmount() []byte {
 	return nil
 }
 
+// TRC-10 token transfer (TransferAssetContract). Addresses are base58check (T...).
+type TransferAssetContract struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AssetName     string                 `protobuf:"bytes,1,opt,name=asset_name,json=assetName,proto3" json:"asset_name,omitempty"`          // TRC-10 asset ID string, e.g. "1000001"
+	OwnerAddress  string                 `protobuf:"bytes,2,opt,name=owner_address,json=ownerAddress,proto3" json:"owner_address,omitempty"` // base58check (T...)
+	ToAddress     string                 `protobuf:"bytes,3,opt,name=to_address,json=toAddress,proto3" json:"to_address,omitempty"`          // base58check (T...)
+	Amount        int64                  `protobuf:"varint,4,opt,name=amount,proto3" json:"amount,omitempty"`                                // token units
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TransferAssetContract) Reset() {
+	*x = TransferAssetContract{}
+	mi := &file_txproto_tron_tron_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TransferAssetContract) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TransferAssetContract) ProtoMessage() {}
+
+func (x *TransferAssetContract) ProtoReflect() protoreflect.Message {
+	mi := &file_txproto_tron_tron_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TransferAssetContract.ProtoReflect.Descriptor instead.
+func (*TransferAssetContract) Descriptor() ([]byte, []int) {
+	return file_txproto_tron_tron_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *TransferAssetContract) GetAssetName() string {
+	if x != nil {
+		return x.AssetName
+	}
+	return ""
+}
+
+func (x *TransferAssetContract) GetOwnerAddress() string {
+	if x != nil {
+		return x.OwnerAddress
+	}
+	return ""
+}
+
+func (x *TransferAssetContract) GetToAddress() string {
+	if x != nil {
+		return x.ToAddress
+	}
+	return ""
+}
+
+func (x *TransferAssetContract) GetAmount() int64 {
+	if x != nil {
+		return x.Amount
+	}
+	return 0
+}
+
+// Stake 2.0: freeze TRX to obtain resources (BANDWIDTH or ENERGY).
+type FreezeBalanceV2Contract struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	OwnerAddress  string                 `protobuf:"bytes,1,opt,name=owner_address,json=ownerAddress,proto3" json:"owner_address,omitempty"`     // base58check (T...)
+	FrozenBalance int64                  `protobuf:"varint,2,opt,name=frozen_balance,json=frozenBalance,proto3" json:"frozen_balance,omitempty"` // SUN (1 TRX = 1,000,000 SUN)
+	Resource      ResourceCode           `protobuf:"varint,3,opt,name=resource,proto3,enum=hdwallet.tron.proto.ResourceCode" json:"resource,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FreezeBalanceV2Contract) Reset() {
+	*x = FreezeBalanceV2Contract{}
+	mi := &file_txproto_tron_tron_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FreezeBalanceV2Contract) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FreezeBalanceV2Contract) ProtoMessage() {}
+
+func (x *FreezeBalanceV2Contract) ProtoReflect() protoreflect.Message {
+	mi := &file_txproto_tron_tron_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FreezeBalanceV2Contract.ProtoReflect.Descriptor instead.
+func (*FreezeBalanceV2Contract) Descriptor() ([]byte, []int) {
+	return file_txproto_tron_tron_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *FreezeBalanceV2Contract) GetOwnerAddress() string {
+	if x != nil {
+		return x.OwnerAddress
+	}
+	return ""
+}
+
+func (x *FreezeBalanceV2Contract) GetFrozenBalance() int64 {
+	if x != nil {
+		return x.FrozenBalance
+	}
+	return 0
+}
+
+func (x *FreezeBalanceV2Contract) GetResource() ResourceCode {
+	if x != nil {
+		return x.Resource
+	}
+	return ResourceCode_BANDWIDTH
+}
+
+// Stake 2.0: unfreeze previously frozen TRX.
+type UnfreezeBalanceV2Contract struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	OwnerAddress    string                 `protobuf:"bytes,1,opt,name=owner_address,json=ownerAddress,proto3" json:"owner_address,omitempty"`           // base58check (T...)
+	UnfreezeBalance int64                  `protobuf:"varint,2,opt,name=unfreeze_balance,json=unfreezeBalance,proto3" json:"unfreeze_balance,omitempty"` // SUN
+	Resource        ResourceCode           `protobuf:"varint,3,opt,name=resource,proto3,enum=hdwallet.tron.proto.ResourceCode" json:"resource,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *UnfreezeBalanceV2Contract) Reset() {
+	*x = UnfreezeBalanceV2Contract{}
+	mi := &file_txproto_tron_tron_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UnfreezeBalanceV2Contract) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UnfreezeBalanceV2Contract) ProtoMessage() {}
+
+func (x *UnfreezeBalanceV2Contract) ProtoReflect() protoreflect.Message {
+	mi := &file_txproto_tron_tron_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UnfreezeBalanceV2Contract.ProtoReflect.Descriptor instead.
+func (*UnfreezeBalanceV2Contract) Descriptor() ([]byte, []int) {
+	return file_txproto_tron_tron_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *UnfreezeBalanceV2Contract) GetOwnerAddress() string {
+	if x != nil {
+		return x.OwnerAddress
+	}
+	return ""
+}
+
+func (x *UnfreezeBalanceV2Contract) GetUnfreezeBalance() int64 {
+	if x != nil {
+		return x.UnfreezeBalance
+	}
+	return 0
+}
+
+func (x *UnfreezeBalanceV2Contract) GetResource() ResourceCode {
+	if x != nil {
+		return x.Resource
+	}
+	return ResourceCode_BANDWIDTH
+}
+
+// Stake 2.0: delegate resources to another account.
+type DelegateResourceContract struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	OwnerAddress    string                 `protobuf:"bytes,1,opt,name=owner_address,json=ownerAddress,proto3" json:"owner_address,omitempty"` // base58check (T...)
+	Resource        ResourceCode           `protobuf:"varint,2,opt,name=resource,proto3,enum=hdwallet.tron.proto.ResourceCode" json:"resource,omitempty"`
+	Balance         int64                  `protobuf:"varint,3,opt,name=balance,proto3" json:"balance,omitempty"`                                       // SUN
+	ReceiverAddress string                 `protobuf:"bytes,4,opt,name=receiver_address,json=receiverAddress,proto3" json:"receiver_address,omitempty"` // base58check (T...)
+	Lock            bool                   `protobuf:"varint,5,opt,name=lock,proto3" json:"lock,omitempty"`                                             // true = lock delegation for 3 days
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *DelegateResourceContract) Reset() {
+	*x = DelegateResourceContract{}
+	mi := &file_txproto_tron_tron_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DelegateResourceContract) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DelegateResourceContract) ProtoMessage() {}
+
+func (x *DelegateResourceContract) ProtoReflect() protoreflect.Message {
+	mi := &file_txproto_tron_tron_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DelegateResourceContract.ProtoReflect.Descriptor instead.
+func (*DelegateResourceContract) Descriptor() ([]byte, []int) {
+	return file_txproto_tron_tron_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *DelegateResourceContract) GetOwnerAddress() string {
+	if x != nil {
+		return x.OwnerAddress
+	}
+	return ""
+}
+
+func (x *DelegateResourceContract) GetResource() ResourceCode {
+	if x != nil {
+		return x.Resource
+	}
+	return ResourceCode_BANDWIDTH
+}
+
+func (x *DelegateResourceContract) GetBalance() int64 {
+	if x != nil {
+		return x.Balance
+	}
+	return 0
+}
+
+func (x *DelegateResourceContract) GetReceiverAddress() string {
+	if x != nil {
+		return x.ReceiverAddress
+	}
+	return ""
+}
+
+func (x *DelegateResourceContract) GetLock() bool {
+	if x != nil {
+		return x.Lock
+	}
+	return false
+}
+
+// Stake 2.0: revoke delegated resources.
+type UndelegateResourceContract struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	OwnerAddress    string                 `protobuf:"bytes,1,opt,name=owner_address,json=ownerAddress,proto3" json:"owner_address,omitempty"` // base58check (T...)
+	Resource        ResourceCode           `protobuf:"varint,2,opt,name=resource,proto3,enum=hdwallet.tron.proto.ResourceCode" json:"resource,omitempty"`
+	Balance         int64                  `protobuf:"varint,3,opt,name=balance,proto3" json:"balance,omitempty"`                                       // SUN
+	ReceiverAddress string                 `protobuf:"bytes,4,opt,name=receiver_address,json=receiverAddress,proto3" json:"receiver_address,omitempty"` // base58check (T...)
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *UndelegateResourceContract) Reset() {
+	*x = UndelegateResourceContract{}
+	mi := &file_txproto_tron_tron_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UndelegateResourceContract) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UndelegateResourceContract) ProtoMessage() {}
+
+func (x *UndelegateResourceContract) ProtoReflect() protoreflect.Message {
+	mi := &file_txproto_tron_tron_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UndelegateResourceContract.ProtoReflect.Descriptor instead.
+func (*UndelegateResourceContract) Descriptor() ([]byte, []int) {
+	return file_txproto_tron_tron_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *UndelegateResourceContract) GetOwnerAddress() string {
+	if x != nil {
+		return x.OwnerAddress
+	}
+	return ""
+}
+
+func (x *UndelegateResourceContract) GetResource() ResourceCode {
+	if x != nil {
+		return x.Resource
+	}
+	return ResourceCode_BANDWIDTH
+}
+
+func (x *UndelegateResourceContract) GetBalance() int64 {
+	if x != nil {
+		return x.Balance
+	}
+	return 0
+}
+
+func (x *UndelegateResourceContract) GetReceiverAddress() string {
+	if x != nil {
+		return x.ReceiverAddress
+	}
+	return ""
+}
+
+// Stake 2.0: withdraw unfrozen TRX after the 14-day unbonding period.
+type WithdrawExpireUnfreezeContract struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	OwnerAddress  string                 `protobuf:"bytes,1,opt,name=owner_address,json=ownerAddress,proto3" json:"owner_address,omitempty"` // base58check (T...)
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WithdrawExpireUnfreezeContract) Reset() {
+	*x = WithdrawExpireUnfreezeContract{}
+	mi := &file_txproto_tron_tron_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WithdrawExpireUnfreezeContract) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WithdrawExpireUnfreezeContract) ProtoMessage() {}
+
+func (x *WithdrawExpireUnfreezeContract) ProtoReflect() protoreflect.Message {
+	mi := &file_txproto_tron_tron_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WithdrawExpireUnfreezeContract.ProtoReflect.Descriptor instead.
+func (*WithdrawExpireUnfreezeContract) Descriptor() ([]byte, []int) {
+	return file_txproto_tron_tron_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *WithdrawExpireUnfreezeContract) GetOwnerAddress() string {
+	if x != nil {
+		return x.OwnerAddress
+	}
+	return ""
+}
+
+// One vote in a VoteWitnessContract.
+type Vote struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	VoteAddress   string                 `protobuf:"bytes,1,opt,name=vote_address,json=voteAddress,proto3" json:"vote_address,omitempty"` // base58check (T...) of the Super Representative
+	VoteCount     int64                  `protobuf:"varint,2,opt,name=vote_count,json=voteCount,proto3" json:"vote_count,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Vote) Reset() {
+	*x = Vote{}
+	mi := &file_txproto_tron_tron_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Vote) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Vote) ProtoMessage() {}
+
+func (x *Vote) ProtoReflect() protoreflect.Message {
+	mi := &file_txproto_tron_tron_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Vote.ProtoReflect.Descriptor instead.
+func (*Vote) Descriptor() ([]byte, []int) {
+	return file_txproto_tron_tron_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *Vote) GetVoteAddress() string {
+	if x != nil {
+		return x.VoteAddress
+	}
+	return ""
+}
+
+func (x *Vote) GetVoteCount() int64 {
+	if x != nil {
+		return x.VoteCount
+	}
+	return 0
+}
+
+// Vote for Super Representatives.
+type VoteWitnessContract struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	OwnerAddress  string                 `protobuf:"bytes,1,opt,name=owner_address,json=ownerAddress,proto3" json:"owner_address,omitempty"` // base58check (T...)
+	Votes         []*Vote                `protobuf:"bytes,2,rep,name=votes,proto3" json:"votes,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *VoteWitnessContract) Reset() {
+	*x = VoteWitnessContract{}
+	mi := &file_txproto_tron_tron_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *VoteWitnessContract) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*VoteWitnessContract) ProtoMessage() {}
+
+func (x *VoteWitnessContract) ProtoReflect() protoreflect.Message {
+	mi := &file_txproto_tron_tron_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use VoteWitnessContract.ProtoReflect.Descriptor instead.
+func (*VoteWitnessContract) Descriptor() ([]byte, []int) {
+	return file_txproto_tron_tron_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *VoteWitnessContract) GetOwnerAddress() string {
+	if x != nil {
+		return x.OwnerAddress
+	}
+	return ""
+}
+
+func (x *VoteWitnessContract) GetVotes() []*Vote {
+	if x != nil {
+		return x.Votes
+	}
+	return nil
+}
+
 // Block header reference values, used to compute ref_block_bytes / ref_block_hash.
 type BlockHeader struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
@@ -167,7 +702,7 @@ type BlockHeader struct {
 
 func (x *BlockHeader) Reset() {
 	*x = BlockHeader{}
-	mi := &file_txproto_tron_tron_proto_msgTypes[2]
+	mi := &file_txproto_tron_tron_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -179,7 +714,7 @@ func (x *BlockHeader) String() string {
 func (*BlockHeader) ProtoMessage() {}
 
 func (x *BlockHeader) ProtoReflect() protoreflect.Message {
-	mi := &file_txproto_tron_tron_proto_msgTypes[2]
+	mi := &file_txproto_tron_tron_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -192,7 +727,7 @@ func (x *BlockHeader) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BlockHeader.ProtoReflect.Descriptor instead.
 func (*BlockHeader) Descriptor() ([]byte, []int) {
-	return file_txproto_tron_tron_proto_rawDescGZIP(), []int{2}
+	return file_txproto_tron_tron_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *BlockHeader) GetTimestamp() int64 {
@@ -248,6 +783,13 @@ type Transaction struct {
 	//
 	//	*Transaction_Transfer
 	//	*Transaction_TransferTrc20
+	//	*Transaction_TransferAsset
+	//	*Transaction_FreezeBalanceV2
+	//	*Transaction_UnfreezeBalanceV2
+	//	*Transaction_DelegateResource
+	//	*Transaction_UndelegateResource
+	//	*Transaction_VoteWitness
+	//	*Transaction_WithdrawExpireUnfreeze
 	ContractOneof isTransaction_ContractOneof `protobuf_oneof:"contract_oneof"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -255,7 +797,7 @@ type Transaction struct {
 
 func (x *Transaction) Reset() {
 	*x = Transaction{}
-	mi := &file_txproto_tron_tron_proto_msgTypes[3]
+	mi := &file_txproto_tron_tron_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -267,7 +809,7 @@ func (x *Transaction) String() string {
 func (*Transaction) ProtoMessage() {}
 
 func (x *Transaction) ProtoReflect() protoreflect.Message {
-	mi := &file_txproto_tron_tron_proto_msgTypes[3]
+	mi := &file_txproto_tron_tron_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -280,7 +822,7 @@ func (x *Transaction) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Transaction.ProtoReflect.Descriptor instead.
 func (*Transaction) Descriptor() ([]byte, []int) {
-	return file_txproto_tron_tron_proto_rawDescGZIP(), []int{3}
+	return file_txproto_tron_tron_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *Transaction) GetTimestamp() int64 {
@@ -336,6 +878,69 @@ func (x *Transaction) GetTransferTrc20() *TransferTRC20Contract {
 	return nil
 }
 
+func (x *Transaction) GetTransferAsset() *TransferAssetContract {
+	if x != nil {
+		if x, ok := x.ContractOneof.(*Transaction_TransferAsset); ok {
+			return x.TransferAsset
+		}
+	}
+	return nil
+}
+
+func (x *Transaction) GetFreezeBalanceV2() *FreezeBalanceV2Contract {
+	if x != nil {
+		if x, ok := x.ContractOneof.(*Transaction_FreezeBalanceV2); ok {
+			return x.FreezeBalanceV2
+		}
+	}
+	return nil
+}
+
+func (x *Transaction) GetUnfreezeBalanceV2() *UnfreezeBalanceV2Contract {
+	if x != nil {
+		if x, ok := x.ContractOneof.(*Transaction_UnfreezeBalanceV2); ok {
+			return x.UnfreezeBalanceV2
+		}
+	}
+	return nil
+}
+
+func (x *Transaction) GetDelegateResource() *DelegateResourceContract {
+	if x != nil {
+		if x, ok := x.ContractOneof.(*Transaction_DelegateResource); ok {
+			return x.DelegateResource
+		}
+	}
+	return nil
+}
+
+func (x *Transaction) GetUndelegateResource() *UndelegateResourceContract {
+	if x != nil {
+		if x, ok := x.ContractOneof.(*Transaction_UndelegateResource); ok {
+			return x.UndelegateResource
+		}
+	}
+	return nil
+}
+
+func (x *Transaction) GetVoteWitness() *VoteWitnessContract {
+	if x != nil {
+		if x, ok := x.ContractOneof.(*Transaction_VoteWitness); ok {
+			return x.VoteWitness
+		}
+	}
+	return nil
+}
+
+func (x *Transaction) GetWithdrawExpireUnfreeze() *WithdrawExpireUnfreezeContract {
+	if x != nil {
+		if x, ok := x.ContractOneof.(*Transaction_WithdrawExpireUnfreeze); ok {
+			return x.WithdrawExpireUnfreeze
+		}
+	}
+	return nil
+}
+
 type isTransaction_ContractOneof interface {
 	isTransaction_ContractOneof()
 }
@@ -348,9 +953,51 @@ type Transaction_TransferTrc20 struct {
 	TransferTrc20 *TransferTRC20Contract `protobuf:"bytes,6,opt,name=transfer_trc20,json=transferTrc20,proto3,oneof"`
 }
 
+type Transaction_TransferAsset struct {
+	TransferAsset *TransferAssetContract `protobuf:"bytes,7,opt,name=transfer_asset,json=transferAsset,proto3,oneof"`
+}
+
+type Transaction_FreezeBalanceV2 struct {
+	FreezeBalanceV2 *FreezeBalanceV2Contract `protobuf:"bytes,8,opt,name=freeze_balance_v2,json=freezeBalanceV2,proto3,oneof"`
+}
+
+type Transaction_UnfreezeBalanceV2 struct {
+	UnfreezeBalanceV2 *UnfreezeBalanceV2Contract `protobuf:"bytes,9,opt,name=unfreeze_balance_v2,json=unfreezeBalanceV2,proto3,oneof"`
+}
+
+type Transaction_DelegateResource struct {
+	DelegateResource *DelegateResourceContract `protobuf:"bytes,10,opt,name=delegate_resource,json=delegateResource,proto3,oneof"`
+}
+
+type Transaction_UndelegateResource struct {
+	UndelegateResource *UndelegateResourceContract `protobuf:"bytes,11,opt,name=undelegate_resource,json=undelegateResource,proto3,oneof"`
+}
+
+type Transaction_VoteWitness struct {
+	VoteWitness *VoteWitnessContract `protobuf:"bytes,12,opt,name=vote_witness,json=voteWitness,proto3,oneof"`
+}
+
+type Transaction_WithdrawExpireUnfreeze struct {
+	WithdrawExpireUnfreeze *WithdrawExpireUnfreezeContract `protobuf:"bytes,13,opt,name=withdraw_expire_unfreeze,json=withdrawExpireUnfreeze,proto3,oneof"`
+}
+
 func (*Transaction_Transfer) isTransaction_ContractOneof() {}
 
 func (*Transaction_TransferTrc20) isTransaction_ContractOneof() {}
+
+func (*Transaction_TransferAsset) isTransaction_ContractOneof() {}
+
+func (*Transaction_FreezeBalanceV2) isTransaction_ContractOneof() {}
+
+func (*Transaction_UnfreezeBalanceV2) isTransaction_ContractOneof() {}
+
+func (*Transaction_DelegateResource) isTransaction_ContractOneof() {}
+
+func (*Transaction_UndelegateResource) isTransaction_ContractOneof() {}
+
+func (*Transaction_VoteWitness) isTransaction_ContractOneof() {}
+
+func (*Transaction_WithdrawExpireUnfreeze) isTransaction_ContractOneof() {}
 
 // SigningInput mirrors a minimal subset of TW.Tron.Proto.SigningInput.
 type SigningInput struct {
@@ -362,7 +1009,7 @@ type SigningInput struct {
 
 func (x *SigningInput) Reset() {
 	*x = SigningInput{}
-	mi := &file_txproto_tron_tron_proto_msgTypes[4]
+	mi := &file_txproto_tron_tron_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -374,7 +1021,7 @@ func (x *SigningInput) String() string {
 func (*SigningInput) ProtoMessage() {}
 
 func (x *SigningInput) ProtoReflect() protoreflect.Message {
-	mi := &file_txproto_tron_tron_proto_msgTypes[4]
+	mi := &file_txproto_tron_tron_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -387,7 +1034,7 @@ func (x *SigningInput) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SigningInput.ProtoReflect.Descriptor instead.
 func (*SigningInput) Descriptor() ([]byte, []int) {
-	return file_txproto_tron_tron_proto_rawDescGZIP(), []int{4}
+	return file_txproto_tron_tron_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *SigningInput) GetTransaction() *Transaction {
@@ -412,7 +1059,7 @@ type SigningOutput struct {
 
 func (x *SigningOutput) Reset() {
 	*x = SigningOutput{}
-	mi := &file_txproto_tron_tron_proto_msgTypes[5]
+	mi := &file_txproto_tron_tron_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -424,7 +1071,7 @@ func (x *SigningOutput) String() string {
 func (*SigningOutput) ProtoMessage() {}
 
 func (x *SigningOutput) ProtoReflect() protoreflect.Message {
-	mi := &file_txproto_tron_tron_proto_msgTypes[5]
+	mi := &file_txproto_tron_tron_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -437,7 +1084,7 @@ func (x *SigningOutput) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SigningOutput.ProtoReflect.Descriptor instead.
 func (*SigningOutput) Descriptor() ([]byte, []int) {
-	return file_txproto_tron_tron_proto_rawDescGZIP(), []int{5}
+	return file_txproto_tron_tron_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *SigningOutput) GetId() []byte {
@@ -497,7 +1144,42 @@ const file_txproto_tron_tron_proto_rawDesc = "" +
 	"\x10contract_address\x18\x02 \x01(\tR\x0fcontractAddress\x12\x1d\n" +
 	"\n" +
 	"to_address\x18\x03 \x01(\tR\ttoAddress\x12\x16\n" +
-	"\x06amount\x18\x04 \x01(\fR\x06amount\"\xc9\x01\n" +
+	"\x06amount\x18\x04 \x01(\fR\x06amount\"\x92\x01\n" +
+	"\x15TransferAssetContract\x12\x1d\n" +
+	"\n" +
+	"asset_name\x18\x01 \x01(\tR\tassetName\x12#\n" +
+	"\rowner_address\x18\x02 \x01(\tR\fownerAddress\x12\x1d\n" +
+	"\n" +
+	"to_address\x18\x03 \x01(\tR\ttoAddress\x12\x16\n" +
+	"\x06amount\x18\x04 \x01(\x03R\x06amount\"\xa4\x01\n" +
+	"\x17FreezeBalanceV2Contract\x12#\n" +
+	"\rowner_address\x18\x01 \x01(\tR\fownerAddress\x12%\n" +
+	"\x0efrozen_balance\x18\x02 \x01(\x03R\rfrozenBalance\x12=\n" +
+	"\bresource\x18\x03 \x01(\x0e2!.hdwallet.tron.proto.ResourceCodeR\bresource\"\xaa\x01\n" +
+	"\x19UnfreezeBalanceV2Contract\x12#\n" +
+	"\rowner_address\x18\x01 \x01(\tR\fownerAddress\x12)\n" +
+	"\x10unfreeze_balance\x18\x02 \x01(\x03R\x0funfreezeBalance\x12=\n" +
+	"\bresource\x18\x03 \x01(\x0e2!.hdwallet.tron.proto.ResourceCodeR\bresource\"\xd7\x01\n" +
+	"\x18DelegateResourceContract\x12#\n" +
+	"\rowner_address\x18\x01 \x01(\tR\fownerAddress\x12=\n" +
+	"\bresource\x18\x02 \x01(\x0e2!.hdwallet.tron.proto.ResourceCodeR\bresource\x12\x18\n" +
+	"\abalance\x18\x03 \x01(\x03R\abalance\x12)\n" +
+	"\x10receiver_address\x18\x04 \x01(\tR\x0freceiverAddress\x12\x12\n" +
+	"\x04lock\x18\x05 \x01(\bR\x04lock\"\xc5\x01\n" +
+	"\x1aUndelegateResourceContract\x12#\n" +
+	"\rowner_address\x18\x01 \x01(\tR\fownerAddress\x12=\n" +
+	"\bresource\x18\x02 \x01(\x0e2!.hdwallet.tron.proto.ResourceCodeR\bresource\x12\x18\n" +
+	"\abalance\x18\x03 \x01(\x03R\abalance\x12)\n" +
+	"\x10receiver_address\x18\x04 \x01(\tR\x0freceiverAddress\"E\n" +
+	"\x1eWithdrawExpireUnfreezeContract\x12#\n" +
+	"\rowner_address\x18\x01 \x01(\tR\fownerAddress\"H\n" +
+	"\x04Vote\x12!\n" +
+	"\fvote_address\x18\x01 \x01(\tR\vvoteAddress\x12\x1d\n" +
+	"\n" +
+	"vote_count\x18\x02 \x01(\x03R\tvoteCount\"k\n" +
+	"\x13VoteWitnessContract\x12#\n" +
+	"\rowner_address\x18\x01 \x01(\tR\fownerAddress\x12/\n" +
+	"\x05votes\x18\x02 \x03(\v2\x19.hdwallet.tron.proto.VoteR\x05votes\"\xc9\x01\n" +
 	"\vBlockHeader\x12\x1c\n" +
 	"\ttimestamp\x18\x01 \x01(\x03R\ttimestamp\x12 \n" +
 	"\ftx_trie_root\x18\x02 \x01(\fR\n" +
@@ -506,7 +1188,7 @@ const file_txproto_tron_tron_proto_rawDesc = "" +
 	"parentHash\x12\x16\n" +
 	"\x06number\x18\x04 \x01(\x03R\x06number\x12'\n" +
 	"\x0fwitness_address\x18\x05 \x01(\fR\x0ewitnessAddress\x12\x18\n" +
-	"\aversion\x18\x06 \x01(\x05R\aversion\"\xd9\x02\n" +
+	"\aversion\x18\x06 \x01(\x05R\aversion\"\xee\a\n" +
 	"\vTransaction\x12\x1c\n" +
 	"\ttimestamp\x18\x01 \x01(\x03R\ttimestamp\x12\x1e\n" +
 	"\n" +
@@ -515,7 +1197,15 @@ const file_txproto_tron_tron_proto_rawDesc = "" +
 	"\fblock_header\x18\x03 \x01(\v2 .hdwallet.tron.proto.BlockHeaderR\vblockHeader\x12\x1b\n" +
 	"\tfee_limit\x18\x04 \x01(\x03R\bfeeLimit\x12C\n" +
 	"\btransfer\x18\x05 \x01(\v2%.hdwallet.tron.proto.TransferContractH\x00R\btransfer\x12S\n" +
-	"\x0etransfer_trc20\x18\x06 \x01(\v2*.hdwallet.tron.proto.TransferTRC20ContractH\x00R\rtransferTrc20B\x10\n" +
+	"\x0etransfer_trc20\x18\x06 \x01(\v2*.hdwallet.tron.proto.TransferTRC20ContractH\x00R\rtransferTrc20\x12S\n" +
+	"\x0etransfer_asset\x18\a \x01(\v2*.hdwallet.tron.proto.TransferAssetContractH\x00R\rtransferAsset\x12Z\n" +
+	"\x11freeze_balance_v2\x18\b \x01(\v2,.hdwallet.tron.proto.FreezeBalanceV2ContractH\x00R\x0ffreezeBalanceV2\x12`\n" +
+	"\x13unfreeze_balance_v2\x18\t \x01(\v2..hdwallet.tron.proto.UnfreezeBalanceV2ContractH\x00R\x11unfreezeBalanceV2\x12\\\n" +
+	"\x11delegate_resource\x18\n" +
+	" \x01(\v2-.hdwallet.tron.proto.DelegateResourceContractH\x00R\x10delegateResource\x12b\n" +
+	"\x13undelegate_resource\x18\v \x01(\v2/.hdwallet.tron.proto.UndelegateResourceContractH\x00R\x12undelegateResource\x12M\n" +
+	"\fvote_witness\x18\f \x01(\v2(.hdwallet.tron.proto.VoteWitnessContractH\x00R\vvoteWitness\x12o\n" +
+	"\x18withdraw_expire_unfreeze\x18\r \x01(\v23.hdwallet.tron.proto.WithdrawExpireUnfreezeContractH\x00R\x16withdrawExpireUnfreezeB\x10\n" +
 	"\x0econtract_oneof\"R\n" +
 	"\fSigningInput\x12B\n" +
 	"\vtransaction\x18\x01 \x01(\v2 .hdwallet.tron.proto.TransactionR\vtransaction\"\xaa\x01\n" +
@@ -525,7 +1215,11 @@ const file_txproto_tron_tron_proto_rawDesc = "" +
 	"\braw_data\x18\x03 \x01(\fR\arawData\x12&\n" +
 	"\x0fref_block_bytes\x18\x04 \x01(\tR\rrefBlockBytes\x12\x12\n" +
 	"\x04json\x18\x05 \x01(\tR\x04json\x12\x14\n" +
-	"\x05error\x18\x06 \x01(\tR\x05errorB/Z-github.com/ranjbar-dev/hd-wallet/txproto/tronb\x06proto3"
+	"\x05error\x18\x06 \x01(\tR\x05error*)\n" +
+	"\fResourceCode\x12\r\n" +
+	"\tBANDWIDTH\x10\x00\x12\n" +
+	"\n" +
+	"\x06ENERGY\x10\x01B/Z-github.com/ranjbar-dev/hd-wallet/txproto/tronb\x06proto3"
 
 var (
 	file_txproto_tron_tron_proto_rawDescOnce sync.Once
@@ -539,25 +1233,47 @@ func file_txproto_tron_tron_proto_rawDescGZIP() []byte {
 	return file_txproto_tron_tron_proto_rawDescData
 }
 
-var file_txproto_tron_tron_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
+var file_txproto_tron_tron_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_txproto_tron_tron_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
 var file_txproto_tron_tron_proto_goTypes = []any{
-	(*TransferContract)(nil),      // 0: hdwallet.tron.proto.TransferContract
-	(*TransferTRC20Contract)(nil), // 1: hdwallet.tron.proto.TransferTRC20Contract
-	(*BlockHeader)(nil),           // 2: hdwallet.tron.proto.BlockHeader
-	(*Transaction)(nil),           // 3: hdwallet.tron.proto.Transaction
-	(*SigningInput)(nil),          // 4: hdwallet.tron.proto.SigningInput
-	(*SigningOutput)(nil),         // 5: hdwallet.tron.proto.SigningOutput
+	(ResourceCode)(0),                      // 0: hdwallet.tron.proto.ResourceCode
+	(*TransferContract)(nil),               // 1: hdwallet.tron.proto.TransferContract
+	(*TransferTRC20Contract)(nil),          // 2: hdwallet.tron.proto.TransferTRC20Contract
+	(*TransferAssetContract)(nil),          // 3: hdwallet.tron.proto.TransferAssetContract
+	(*FreezeBalanceV2Contract)(nil),        // 4: hdwallet.tron.proto.FreezeBalanceV2Contract
+	(*UnfreezeBalanceV2Contract)(nil),      // 5: hdwallet.tron.proto.UnfreezeBalanceV2Contract
+	(*DelegateResourceContract)(nil),       // 6: hdwallet.tron.proto.DelegateResourceContract
+	(*UndelegateResourceContract)(nil),     // 7: hdwallet.tron.proto.UndelegateResourceContract
+	(*WithdrawExpireUnfreezeContract)(nil), // 8: hdwallet.tron.proto.WithdrawExpireUnfreezeContract
+	(*Vote)(nil),                           // 9: hdwallet.tron.proto.Vote
+	(*VoteWitnessContract)(nil),            // 10: hdwallet.tron.proto.VoteWitnessContract
+	(*BlockHeader)(nil),                    // 11: hdwallet.tron.proto.BlockHeader
+	(*Transaction)(nil),                    // 12: hdwallet.tron.proto.Transaction
+	(*SigningInput)(nil),                   // 13: hdwallet.tron.proto.SigningInput
+	(*SigningOutput)(nil),                  // 14: hdwallet.tron.proto.SigningOutput
 }
 var file_txproto_tron_tron_proto_depIdxs = []int32{
-	2, // 0: hdwallet.tron.proto.Transaction.block_header:type_name -> hdwallet.tron.proto.BlockHeader
-	0, // 1: hdwallet.tron.proto.Transaction.transfer:type_name -> hdwallet.tron.proto.TransferContract
-	1, // 2: hdwallet.tron.proto.Transaction.transfer_trc20:type_name -> hdwallet.tron.proto.TransferTRC20Contract
-	3, // 3: hdwallet.tron.proto.SigningInput.transaction:type_name -> hdwallet.tron.proto.Transaction
-	4, // [4:4] is the sub-list for method output_type
-	4, // [4:4] is the sub-list for method input_type
-	4, // [4:4] is the sub-list for extension type_name
-	4, // [4:4] is the sub-list for extension extendee
-	0, // [0:4] is the sub-list for field type_name
+	0,  // 0: hdwallet.tron.proto.FreezeBalanceV2Contract.resource:type_name -> hdwallet.tron.proto.ResourceCode
+	0,  // 1: hdwallet.tron.proto.UnfreezeBalanceV2Contract.resource:type_name -> hdwallet.tron.proto.ResourceCode
+	0,  // 2: hdwallet.tron.proto.DelegateResourceContract.resource:type_name -> hdwallet.tron.proto.ResourceCode
+	0,  // 3: hdwallet.tron.proto.UndelegateResourceContract.resource:type_name -> hdwallet.tron.proto.ResourceCode
+	9,  // 4: hdwallet.tron.proto.VoteWitnessContract.votes:type_name -> hdwallet.tron.proto.Vote
+	11, // 5: hdwallet.tron.proto.Transaction.block_header:type_name -> hdwallet.tron.proto.BlockHeader
+	1,  // 6: hdwallet.tron.proto.Transaction.transfer:type_name -> hdwallet.tron.proto.TransferContract
+	2,  // 7: hdwallet.tron.proto.Transaction.transfer_trc20:type_name -> hdwallet.tron.proto.TransferTRC20Contract
+	3,  // 8: hdwallet.tron.proto.Transaction.transfer_asset:type_name -> hdwallet.tron.proto.TransferAssetContract
+	4,  // 9: hdwallet.tron.proto.Transaction.freeze_balance_v2:type_name -> hdwallet.tron.proto.FreezeBalanceV2Contract
+	5,  // 10: hdwallet.tron.proto.Transaction.unfreeze_balance_v2:type_name -> hdwallet.tron.proto.UnfreezeBalanceV2Contract
+	6,  // 11: hdwallet.tron.proto.Transaction.delegate_resource:type_name -> hdwallet.tron.proto.DelegateResourceContract
+	7,  // 12: hdwallet.tron.proto.Transaction.undelegate_resource:type_name -> hdwallet.tron.proto.UndelegateResourceContract
+	10, // 13: hdwallet.tron.proto.Transaction.vote_witness:type_name -> hdwallet.tron.proto.VoteWitnessContract
+	8,  // 14: hdwallet.tron.proto.Transaction.withdraw_expire_unfreeze:type_name -> hdwallet.tron.proto.WithdrawExpireUnfreezeContract
+	12, // 15: hdwallet.tron.proto.SigningInput.transaction:type_name -> hdwallet.tron.proto.Transaction
+	16, // [16:16] is the sub-list for method output_type
+	16, // [16:16] is the sub-list for method input_type
+	16, // [16:16] is the sub-list for extension type_name
+	16, // [16:16] is the sub-list for extension extendee
+	0,  // [0:16] is the sub-list for field type_name
 }
 
 func init() { file_txproto_tron_tron_proto_init() }
@@ -565,22 +1281,30 @@ func file_txproto_tron_tron_proto_init() {
 	if File_txproto_tron_tron_proto != nil {
 		return
 	}
-	file_txproto_tron_tron_proto_msgTypes[3].OneofWrappers = []any{
+	file_txproto_tron_tron_proto_msgTypes[11].OneofWrappers = []any{
 		(*Transaction_Transfer)(nil),
 		(*Transaction_TransferTrc20)(nil),
+		(*Transaction_TransferAsset)(nil),
+		(*Transaction_FreezeBalanceV2)(nil),
+		(*Transaction_UnfreezeBalanceV2)(nil),
+		(*Transaction_DelegateResource)(nil),
+		(*Transaction_UndelegateResource)(nil),
+		(*Transaction_VoteWitness)(nil),
+		(*Transaction_WithdrawExpireUnfreeze)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_txproto_tron_tron_proto_rawDesc), len(file_txproto_tron_tron_proto_rawDesc)),
-			NumEnums:      0,
-			NumMessages:   6,
+			NumEnums:      1,
+			NumMessages:   14,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
 		GoTypes:           file_txproto_tron_tron_proto_goTypes,
 		DependencyIndexes: file_txproto_tron_tron_proto_depIdxs,
+		EnumInfos:         file_txproto_tron_tron_proto_enumTypes,
 		MessageInfos:      file_txproto_tron_tron_proto_msgTypes,
 	}.Build()
 	File_txproto_tron_tron_proto = out.File

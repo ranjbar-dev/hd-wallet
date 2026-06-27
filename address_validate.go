@@ -19,6 +19,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/btcsuite/btcd/btcutil/base58"
@@ -60,6 +61,9 @@ var validators = map[Symbol]addressValidator{
 	ETH: ethValidator(ETH),
 	TRX: base58CheckValidator1(0x41, TRX),
 	XRP: base58CheckValidatorN(base58XRP, []byte{0x00}, XRP),
+	ICX: icxValidator(ICX),
+	CKB: ckbValidator(CKB),
+	ZIL: zilValidator(ZIL),
 
 	// ---- secp256k1 : EVM chains (identical to Ethereum) ----
 	BNB:   ethValidator(BNB),
@@ -532,8 +536,15 @@ func algoValidator(symbol Symbol) addressValidator {
 // byte (0x01), and the 57-byte payload (header + 28-byte payment hash + 28-byte
 // staking hash). It returns the 57-byte payload (header || paymentHash ||
 // stakingHash).
+// maxCardanoAddrLen caps bech32.DecodeNoLimit against unbounded-CPU input.
+// The longest valid Cardano mainnet base address is ~114 chars.
+const maxCardanoAddrLen = 200
+
 func cardanoValidator(symbol Symbol) addressValidator {
 	return func(addr string) ([]byte, error) {
+		if len(addr) > maxCardanoAddrLen {
+			return nil, addrErr(symbol, "address too long")
+		}
 		hrp, data, err := bech32.DecodeNoLimit(addr)
 		if err != nil {
 			return nil, addrErr(symbol, "bech32 decode failed: "+err.Error())
@@ -572,4 +583,381 @@ func hexHashValidator(symbol Symbol) addressValidator {
 		}
 		return raw, nil
 	}
+}
+
+// icxValidator validates an ICON address: "hx" + 40 lowercase hex characters (20 bytes).
+func icxValidator(symbol Symbol) addressValidator {
+	return func(addr string) ([]byte, error) {
+		if len(addr) != 42 || addr[:2] != "hx" {
+			return nil, addrErr(symbol, "must start with hx and be 42 characters")
+		}
+		raw, err := hex.DecodeString(addr[2:])
+		if err != nil {
+			return nil, addrErr(symbol, "invalid hex: "+err.Error())
+		}
+		return raw, nil
+	}
+}
+
+// maxCKBAddrLen caps bech32.DecodeNoLimit against unbounded-CPU input.
+// The longest valid CKB full address (54-byte payload) is ~107 chars.
+const maxCKBAddrLen = 200
+
+// ckbValidator validates a Nervos CKB full address (RFC 0021): bech32m with HRP "ckb",
+// format byte 0x00, 32-byte code_hash, 1-byte hash_type, 20-byte args = 54 bytes payload.
+// CKB full addresses exceed the 90-char bech32 length limit, so DecodeNoLimit is used.
+func ckbValidator(symbol Symbol) addressValidator {
+	return func(addr string) ([]byte, error) {
+		if len(addr) > maxCKBAddrLen {
+			return nil, addrErr(symbol, "address too long")
+		}
+		// ponytail: DecodeNoLimit accepts bech32 and bech32m; CKB RFC 0021 mandates bech32m
+		// but the checksum type is not distinguishable here. Payload validation compensates.
+		hrp, data, err := bech32.DecodeNoLimit(addr)
+		if err != nil {
+			return nil, addrErr(symbol, "bech32 decode failed: "+err.Error())
+		}
+		if hrp != "ckb" {
+			return nil, addrErr(symbol, fmt.Sprintf("wrong prefix %q (want ckb)", hrp))
+		}
+		payload, err := bech32.ConvertBits(data, 5, 8, false)
+		if err != nil {
+			return nil, addrErr(symbol, "invalid payload: "+err.Error())
+		}
+		if len(payload) != 54 {
+			return nil, addrErr(symbol, fmt.Sprintf("payload length %d (want 54)", len(payload)))
+		}
+		if payload[0] != 0x00 {
+			return nil, addrErr(symbol, fmt.Sprintf("unsupported format byte 0x%02x (want 0x00)", payload[0]))
+		}
+		return payload[34:], nil // 20-byte args
+	}
+}
+
+// zilValidator validates a Zilliqa address: bech32 with HRP "zil", 20-byte payload.
+func zilValidator(symbol Symbol) addressValidator {
+	return func(addr string) ([]byte, error) {
+		hrp, data, err := bech32.Decode(addr)
+		if err != nil {
+			return nil, addrErr(symbol, "bech32 decode failed: "+err.Error())
+		}
+		if hrp != "zil" {
+			return nil, addrErr(symbol, fmt.Sprintf("wrong prefix %q (want zil)", hrp))
+		}
+		payload, err := bech32.ConvertBits(data, 5, 8, false)
+		if err != nil {
+			return nil, addrErr(symbol, "invalid payload: "+err.Error())
+		}
+		if len(payload) != 20 {
+			return nil, addrErr(symbol, fmt.Sprintf("payload length %d (want 20)", len(payload)))
+		}
+		return payload, nil
+	}
+}
+
+// starknetValidator validates a StarkNet address: "0x" or "0X" prefix followed by
+// 1–64 hex characters representing a 252-bit field element. Returns the value
+// zero-padded to 32 bytes. StarkNet addresses with fewer than 64 hex chars after the
+// prefix are valid (leading zeros stripped).
+func starknetValidator(symbol Symbol) addressValidator {
+	return func(addr string) ([]byte, error) {
+		if len(addr) < 3 || (addr[:2] != "0x" && addr[:2] != "0X") {
+			return nil, addrErr(symbol, "must start with 0x")
+		}
+		hexStr := addr[2:]
+		if len(hexStr) == 0 || len(hexStr) > 64 {
+			return nil, addrErr(symbol, "address must be 1-64 hex chars after 0x")
+		}
+		if len(hexStr)%2 != 0 {
+			hexStr = "0" + hexStr
+		}
+		raw, err := hex.DecodeString(hexStr)
+		if err != nil {
+			return nil, addrErr(symbol, "invalid hex: "+err.Error())
+		}
+		padded := make([]byte, 32)
+		copy(padded[32-len(raw):], raw)
+		return padded, nil
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Feature: EIP-55 checksum normalization
+// ---------------------------------------------------------------------------
+
+// ChecksumEthAddress returns the EIP-55 mixed-case checksum of an Ethereum
+// address. Input may be with or without "0x"/"0X" prefix, any case. Returns
+// ErrInvalidAddress if the input is not a valid 20-byte hex address.
+func ChecksumEthAddress(addr string) (string, error) {
+	s := addr
+	if len(s) >= 2 && s[0] == '0' && (s[1] == 'x' || s[1] == 'X') {
+		s = s[2:]
+	}
+	if len(s) != 40 {
+		return "", fmt.Errorf("%w: must be 40 hex characters", ErrInvalidAddress)
+	}
+	raw, err := hex.DecodeString(s)
+	if err != nil {
+		return "", fmt.Errorf("%w: invalid hex: %s", ErrInvalidAddress, err)
+	}
+	return eip55(raw), nil
+}
+
+// ---------------------------------------------------------------------------
+// Feature: multi-symbol detection
+// ---------------------------------------------------------------------------
+
+// DetectSymbols returns all registered symbols whose address validator accepts
+// addr. The result is sorted alphabetically. Returns nil if no match is found.
+// This is O(n) over all registered coins — do not call in hot loops.
+func DetectSymbols(addr string) []Symbol {
+	var out []Symbol
+	for sym := range validators {
+		if IsValidAddress(sym, addr) {
+			out = append(out, sym)
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return string(out[i]) < string(out[j]) })
+	return out
+}
+
+// ---------------------------------------------------------------------------
+// Feature: AddressFromPayload — inverse of ParseAddress
+// ---------------------------------------------------------------------------
+
+// payloadEncoders maps each symbol to a function that re-encodes the raw
+// payload returned by ParseAddress back into the canonical address string.
+// Populated by the static map below plus init() for dynamic registry entries.
+var payloadEncoders map[Symbol]func([]byte) (string, error)
+
+func init() {
+	payloadEncoders = map[Symbol]func([]byte) (string, error){
+		// EVM chains: 20-byte → EIP-55 checksummed hex
+		ETH:   ethPayload,
+		BNB:   ethPayload,
+		MATIC: ethPayload,
+		AVAX:  ethPayload,
+		ARB:   ethPayload,
+		OP:    ethPayload,
+		FTM:   ethPayload,
+		BASE:  ethPayload,
+		CRO:   ethPayload,
+		GNO:   ethPayload,
+		CELO:  ethPayload,
+		// Bitcoin-family: 20-byte hash160 → P2PKH base58check
+		BTC:  btcP2PKHPayload(0x00),
+		LTC:  btcP2PKHPayload(0x30),
+		DOGE: btcP2PKHPayload(0x1e),
+		DASH: btcP2PKHPayload(0x4c),
+		TRX:  btcP2PKHPayload(0x41),
+		NEO:  btcP2PKHPayload(0x17),
+		BCD:  btcP2PKHPayload(0x00),
+		// Multi-byte version base58check
+		ZEC:  multiVersionPayload(base58BTC, []byte{0x1c, 0xb8}),
+		XTZ:  multiVersionPayload(base58BTC, []byte{0x06, 0xa1, 0x9f}),
+		XRP:  multiVersionPayload(base58XRP, []byte{0x00}),
+		ZEN:  multiVersionPayload(base58BTC, []byte{0x20, 0x89}),
+		FLUX: multiVersionPayload(base58BTC, []byte{0x1c, 0xb8}),
+		// CashAddr: 20-byte hash → P2KH cashaddr
+		BCH: cashHashPayload("bitcoincash"),
+		XEC: cashHashPayload("ecash"),
+		// Special encodings
+		ICX: icxPayload,
+		// Cosmos bech32 (base + registered)
+		ATOM: bech32HashPayload("cosmos"),
+		OSMO: bech32HashPayload("osmo"),
+		JUNO: bech32HashPayload("juno"),
+		TIA:  bech32HashPayload("celestia"),
+		ZIL:  bech32HashPayload("zil"),
+		// ed25519: payload IS the 32-byte public key
+		SOL:  pub32Payload(encodeSOL),
+		XLM:  pub32Payload(encodeXLM),
+		DOT:  pub32Payload(ss58Encoder(0)),
+		KSM:  pub32Payload(ss58Encoder(2)),
+		NEAR: pub32Payload(encodeNEAR),
+		ALGO: pub32Payload(encodeALGO),
+		KIN:  pub32Payload(encodeXLM),
+		IOST: pub32Payload(encodeSOL),
+		// 32-byte hash chains: "0x" + hex
+		SUI:   hexHashPayload,
+		APTOS: hexHashPayload,
+		STRK:  hexHashPayload,
+		// Cardano: 57-byte payload → bech32 "addr"
+		ADA: cardanoFromPayload,
+	}
+	// Additional EVM chains
+	for _, s := range []Symbol{
+		ETC, ZKSYNC, LINEA, SCROLL, MANTLE, BLAST, KAIA, AURORA, GLMR, MOVR,
+		BOBA, METIS, OPBNB, POLZKEVM, MANTA, RBTC, HECO, OKT, KCS, WAN,
+		POA, CLO, GO, TT, VET, IOTX, THETA, NEON, MERLIN, LIGHT,
+		SONIC, ZENEON, ZETAEVM,
+	} {
+		payloadEncoders[s] = ethPayload
+	}
+	payloadEncoders[RONIN] = func(p []byte) (string, error) {
+		if len(p) != 20 {
+			return "", fmt.Errorf("payload length %d (want 20)", len(p))
+		}
+		return "ronin:" + eip55(p)[2:], nil
+	}
+	// Additional Cosmos SDK chains (bech32, 20-byte)
+	for sym, hrp := range map[Symbol]string{
+		LUNA: "terra", KAVA: "kava", SCRT: "secret", BAND: "band", RUNE: "thor",
+		STARS: "stars", AXL: "axelar", STRD: "stride", BLD: "agoric", CRE: "cre",
+		KUJI: "kujira", CMDX: "comdex", NTRN: "neutron", SOMM: "somm", FET: "fetch",
+		MARS: "mars", UMEE: "umee", COREUM: "core", QSR: "quasar", XPRT: "persistence",
+		AKT: "akash", NOBLE: "noble", SEI: "sei", DYDX: "dydx", BLZ: "bluzelle",
+		CRYPTOORG: "cro",
+		EVMOS:     "evmos", INJ: "inj", CANTO: "canto", ZETA: "zeta", ONE: "one",
+	} {
+		payloadEncoders[sym] = bech32HashPayload(hrp)
+	}
+	// Additional SegWit UTXO chains (20-byte witness program → bech32 witness v0)
+	for sym, hrp := range map[Symbol]string{
+		GRS: "grs", DGB: "dgb", BTG: "btg", SYS: "sys", VIA: "via", STRAX: "strax",
+	} {
+		payloadEncoders[sym] = segwitHashPayload(hrp)
+	}
+	// Additional legacy P2PKH chains
+	for sym, ver := range map[Symbol]byte{
+		QTUM: 0x3a, RVN: 0x3c, KMD: 0x3c, FIRO: 0x52, MONA: 0x32,
+		XVG: 0x1e, PIVX: 0x1e, NEBL: 0x35, ONT: 0x17,
+	} {
+		payloadEncoders[sym] = btcP2PKHPayload(ver)
+	}
+}
+
+// --- payload re-encoder helpers ---
+
+func ethPayload(p []byte) (string, error) {
+	if len(p) != 20 {
+		return "", fmt.Errorf("payload length %d (want 20)", len(p))
+	}
+	return eip55(p), nil
+}
+
+func btcP2PKHPayload(ver byte) func([]byte) (string, error) {
+	return func(p []byte) (string, error) {
+		if len(p) != 20 {
+			return "", fmt.Errorf("payload length %d (want 20)", len(p))
+		}
+		return base58.CheckEncode(p, ver), nil
+	}
+}
+
+func multiVersionPayload(alphabet string, version []byte) func([]byte) (string, error) {
+	return func(p []byte) (string, error) {
+		if len(p) != 20 {
+			return "", fmt.Errorf("payload length %d (want 20)", len(p))
+		}
+		return base58CheckEncode(alphabet, version, p), nil
+	}
+}
+
+// bech32HashPayload encodes a 20-byte payload as a standard bech32 address
+// (no witness version prefix). Used for Cosmos and Zilliqa chains.
+func bech32HashPayload(hrp string) func([]byte) (string, error) {
+	return func(p []byte) (string, error) {
+		if len(p) != 20 {
+			return "", fmt.Errorf("payload length %d (want 20)", len(p))
+		}
+		conv, err := bech32.ConvertBits(p, 8, 5, true)
+		if err != nil {
+			return "", err
+		}
+		return bech32.Encode(hrp, conv)
+	}
+}
+
+// segwitHashPayload encodes a 20-byte witness program as a bech32 witness-v0
+// address (prepends witness version 0). Used for native-SegWit altcoins.
+func segwitHashPayload(hrp string) func([]byte) (string, error) {
+	return func(p []byte) (string, error) {
+		if len(p) != 20 {
+			return "", fmt.Errorf("payload length %d (want 20)", len(p))
+		}
+		conv, err := bech32.ConvertBits(p, 8, 5, true)
+		if err != nil {
+			return "", err
+		}
+		return bech32.Encode(hrp, append([]byte{0x00}, conv...))
+	}
+}
+
+func cashHashPayload(prefix string) func([]byte) (string, error) {
+	return func(p []byte) (string, error) {
+		if len(p) != 20 {
+			return "", fmt.Errorf("payload length %d (want 20)", len(p))
+		}
+		vp := append([]byte{0x00}, p...)
+		conv, err := bech32.ConvertBits(vp, 8, 5, true)
+		if err != nil {
+			return "", err
+		}
+		combined := append(conv, cashChecksum(prefix, conv)...)
+		var sb strings.Builder
+		sb.WriteString(prefix)
+		sb.WriteByte(':')
+		for _, v := range combined {
+			sb.WriteByte(cashCharset[v])
+		}
+		return sb.String(), nil
+	}
+}
+
+func icxPayload(p []byte) (string, error) {
+	if len(p) != 20 {
+		return "", fmt.Errorf("payload length %d (want 20)", len(p))
+	}
+	return "hx" + hex.EncodeToString(p), nil
+}
+
+func hexHashPayload(p []byte) (string, error) {
+	if len(p) != 32 {
+		return "", fmt.Errorf("payload length %d (want 32)", len(p))
+	}
+	return "0x" + hex.EncodeToString(p), nil
+}
+
+// pub32Payload wraps an ed25519-style encoder with a 32-byte length check.
+func pub32Payload(enc func([]byte) (string, error)) func([]byte) (string, error) {
+	return func(p []byte) (string, error) {
+		if len(p) != 32 {
+			return "", fmt.Errorf("payload length %d (want 32)", len(p))
+		}
+		return enc(p)
+	}
+}
+
+func cardanoFromPayload(p []byte) (string, error) {
+	if len(p) != 1+2*cardanoKeyHashLen {
+		return "", fmt.Errorf("payload length %d (want %d)", len(p), 1+2*cardanoKeyHashLen)
+	}
+	conv, err := bech32.ConvertBits(p, 8, 5, true)
+	if err != nil {
+		return "", err
+	}
+	return bech32.Encode(cardanoHRP, conv)
+}
+
+// AddressFromPayload derives an address for symbol from a raw address payload.
+// For EVM/secp256k1 chains: payload is the 20-byte keccak address.
+// For Bitcoin P2PKH: payload is the 20-byte hash160 (always encodes as P2PKH).
+// For ed25519 chains: payload is the 32-byte public key.
+// Returns ErrUnsupportedCoin if the symbol is not in the validator registry
+// (or payload re-encoding is not implemented), or ErrInvalidAddress if the
+// payload length does not match the expected format.
+func AddressFromPayload(symbol Symbol, payload []byte) (string, error) {
+	if _, ok := validators[symbol]; !ok {
+		return "", fmt.Errorf("%w: %s", ErrUnsupportedCoin, symbol)
+	}
+	enc, ok := payloadEncoders[symbol]
+	if !ok {
+		return "", fmt.Errorf("%w: %s: payload re-encoding not implemented", ErrUnsupportedCoin, symbol)
+	}
+	addr, err := enc(payload)
+	if err != nil {
+		return "", fmt.Errorf("%w: %s: %v", ErrInvalidAddress, symbol, err)
+	}
+	return addr, nil
 }

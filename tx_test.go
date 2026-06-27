@@ -141,7 +141,7 @@ func TestSignTransactionInputValidation(t *testing.T) {
 			ContractOneof: &txtron.Transaction_Transfer{Transfer: &txtron.TransferContract{OwnerAddress: "zzz", ToAddress: "zzz", Amount: 1}},
 		}}},
 		{"ripple missing payment", XRP, &txripple.SigningInput{}},
-		{"ripple bad account", XRP, &txripple.SigningInput{Account: "notxrp", Payment: &txripple.Payment{Destination: "rU893viamSnsfP3zjzM2KPxjqZjXSXK6VF", Amount: 1}}},
+		{"ripple bad account", XRP, &txripple.SigningInput{Account: "notxrp", Transaction: &txripple.SigningInput_Payment{Payment: &txripple.Payment{Destination: "rU893viamSnsfP3zjzM2KPxjqZjXSXK6VF", Amount: 1}}}},
 		{"cosmos missing send", ATOM, &txcosmos.SigningInput{Fee: &txcosmos.Fee{Denom: "muon", Amount: "1", Gas: 1}}},
 		{"cosmos missing fee", ATOM, &txcosmos.SigningInput{Send: &txcosmos.SendCoinsMessage{FromAddress: "a", ToAddress: "b", Denom: "muon", Amount: "1"}}},
 		{"solana missing transfer", SOL, &txsolana.SigningInput{RecentBlockhash: "11111111111111111111111111111111"}},

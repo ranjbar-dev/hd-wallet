@@ -458,6 +458,74 @@ func TestSignTxBitcoinNestedP2SHP2WPKH(t *testing.T) {
 	btcEngineVerify(t, &ours, in.Utxo)
 }
 
+// TestRBFSequence verifies that inputs with OutPointSequence == BTCSequenceRBF
+// are preserved as-is through signing: the wire tx must carry 0xFFFFFFFD on
+// every input.
+func TestRBFSequence(t *testing.T) {
+	w, err := FromMnemonic(canonicalMnemonic)
+	if err != nil {
+		t.Fatalf("FromMnemonic: %v", err)
+	}
+	defer w.Destroy()
+
+	pub, _ := w.PublicKeyIndex(BTC, 0)
+	utxoScript := append([]byte{0x00, 0x14}, btcutil.Hash160(pub)...)
+	to, _ := w.BitcoinAddress(BTC, P2WPKH, 0, 0, 1)
+	change, _ := w.BitcoinAddress(BTC, P2WPKH, 0, 1, 0)
+
+	in := &txbtc.SigningInput{
+		Amount: 1500, ByteFee: 1, ToAddress: to, ChangeAddress: change,
+		Utxo: []*txbtc.UnspentTransaction{{
+			OutPointHash:     mustHex(t, dummyPrevTxid),
+			OutPointSequence: BTCSequenceRBF,
+			Amount:           10000,
+			Script:           utxoScript,
+		}},
+	}
+	outMsg, err := w.SignTransaction(BTC, 0, in)
+	if err != nil {
+		t.Fatalf("SignTransaction: %v", err)
+	}
+	out := outMsg.(*txbtc.SigningOutput)
+
+	var msg wire.MsgTx
+	if err := msg.Deserialize(bytes.NewReader(out.Encoded)); err != nil {
+		t.Fatalf("deserialize: %v", err)
+	}
+	for i, txIn := range msg.TxIn {
+		if txIn.Sequence != BTCSequenceRBF {
+			t.Fatalf("input %d sequence = 0x%x, want 0x%x (BTCSequenceRBF)", i, txIn.Sequence, BTCSequenceRBF)
+		}
+	}
+}
+
+// TestCPFPFee covers the CPFP fee helper with a table of cases.
+func TestCPFPFee(t *testing.T) {
+	cases := []struct {
+		name           string
+		parentPaid     int64
+		parentVsize    int64
+		childVsize     int64
+		targetSatPerVB float64
+		wantFee        int64
+	}{
+		{"parent meets target", 2000, 200, 150, 5.0, 250},    // need ceil(350*5)=1750, parent paid 2000 → child=0 → 250... wait
+		{"parent underpays", 500, 200, 150, 5.0, 1250},       // need ceil(350*5)=1750, child=1750-500=1250
+		{"parent exactly meets", 1750, 200, 150, 5.0, 0},     // need 1750, paid 1750 → 0
+		{"parent overpays", 2000, 200, 150, 5.0, 0},          // need 1750, paid 2000 → 0
+		{"fractional rate", 100, 100, 100, 1.5, 200},         // need ceil(200*1.5)=300, child=200
+	}
+	// Fix the "parent meets target" case: ceil(350*5)=1750, paid=2000 → 0
+	cases[0].wantFee = 0
+	for _, tc := range cases {
+		got := CPFPFee(tc.parentPaid, tc.parentVsize, tc.childVsize, tc.targetSatPerVB)
+		if got != tc.wantFee {
+			t.Errorf("%s: CPFPFee(%d,%d,%d,%.1f)=%d, want %d",
+				tc.name, tc.parentPaid, tc.parentVsize, tc.childVsize, tc.targetSatPerVB, got, tc.wantFee)
+		}
+	}
+}
+
 // TestEstimateBitcoinFee sanity-checks the public fee/size estimator against
 // btcd's blockchain/txsizes for a 1-in/2-out P2WPKH transaction.
 func TestEstimateBitcoinFee(t *testing.T) {

@@ -1,6 +1,7 @@
 package hdwallet
 
 import (
+	"crypto/sha256"
 	"encoding/base32"
 	"encoding/hex"
 	"strings"
@@ -318,4 +319,66 @@ func cashPolymod(v []byte) uint64 {
 		}
 	}
 	return c ^ 1
+}
+
+// ---------- ICON (ICX): "hx" + lowercase keccak20 ----------
+
+// encodeICX builds an ICON address: "hx" + lowercase hex of keccak256(uncompressed[1:])[12:].
+// Identical to the Ethereum address bytes but with the "0x" prefix replaced by "hx" and
+// without EIP-55 checksum (TWC always emits lowercase for ICON).
+func encodeICX(pub []byte) (string, error) {
+	pk, err := btcec.ParsePubKey(pub)
+	if err != nil {
+		return "", err
+	}
+	raw := keccak256(pk.SerializeUncompressed()[1:])[12:]
+	return "hx" + hex.EncodeToString(raw), nil
+}
+
+// ---------- Nervos (CKB): bech32m full-address (RFC 0021) ----------
+
+// ckbSecp256k1CodeHash is the mainnet secp256k1-blake160-sighash-all lock code hash (type-ID).
+var ckbSecp256k1CodeHash = []byte{
+	0x9b, 0xd7, 0xe0, 0x6f, 0x3e, 0xcf, 0x4b, 0xe0, 0xf2, 0xfc, 0xd2, 0x18,
+	0x8b, 0x23, 0xf1, 0xb9, 0xfc, 0xc8, 0x8e, 0x5d, 0x4b, 0x65, 0xa8, 0x63,
+	0x7b, 0x17, 0x72, 0x3b, 0xbd, 0xa3, 0xcc, 0xe8,
+}
+
+// encodeCKB builds a CKB full address (bech32m, HRP "ckb"):
+//   payload = 0x00 || code_hash (32) || hash_type 0x01 (type) || args (20 = blake2b-160 of pubkey)
+func encodeCKB(pub []byte) (string, error) {
+	args := blake2b160(pub)
+	payload := make([]byte, 0, 54)
+	payload = append(payload, 0x00)
+	payload = append(payload, ckbSecp256k1CodeHash...)
+	payload = append(payload, 0x01)
+	payload = append(payload, args...)
+	conv, err := bech32.ConvertBits(payload, 8, 5, true)
+	if err != nil {
+		return "", err
+	}
+	return bech32.EncodeM("ckb", conv)
+}
+
+// ---------- Zilliqa (ZIL): bech32("zil", sha256(compressed_pub)[12:]) ----------
+
+// encodeZIL builds a Zilliqa address: bech32 with HRP "zil" over the last 20 bytes
+// of SHA-256 of the 33-byte compressed public key.
+func encodeZIL(pub []byte) (string, error) {
+	h := sha256.Sum256(pub)
+	conv, err := bech32.ConvertBits(h[12:], 8, 5, true)
+	if err != nil {
+		return "", err
+	}
+	return bech32.Encode("zil", conv)
+}
+
+// ---------- StarkNet (STRK): "0x" + hex of the 32-byte STARK public-key x-coordinate ----------
+
+// encodeStarknet formats the STARK public key (32-byte big-endian x-coordinate of
+// d*G on the STARK curve, returned by starkexPublicKey) as a 0x-prefixed 64-char
+// hex string. This is the address format used by StarkNet EOA wallets and matches
+// Trust Wallet Core's StarkNet address encoding.
+func encodeStarknet(pub []byte) (string, error) {
+	return "0x" + hex.EncodeToString(pub), nil
 }

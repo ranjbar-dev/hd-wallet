@@ -191,6 +191,55 @@ func encodeP2TR(hrp string, pub []byte) (string, error) {
 	return bech32.EncodeM(hrp, append([]byte{0x01}, conv...)) // witness version 1
 }
 
+// ---------------------------------------------------------------------------
+// Bitcoin address kind detection
+// ---------------------------------------------------------------------------
+
+// BitcoinAddressKind describes the script type of a Bitcoin-family address.
+type BitcoinAddressKind int
+
+const (
+	BitcoinAddressKindUnknown    BitcoinAddressKind = iota
+	BitcoinAddressKindP2PKH                         // 1… (base58check, version 0x00 for BTC)
+	BitcoinAddressKindP2SHP2WPKH                    // 3… (base58check, version 0x05 for BTC)
+	BitcoinAddressKindP2WPKH                        // bc1q… (bech32, witness v0, 20-byte program)
+	BitcoinAddressKindP2TR                          // bc1p… (bech32m, witness v1, 32-byte program)
+)
+
+// DetectBitcoinAddressKind returns the address type for a Bitcoin-family
+// address, using the coin's version bytes and bech32 HRP from btcAddrParams.
+// Returns BitcoinAddressKindUnknown if the format is not recognised for that
+// symbol (including symbols not in btcAddrParams).
+func DetectBitcoinAddressKind(symbol Symbol, addr string) BitcoinAddressKind {
+	p, ok := btcAddrParams[symbol]
+	if !ok {
+		return BitcoinAddressKindUnknown
+	}
+	lower := strings.ToLower(addr)
+	hrp1 := p.hrp + "1"
+	if strings.HasPrefix(lower, hrp1) {
+		rest := lower[len(hrp1):]
+		if strings.HasPrefix(rest, "q") {
+			return BitcoinAddressKindP2WPKH
+		}
+		if strings.HasPrefix(rest, "p") {
+			return BitcoinAddressKindP2TR
+		}
+		return BitcoinAddressKindUnknown
+	}
+	raw, ver, err := base58.CheckDecode(addr)
+	if err != nil || len(raw) != 20 {
+		return BitcoinAddressKindUnknown
+	}
+	switch ver {
+	case p.p2pkhVer:
+		return BitcoinAddressKindP2PKH
+	case p.p2shVer:
+		return BitcoinAddressKindP2SHP2WPKH
+	}
+	return BitcoinAddressKindUnknown
+}
+
 // bitcoinValidator validates any of the four standard Bitcoin address types for a
 // chain in btcAddrParams (P2PKH, P2SH, P2WPKH, P2TR) and returns the decoded
 // payload (20-byte hash for P2PKH/P2SH/P2WPKH, 32-byte output key for P2TR). It

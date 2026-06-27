@@ -17,9 +17,11 @@ package hdwallet
 // This file adds no signer/registry/proto changes; it is display-only.
 
 import (
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"math/big"
+	"strings"
 )
 
 // ErrTxDecode is returned when raw transaction bytes are malformed, truncated or
@@ -348,4 +350,110 @@ func chainIDFromV(v *big.Int) *big.Int {
 	}
 	id := new(big.Int).Sub(v, thirtyFive)
 	return id.Rsh(id, 1)
+}
+
+// ---------- Ethereum event log decoding ----------
+
+// EthLog represents one Ethereum event log entry as returned by eth_getLogs or
+// a transaction receipt. Topics is a slice of hex-encoded 32-byte values (with
+// or without "0x" prefix); Data holds the non-indexed ABI-encoded parameters.
+type EthLog struct {
+	Address string   // contract address ("0x"-hex)
+	Topics  []string // hex-encoded 32-byte topics: [eventSig, indexedParam…]
+	Data    []byte   // ABI-encoded non-indexed parameters
+}
+
+// DecodeEthLog decodes the non-indexed ABI parameters from an Ethereum event
+// log. abiTypes is the list of Solidity types for the non-indexed params (e.g.
+// ["uint256", "address"]). Returns the decoded values using ABIDecodeParams.
+func DecodeEthLog(log *EthLog, abiTypes []string) ([]ABIValue, error) {
+	return ABIDecodeParams(abiTypes, log.Data)
+}
+
+// ERC20TransferLog decodes a standard ERC-20 Transfer(address,address,uint256)
+// event log. Topics[1]=from (indexed), Topics[2]=to (indexed), Data=amount.
+// Returns ErrTxDecode if the log does not match the Transfer event signature.
+func ERC20TransferLog(log *EthLog) (from, to string, amount *big.Int, err error) {
+	if len(log.Topics) < 3 {
+		return "", "", nil, fmt.Errorf("%w: erc20 transfer: need ≥3 topics, got %d", ErrTxDecode, len(log.Topics))
+	}
+	if err := assertTransferTopic(log.Topics[0]); err != nil {
+		return "", "", nil, err
+	}
+	fromBytes, e := decodeLogTopic(log.Topics[1])
+	if e != nil {
+		return "", "", nil, e
+	}
+	toBytes, e := decodeLogTopic(log.Topics[2])
+	if e != nil {
+		return "", "", nil, e
+	}
+	vals, e := ABIDecodeParams([]string{"uint256"}, log.Data)
+	if e != nil {
+		return "", "", nil, fmt.Errorf("%w: erc20 transfer: amount: %v", ErrTxDecode, e)
+	}
+	amt, ok := vals[0].Value.(*big.Int)
+	if !ok {
+		return "", "", nil, fmt.Errorf("%w: erc20 transfer: amount type assertion", ErrTxDecode)
+	}
+	return addressFromLogTopic(fromBytes), addressFromLogTopic(toBytes), amt, nil
+}
+
+// ERC721TransferLog decodes a standard ERC-721 Transfer(address,address,uint256)
+// event log. Topics[1]=from, Topics[2]=to, Topics[3]=tokenId (all indexed).
+// Returns ErrTxDecode if the log does not match the Transfer event signature.
+func ERC721TransferLog(log *EthLog) (from, to string, tokenID *big.Int, err error) {
+	if len(log.Topics) < 4 {
+		return "", "", nil, fmt.Errorf("%w: erc721 transfer: need ≥4 topics, got %d", ErrTxDecode, len(log.Topics))
+	}
+	if err := assertTransferTopic(log.Topics[0]); err != nil {
+		return "", "", nil, err
+	}
+	fromBytes, e := decodeLogTopic(log.Topics[1])
+	if e != nil {
+		return "", "", nil, e
+	}
+	toBytes, e := decodeLogTopic(log.Topics[2])
+	if e != nil {
+		return "", "", nil, e
+	}
+	tokenBytes, e := decodeLogTopic(log.Topics[3])
+	if e != nil {
+		return "", "", nil, e
+	}
+	return addressFromLogTopic(fromBytes), addressFromLogTopic(toBytes), new(big.Int).SetBytes(tokenBytes), nil
+}
+
+// assertTransferTopic checks that a topic matches the ERC-20/721 Transfer event
+// signature keccak256("Transfer(address,address,uint256)").
+func assertTransferTopic(topic string) error {
+	b, err := decodeLogTopic(topic)
+	if err != nil {
+		return err
+	}
+	want := keccak256([]byte("Transfer(address,address,uint256)"))
+	if !bytesEqual(b, want) {
+		return fmt.Errorf("%w: topic[0] is not the Transfer event signature", ErrTxDecode)
+	}
+	return nil
+}
+
+// decodeLogTopic hex-decodes a topic string (with or without "0x" prefix) and
+// returns the 32-byte value. Returns ErrTxDecode if malformed.
+func decodeLogTopic(topic string) ([]byte, error) {
+	s := strings.TrimPrefix(topic, "0x")
+	b, err := hex.DecodeString(s)
+	if err != nil {
+		return nil, fmt.Errorf("%w: log: topic hex: %v", ErrTxDecode, err)
+	}
+	if len(b) != 32 {
+		return nil, fmt.Errorf("%w: log: topic must be 32 bytes, got %d", ErrTxDecode, len(b))
+	}
+	return b, nil
+}
+
+// addressFromLogTopic extracts a 20-byte EVM address from a zero-padded
+// 32-byte ABI topic value (last 20 bytes), returned as "0x"-hex.
+func addressFromLogTopic(topic []byte) string {
+	return "0x" + bytesToHex(topic[12:])
 }
