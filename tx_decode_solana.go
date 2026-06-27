@@ -31,9 +31,11 @@ import (
 // SolanaInstructionKind identifies a decoded instruction type.
 type SolanaInstructionKind int
 
+// SolanaInstructionUnknown is the zero value returned for instructions that
+// are not one of the recognised/decoded types.
 const (
 	SolanaInstructionUnknown            SolanaInstructionKind = iota
-	SolanaInstructionSystemTransfer                          // system: Transfer
+	SolanaInstructionSystemTransfer                              // system: Transfer
 	SolanaInstructionSPLTransfer                             // spl-token: Transfer
 	SolanaInstructionSPLTransferChecked                      // spl-token: TransferChecked
 	SolanaInstructionComputeBudgetSetLimit                   // compute-budget: SetComputeUnitLimit

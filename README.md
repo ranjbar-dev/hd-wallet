@@ -455,6 +455,8 @@ go test -race -cover ./...
 | Function / method | Purpose |
 |---|---|
 | `(*HDWallet) SignTransaction(symbol, index, proto.Message) (proto.Message, error)` | Build+sign a raw tx (EVM/Tron/XRP/Cosmos/Solana; no broadcast). |
+| `BroadcastPayload(symbol, proto.Message) (string, error)` | Convert a `SignTransaction` output to the exact string each chain's RPC endpoint expects: `"0x"+hex` for EVM, bare hex for Bitcoin/UTXO, base64 for Solana and Cosmos, a TronGrid JSON object for Tron, uppercase hex for XRP. |
+| `TransactionID(proto.Message) (string, error)` | Extract the canonical transaction id from any `SignTransaction` output, normalised to lower-case hex (or base58 for Solana). |
 | `(*HDWallet) SignMessage(symbol, index, []byte) ([]byte, error)` | EIP-191 `personal_sign` → 65-byte r‖s‖v. |
 | `(*HDWallet) SignTypedData(symbol, index, []byte) ([]byte, error)` | EIP-712 typed-data signature. |
 | `(*HDWallet) SignBitcoinMessage(symbol, index, []byte) (string, error)` | Bitcoin `signmessage` → base64. With `VerifyBitcoinMessage`. |
