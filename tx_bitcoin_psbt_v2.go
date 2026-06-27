@@ -390,7 +390,7 @@ func psbt2KV(b, key, value []byte) []byte {
 }
 
 func psbt2TxOut(out *wire.TxOut) []byte {
-	var b []byte
+	b := make([]byte, 0, 8+9+len(out.PkScript)) // 8 LE64 + up-to-9 varInt + script
 	b = append(b, btcLE64(i64AsU64(out.Value))...)
 	b = append(b, btcVarInt(uint64(len(out.PkScript)))...)
 	b = append(b, out.PkScript...)

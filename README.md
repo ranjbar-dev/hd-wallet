@@ -206,23 +206,49 @@ sig2, _ := w.SignTypedData(hdwallet.ETH, 0, typedDataJSON)           // EIP-712
 Plus standalone EVM tooling: `EncodeRLP`/`DecodeRLP`, `ABIEncode`/`ABIDecode`,
 `ABIFunctionSelector`, `EthereumPersonalMessageHash`, `EIP712Hash`.
 
-### Bitcoin & Solana message signing
+### Bitcoin, Solana, Cosmos & Tron message signing
 
-Non-EVM message signing, each pinned byte-for-byte to its Trust Wallet Core
-`MessageSigner` vector:
+Non-EVM message signing, each following the chain's canonical standard:
 
 ```go
 // Bitcoin "signmessage" standard → base64; verifies against a legacy P2PKH address.
+// Pinned byte-for-byte to Trust Wallet Core BitcoinMessageSigner vectors.
 sig, _  := w.SignBitcoinMessage(hdwallet.BTC, 0, []byte("test signature"))
 ok      := hdwallet.VerifyBitcoinMessage("19cAJn4Ms8jodBBGtroBNNpCZiHAWGAq7X", []byte("test signature"), sig)
 
 // Solana off-chain message (raw ed25519) → base58.
+// Pinned to Trust Wallet Core SolanaMessageSigner vector.
 ssig, _ := w.SignSolanaMessage(hdwallet.SOL, 0, []byte("Hello world"))
 sok     := hdwallet.VerifySolanaMessage(addr, []byte("Hello world"), ssig)
+
+// Cosmos ADR-36 arbitrary-message signing → base64 (65-byte recoverable secp256k1).
+// Follows the CosmJS / Keplr makeADR36AminoSignDoc + serializeSignDoc pipeline;
+// ecrecover is used for verification (no separate public key needed).
+signer, _ := w.Address(hdwallet.ATOM)
+csig, _ := w.SignCosmosADR36(hdwallet.ATOM, 0, signer, []byte("arbitrary cosmos data"))
+cok     := hdwallet.VerifyCosmosADR36(signer, []byte("arbitrary cosmos data"), csig)
+
+// Tron TIP-191 message signing → "0x…" hex (65-byte R‖S‖V, V ∈ {27,28}).
+// Matches TronWeb trx.signMessageV2; uses keccak256("\x19TRON Signed Message:\n32" ‖ keccak256(msg)).
+tsig, _ := w.SignTronMessage(hdwallet.TRX, 0, []byte("Hello World"))
+tok     := hdwallet.VerifyTronMessage(tronAddr, []byte("Hello World"), tsig)
 ```
 
-> Cosmos ADR-36 arbitrary-message signing is on the roadmap (no authoritative
-> Trust Wallet Core vector to verify against yet).
+### Chain-neutral raw message signing
+
+For advanced use cases, `SignRawMessage` / `VerifyRawMessage` route through the
+correct curve for any registered symbol without a chain-specific envelope:
+
+```go
+// secp256k1 chains: pass the 32-byte digest you pre-hashed.
+digest := hdwallet.Keccak256([]byte("raw data"))
+sig, _ := w.SignRawMessage(hdwallet.ETH, 0, digest)
+pub, _ := w.PublicKey(hdwallet.ETH)
+ok, _ := hdwallet.VerifyRawMessage(hdwallet.ETH, pub, digest, sig)
+
+// ed25519 chains: pass the raw message; EdDSA hashes internally.
+sig, _ = w.SignRawMessage(hdwallet.SOL, 0, []byte("any length"))
+```
 
 ### Address validation & parsing
 
@@ -377,10 +403,9 @@ because a fund-critical address must match an authoritative vector first:
 Deferred signing features: Bitcoin transaction building now spends **P2WPKH** and
 **Taproot key-path** inputs (BTC/LTC); still deferred are **legacy P2PKH** and
 **nested P2SH-P2WPKH** input spending (pre-BIP-143 / wrapped-witness sighash). The
-**ethermint-keyed Cosmos** chains beyond EVMOS (INJ/CANTO/ZETA — each needs its
-own vector since the pubkey type URL enters the signed bytes) — see
-`tx_families.go`; and **Cosmos ADR-36** message signing — see
-`message_cosmos_test.go`.
+**ethermint-keyed Cosmos** chains beyond EVMOS and INJ (CANTO/ZETA/ONE — each needs
+its own vector since the pubkey type URL enters the signed bytes) — see
+`tx_families.go`.
 
 Contributions with test vectors welcome.
 
@@ -459,6 +484,9 @@ go test -race -cover ./...
 | `(*HDWallet) SignTypedData(symbol, index, []byte) ([]byte, error)` | EIP-712 typed-data signature. |
 | `(*HDWallet) SignBitcoinMessage(symbol, index, []byte) (string, error)` | Bitcoin `signmessage` → base64. With `VerifyBitcoinMessage`. |
 | `(*HDWallet) SignSolanaMessage(symbol, index, []byte) (string, error)` | Solana off-chain message → base58. With `VerifySolanaMessage`. |
+| `(*HDWallet) SignCosmosADR36(symbol, index, signer, []byte) (string, error)` | Cosmos ADR-36 arbitrary-message → base64 (65-byte recoverable). With `VerifyCosmosADR36`. |
+| `(*HDWallet) SignTronMessage(symbol, index, []byte) (string, error)` | Tron TIP-191 message → `0x…` hex (V ∈ {27,28}). With `VerifyTronMessage`. |
+| `(*HDWallet) SignRawMessage(symbol, index, []byte) (*Signature, error)` | Chain-neutral: ECDSA 32-byte digest or ed25519 raw message. With `VerifyRawMessage`. |
 | `RecoverEthereumAddress([]byte, []byte) (string, error)` · `VerifyEthereumMessage` / `…TypedData` | Recover/verify EIP-191/712 signers. |
 | `EncodeRLP`/`DecodeRLP` · `ABIEncode`/`ABIDecode` · `ABIFunctionSelector` · `EIP712Hash` | Standalone EVM encoding utilities. |
 

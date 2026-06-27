@@ -190,11 +190,12 @@ func (ww *WatchWallet) publicKey(change, index uint32) ([]byte, error) {
 // XPubVersion describes the address type implied by an extended public key prefix.
 type XPubVersion int
 
+// XPubVersion values for the supported BIP-32 extended public key prefix families.
 const (
-	XPubVersionUnknown    XPubVersion = iota
-	XPubVersionLegacy                 // xpub/tpub — BIP-44 P2PKH
-	XPubVersionP2SHP2WPKH             // ypub/upub — BIP-49 P2SH-P2WPKH
-	XPubVersionP2WPKH                 // zpub/vpub — BIP-84 native SegWit
+	XPubVersionUnknown    XPubVersion = iota // prefix did not match a known xpub version
+	XPubVersionLegacy                        // xpub/tpub — BIP-44 P2PKH
+	XPubVersionP2SHP2WPKH                    // ypub/upub — BIP-49 P2SH-P2WPKH
+	XPubVersionP2WPKH                        // zpub/vpub — BIP-84 native SegWit
 )
 
 // version byte arrays for BIP-32 extended key prefixes (mainnet + testnet)

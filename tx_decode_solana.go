@@ -31,13 +31,14 @@ import (
 // SolanaInstructionKind identifies a decoded instruction type.
 type SolanaInstructionKind int
 
+// SolanaInstructionKind values for each recognised Solana instruction program.
 const (
-	SolanaInstructionUnknown            SolanaInstructionKind = iota
-	SolanaInstructionSystemTransfer                          // system: Transfer
-	SolanaInstructionSPLTransfer                             // spl-token: Transfer
-	SolanaInstructionSPLTransferChecked                      // spl-token: TransferChecked
-	SolanaInstructionComputeBudgetSetLimit                   // compute-budget: SetComputeUnitLimit
-	SolanaInstructionComputeBudgetSetPrice                   // compute-budget: SetComputeUnitPrice
+	SolanaInstructionUnknown            SolanaInstructionKind = iota // instruction type could not be decoded
+	SolanaInstructionSystemTransfer                                  // system: Transfer
+	SolanaInstructionSPLTransfer                                     // spl-token: Transfer
+	SolanaInstructionSPLTransferChecked                              // spl-token: TransferChecked
+	SolanaInstructionComputeBudgetSetLimit                           // compute-budget: SetComputeUnitLimit
+	SolanaInstructionComputeBudgetSetPrice                           // compute-budget: SetComputeUnitPrice
 )
 
 // SolanaDecodedInstruction is a decoded Solana instruction with typed fields.
