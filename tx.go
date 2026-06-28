@@ -27,6 +27,7 @@ import (
 
 	"google.golang.org/protobuf/proto"
 
+	txalgo "github.com/ranjbar-dev/hd-wallet/txproto/algorand"
 	txbtc "github.com/ranjbar-dev/hd-wallet/txproto/bitcoin"
 	txcosmos "github.com/ranjbar-dev/hd-wallet/txproto/cosmos"
 	txeth "github.com/ranjbar-dev/hd-wallet/txproto/ethereum"
@@ -57,6 +58,7 @@ const (
 	familyCosmosEthermint
 	familySolana
 	familyBitcoin
+	familyAlgorand
 )
 
 // txFamilyOf maps a symbol to its transaction-building family. EVM and standard
@@ -85,6 +87,8 @@ func txFamilyOf(symbol Symbol) txFamily {
 		return familySolana
 	case BTC, LTC:
 		return familyBitcoin
+	case ALGO:
+		return familyAlgorand
 	default:
 		return familyNone
 	}
@@ -146,6 +150,12 @@ func (w *HDWallet) SignTransaction(symbol Symbol, index uint32, input proto.Mess
 			return nil, fmt.Errorf("%w: %s expects *bitcoin.SigningInput", ErrTxInput, symbol)
 		}
 		return w.signBitcoinTx(symbol, index, in)
+	case familyAlgorand:
+		in, ok := input.(*txalgo.SigningInput)
+		if !ok {
+			return nil, fmt.Errorf("%w: %s expects *algorand.SigningInput", ErrTxInput, symbol)
+		}
+		return w.signALGOTx(symbol, index, in)
 	default:
 		return nil, fmt.Errorf("%w: %s", ErrTxUnsupported, symbol)
 	}
@@ -219,6 +229,20 @@ func ValidateSigningInput(symbol Symbol, input proto.Message) error {
 		}
 		if in.Sequence == 0 {
 			return fmt.Errorf("%w: %s: sequence is required", ErrTxInput, symbol)
+		}
+		if in.Fee == 0 {
+			return fmt.Errorf("%w: %s: fee is required", ErrTxInput, symbol)
+		}
+	case familyAlgorand:
+		in, ok := input.(*txalgo.SigningInput)
+		if !ok {
+			return fmt.Errorf("%w: %s expects *algorand.SigningInput", ErrTxInput, symbol)
+		}
+		if len(in.GenesisHash) != 32 {
+			return fmt.Errorf("%w: %s: genesis_hash must be 32 bytes", ErrTxInput, symbol)
+		}
+		if len(in.To) != 32 {
+			return fmt.Errorf("%w: %s: to must be 32 bytes", ErrTxInput, symbol)
 		}
 		if in.Fee == 0 {
 			return fmt.Errorf("%w: %s: fee is required", ErrTxInput, symbol)
