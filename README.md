@@ -194,6 +194,27 @@ out, _ := w.SignTransaction(hdwallet.ETH, 0, &ethpb.SigningInput{ /* … */ })
 > Bitcoin spending currently covers P2WPKH and Taproot key-path inputs; legacy
 > P2PKH and nested P2SH-P2WPKH input spending remain on the roadmap.
 
+### What you must provide (no network I/O)
+
+`SignTransaction` never calls the network. The caller supplies all chain state
+as fields on the `SigningInput` proto before signing. `providers.go` exports
+five small interfaces that formalise this contract; `doc.go` contains the full
+per-family matrix mapping each `SigningInput` field to its data source:
+
+| Interface | Used for | Chain state |
+|---|---|---|
+| `NonceProvider` | EVM, XRP, Cosmos | sender nonce / account sequence |
+| `UTXOProvider` | Bitcoin-family | unspent outputs (txid, vout, amount, scriptPubKey) |
+| `FeeOracle` | EVM, Bitcoin, XRP, Tron | gas price / sat-per-vbyte / drops |
+| `RecentBlockhashProvider` | Solana | latest confirmed blockhash |
+| `Broadcaster` | all families | post-signing submission sink |
+
+None of these interfaces are called inside the package — they exist purely for
+typing and documentation. Wire them as thin wrappers around your node RPC or
+indexer client, call each one before building the `SigningInput`, then pass the
+results in. See `example_providers_test.go` for a minimal wiring example and
+`doc.go` for the field-by-field mapping.
+
 ### Ethereum message signing (EIP-191 / EIP-712)
 
 ```go
