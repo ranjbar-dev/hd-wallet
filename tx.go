@@ -32,6 +32,7 @@ import (
 	txeth "github.com/ranjbar-dev/hd-wallet/txproto/ethereum"
 	txripple "github.com/ranjbar-dev/hd-wallet/txproto/ripple"
 	txsolana "github.com/ranjbar-dev/hd-wallet/txproto/solana"
+	txstellar "github.com/ranjbar-dev/hd-wallet/txproto/stellar"
 	txtron "github.com/ranjbar-dev/hd-wallet/txproto/tron"
 )
 
@@ -57,6 +58,7 @@ const (
 	familyCosmosEthermint
 	familySolana
 	familyBitcoin
+	familyStellar // XLM: XDR TransactionV0 + SHA256(networkId||ENVELOPE_TYPE_TX||xdr)
 )
 
 // txFamilyOf maps a symbol to its transaction-building family. EVM and standard
@@ -85,6 +87,8 @@ func txFamilyOf(symbol Symbol) txFamily {
 		return familySolana
 	case BTC, LTC:
 		return familyBitcoin
+	case XLM:
+		return familyStellar
 	default:
 		return familyNone
 	}
@@ -146,6 +150,12 @@ func (w *HDWallet) SignTransaction(symbol Symbol, index uint32, input proto.Mess
 			return nil, fmt.Errorf("%w: %s expects *bitcoin.SigningInput", ErrTxInput, symbol)
 		}
 		return w.signBitcoinTx(symbol, index, in)
+	case familyStellar:
+		in, ok := input.(*txstellar.SigningInput)
+		if !ok {
+			return nil, fmt.Errorf("%w: %s expects *stellar.SigningInput", ErrTxInput, symbol)
+		}
+		return w.signXLMTx(symbol, index, in)
 	default:
 		return nil, fmt.Errorf("%w: %s", ErrTxUnsupported, symbol)
 	}
@@ -222,6 +232,23 @@ func ValidateSigningInput(symbol Symbol, input proto.Message) error {
 		}
 		if in.Fee == 0 {
 			return fmt.Errorf("%w: %s: fee is required", ErrTxInput, symbol)
+		}
+	case familyStellar:
+		in, ok := input.(*txstellar.SigningInput)
+		if !ok {
+			return fmt.Errorf("%w: %s expects *stellar.SigningInput", ErrTxInput, symbol)
+		}
+		if in.Account == "" {
+			return fmt.Errorf("%w: %s: account is required", ErrTxInput, symbol)
+		}
+		if in.Sequence == 0 {
+			return fmt.Errorf("%w: %s: sequence is required", ErrTxInput, symbol)
+		}
+		if in.Fee <= 0 {
+			return fmt.Errorf("%w: %s: fee must be positive (got %d)", ErrTxInput, symbol, in.Fee)
+		}
+		if in.GetPayment() == nil {
+			return fmt.Errorf("%w: %s: payment operation is required", ErrTxInput, symbol)
 		}
 	default:
 		return fmt.Errorf("%w: %s", ErrTxUnsupported, symbol)

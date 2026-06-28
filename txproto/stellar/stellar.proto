@@ -1,0 +1,38 @@
+syntax = "proto3";
+
+package hdwallet.stellar.proto;
+
+option go_package = "github.com/ranjbar-dev/hd-wallet/txproto/stellar";
+
+// Payment operation: transfer native XLM.
+message PaymentOp {
+  string destination = 1; // G-address of the recipient
+  int64 amount = 2;       // amount in stroops (1 XLM = 10_000_000 stroops)
+}
+
+// SigningInput mirrors a minimal subset of TW.Stellar.Proto.SigningInput.
+message SigningInput {
+  // Source account G-address (needed for XDR source-account field).
+  string account = 1;
+  // Base fee in stroops (per-operation); e.g. 1000.
+  int32 fee = 2;
+  // Transaction sequence number (one more than the account's current seq).
+  int64 sequence = 3;
+  // Stellar network passphrase. Empty string → mainnet default:
+  //   "Public Global Stellar Network ; September 2015"
+  string passphrase = 4;
+
+  oneof operation {
+    PaymentOp payment = 5;
+  }
+}
+
+// SigningOutput mirrors a minimal subset of TW.Stellar.Proto.SigningOutput.
+message SigningOutput {
+  // base64(XDR(TransactionEnvelope)) — the wire-ready signed transaction.
+  string encoded = 1;
+  // Raw XDR bytes of the TransactionEnvelope.
+  bytes raw = 2;
+  // Error message; empty on success.
+  string error = 3;
+}
