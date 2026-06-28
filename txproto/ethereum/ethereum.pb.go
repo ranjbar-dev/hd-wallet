@@ -177,6 +177,101 @@ func (x *Access) GetStoredKeys() [][]byte {
 	return nil
 }
 
+// EthAuthorization is one EIP-7702 authorization-list entry. The EOA that
+// wants to delegate its code to `address` signs [chain_id, address, nonce]
+// off-band (using keccak256(0x05 || rlp([chain_id, address, nonce]))), and
+// the resulting (y_parity, r, s) plus the delegation target are carried here.
+// All fields are required; the tx signer does NOT sign the authorization tuple.
+type EthAuthorization struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Chain id for which this authorization is valid, big-endian bytes.
+	ChainId []byte `protobuf:"bytes,1,opt,name=chain_id,json=chainId,proto3" json:"chain_id,omitempty"`
+	// Delegation target ("0x"-prefixed hex, 20 bytes).
+	Address string `protobuf:"bytes,2,opt,name=address,proto3" json:"address,omitempty"`
+	// Authorizing EOA nonce at the time of authorization.
+	Nonce uint64 `protobuf:"varint,3,opt,name=nonce,proto3" json:"nonce,omitempty"`
+	// y_parity of the authorization signature (0 or 1).
+	YParity uint32 `protobuf:"varint,4,opt,name=y_parity,json=yParity,proto3" json:"y_parity,omitempty"`
+	// r component of the authorization signature, 32 bytes big-endian.
+	R []byte `protobuf:"bytes,5,opt,name=r,proto3" json:"r,omitempty"`
+	// s component of the authorization signature, 32 bytes big-endian.
+	S             []byte `protobuf:"bytes,6,opt,name=s,proto3" json:"s,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *EthAuthorization) Reset() {
+	*x = EthAuthorization{}
+	mi := &file_txproto_ethereum_ethereum_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EthAuthorization) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EthAuthorization) ProtoMessage() {}
+
+func (x *EthAuthorization) ProtoReflect() protoreflect.Message {
+	mi := &file_txproto_ethereum_ethereum_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EthAuthorization.ProtoReflect.Descriptor instead.
+func (*EthAuthorization) Descriptor() ([]byte, []int) {
+	return file_txproto_ethereum_ethereum_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *EthAuthorization) GetChainId() []byte {
+	if x != nil {
+		return x.ChainId
+	}
+	return nil
+}
+
+func (x *EthAuthorization) GetAddress() string {
+	if x != nil {
+		return x.Address
+	}
+	return ""
+}
+
+func (x *EthAuthorization) GetNonce() uint64 {
+	if x != nil {
+		return x.Nonce
+	}
+	return 0
+}
+
+func (x *EthAuthorization) GetYParity() uint32 {
+	if x != nil {
+		return x.YParity
+	}
+	return 0
+}
+
+func (x *EthAuthorization) GetR() []byte {
+	if x != nil {
+		return x.R
+	}
+	return nil
+}
+
+func (x *EthAuthorization) GetS() []byte {
+	if x != nil {
+		return x.S
+	}
+	return nil
+}
+
 // SigningInput mirrors a minimal subset of TW.Ethereum.Proto.SigningInput.
 type SigningInput struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -184,7 +279,8 @@ type SigningInput struct {
 	ChainId []byte `protobuf:"bytes,1,opt,name=chain_id,json=chainId,proto3" json:"chain_id,omitempty"`
 	// Sender nonce, big-endian bytes.
 	Nonce []byte `protobuf:"bytes,2,opt,name=nonce,proto3" json:"nonce,omitempty"`
-	// Transaction type: 0 = legacy, 1 = EIP-2930 (access list), 2 = EIP-1559.
+	// Transaction type: 0 = legacy, 1 = EIP-2930 (access list), 2 = EIP-1559,
+	// 3 = EIP-4844 (blob), 4 = EIP-7702 (set-code).
 	TxMode uint32 `protobuf:"varint,3,opt,name=tx_mode,json=txMode,proto3" json:"tx_mode,omitempty"`
 	// Legacy gas price, big-endian bytes (tx_mode == 0).
 	GasPrice []byte `protobuf:"bytes,4,opt,name=gas_price,json=gasPrice,proto3" json:"gas_price,omitempty"`
@@ -202,14 +298,27 @@ type SigningInput struct {
 	// Optional EIP-2930 access list. Carried in the signed bytes for tx_mode 1
 	// (EIP-2930) and tx_mode 2 (EIP-1559); ignored for legacy (tx_mode 0). An
 	// empty list reproduces the no-access-list encoding exactly.
-	AccessList    []*Access `protobuf:"bytes,10,rep,name=access_list,json=accessList,proto3" json:"access_list,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	AccessList []*Access `protobuf:"bytes,10,rep,name=access_list,json=accessList,proto3" json:"access_list,omitempty"`
+	// EIP-4844: max fee per blob gas (a.k.a. maxFeePerBlobGas), big-endian
+	// bytes. Required for tx_mode 3 (EIP-4844); ignored otherwise.
+	MaxFeePerBlobGas []byte `protobuf:"bytes,11,opt,name=max_fee_per_blob_gas,json=maxFeePerBlobGas,proto3" json:"max_fee_per_blob_gas,omitempty"`
+	// EIP-4844: versioned blob hashes. Each entry must be exactly 32 bytes;
+	// the first byte is the version (0x01 for KZG commitments per EIP-4844).
+	// At least one hash is required for tx_mode 3; ignored otherwise.
+	// The network-wrapper (blobs, commitments, proofs) is out of scope — only
+	// the tx envelope is signed here.
+	BlobVersionedHashes [][]byte `protobuf:"bytes,12,rep,name=blob_versioned_hashes,json=blobVersionedHashes,proto3" json:"blob_versioned_hashes,omitempty"`
+	// EIP-7702: authorization list. Required for tx_mode 4 (EIP-7702); ignored
+	// otherwise. Each entry is a pre-signed delegation authorization from an EOA
+	// that wishes to set its code to point at a contract address.
+	AuthorizationList []*EthAuthorization `protobuf:"bytes,13,rep,name=authorization_list,json=authorizationList,proto3" json:"authorization_list,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *SigningInput) Reset() {
 	*x = SigningInput{}
-	mi := &file_txproto_ethereum_ethereum_proto_msgTypes[2]
+	mi := &file_txproto_ethereum_ethereum_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -221,7 +330,7 @@ func (x *SigningInput) String() string {
 func (*SigningInput) ProtoMessage() {}
 
 func (x *SigningInput) ProtoReflect() protoreflect.Message {
-	mi := &file_txproto_ethereum_ethereum_proto_msgTypes[2]
+	mi := &file_txproto_ethereum_ethereum_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -234,7 +343,7 @@ func (x *SigningInput) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SigningInput.ProtoReflect.Descriptor instead.
 func (*SigningInput) Descriptor() ([]byte, []int) {
-	return file_txproto_ethereum_ethereum_proto_rawDescGZIP(), []int{2}
+	return file_txproto_ethereum_ethereum_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *SigningInput) GetChainId() []byte {
@@ -307,6 +416,27 @@ func (x *SigningInput) GetAccessList() []*Access {
 	return nil
 }
 
+func (x *SigningInput) GetMaxFeePerBlobGas() []byte {
+	if x != nil {
+		return x.MaxFeePerBlobGas
+	}
+	return nil
+}
+
+func (x *SigningInput) GetBlobVersionedHashes() [][]byte {
+	if x != nil {
+		return x.BlobVersionedHashes
+	}
+	return nil
+}
+
+func (x *SigningInput) GetAuthorizationList() []*EthAuthorization {
+	if x != nil {
+		return x.AuthorizationList
+	}
+	return nil
+}
+
 // SigningOutput mirrors a minimal subset of TW.Ethereum.Proto.SigningOutput.
 type SigningOutput struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -329,7 +459,7 @@ type SigningOutput struct {
 
 func (x *SigningOutput) Reset() {
 	*x = SigningOutput{}
-	mi := &file_txproto_ethereum_ethereum_proto_msgTypes[3]
+	mi := &file_txproto_ethereum_ethereum_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -341,7 +471,7 @@ func (x *SigningOutput) String() string {
 func (*SigningOutput) ProtoMessage() {}
 
 func (x *SigningOutput) ProtoReflect() protoreflect.Message {
-	mi := &file_txproto_ethereum_ethereum_proto_msgTypes[3]
+	mi := &file_txproto_ethereum_ethereum_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -354,7 +484,7 @@ func (x *SigningOutput) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SigningOutput.ProtoReflect.Descriptor instead.
 func (*SigningOutput) Descriptor() ([]byte, []int) {
-	return file_txproto_ethereum_ethereum_proto_rawDescGZIP(), []int{3}
+	return file_txproto_ethereum_ethereum_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *SigningOutput) GetEncoded() []byte {
@@ -419,7 +549,7 @@ type Transaction_Transfer struct {
 
 func (x *Transaction_Transfer) Reset() {
 	*x = Transaction_Transfer{}
-	mi := &file_txproto_ethereum_ethereum_proto_msgTypes[4]
+	mi := &file_txproto_ethereum_ethereum_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -431,7 +561,7 @@ func (x *Transaction_Transfer) String() string {
 func (*Transaction_Transfer) ProtoMessage() {}
 
 func (x *Transaction_Transfer) ProtoReflect() protoreflect.Message {
-	mi := &file_txproto_ethereum_ethereum_proto_msgTypes[4]
+	mi := &file_txproto_ethereum_ethereum_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -474,7 +604,7 @@ type Transaction_ERC20Transfer struct {
 
 func (x *Transaction_ERC20Transfer) Reset() {
 	*x = Transaction_ERC20Transfer{}
-	mi := &file_txproto_ethereum_ethereum_proto_msgTypes[5]
+	mi := &file_txproto_ethereum_ethereum_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -486,7 +616,7 @@ func (x *Transaction_ERC20Transfer) String() string {
 func (*Transaction_ERC20Transfer) ProtoMessage() {}
 
 func (x *Transaction_ERC20Transfer) ProtoReflect() protoreflect.Message {
-	mi := &file_txproto_ethereum_ethereum_proto_msgTypes[5]
+	mi := &file_txproto_ethereum_ethereum_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -533,7 +663,7 @@ type Transaction_ContractGeneric struct {
 
 func (x *Transaction_ContractGeneric) Reset() {
 	*x = Transaction_ContractGeneric{}
-	mi := &file_txproto_ethereum_ethereum_proto_msgTypes[6]
+	mi := &file_txproto_ethereum_ethereum_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -545,7 +675,7 @@ func (x *Transaction_ContractGeneric) String() string {
 func (*Transaction_ContractGeneric) ProtoMessage() {}
 
 func (x *Transaction_ContractGeneric) ProtoReflect() protoreflect.Message {
-	mi := &file_txproto_ethereum_ethereum_proto_msgTypes[6]
+	mi := &file_txproto_ethereum_ethereum_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -597,7 +727,14 @@ const file_txproto_ethereum_ethereum_proto_rawDesc = "" +
 	"\x06Access\x12\x18\n" +
 	"\aaddress\x18\x01 \x01(\tR\aaddress\x12\x1f\n" +
 	"\vstored_keys\x18\x02 \x03(\fR\n" +
-	"storedKeys\"\x9c\x03\n" +
+	"storedKeys\"\x94\x01\n" +
+	"\x10EthAuthorization\x12\x19\n" +
+	"\bchain_id\x18\x01 \x01(\fR\achainId\x12\x18\n" +
+	"\aaddress\x18\x02 \x01(\tR\aaddress\x12\x14\n" +
+	"\x05nonce\x18\x03 \x01(\x04R\x05nonce\x12\x19\n" +
+	"\by_parity\x18\x04 \x01(\rR\ayParity\x12\f\n" +
+	"\x01r\x18\x05 \x01(\fR\x01r\x12\f\n" +
+	"\x01s\x18\x06 \x01(\fR\x01s\"\xda\x04\n" +
 	"\fSigningInput\x12\x19\n" +
 	"\bchain_id\x18\x01 \x01(\fR\achainId\x12\x14\n" +
 	"\x05nonce\x18\x02 \x01(\fR\x05nonce\x12\x17\n" +
@@ -611,7 +748,10 @@ const file_txproto_ethereum_ethereum_proto_rawDesc = "" +
 	"\vtransaction\x18\t \x01(\v2$.hdwallet.ethereum.proto.TransactionR\vtransaction\x12@\n" +
 	"\vaccess_list\x18\n" +
 	" \x03(\v2\x1f.hdwallet.ethereum.proto.AccessR\n" +
-	"accessList\"\x9f\x01\n" +
+	"accessList\x12.\n" +
+	"\x14max_fee_per_blob_gas\x18\v \x01(\fR\x10maxFeePerBlobGas\x122\n" +
+	"\x15blob_versioned_hashes\x18\f \x03(\fR\x13blobVersionedHashes\x12X\n" +
+	"\x12authorization_list\x18\r \x03(\v2).hdwallet.ethereum.proto.EthAuthorizationR\x11authorizationList\"\x9f\x01\n" +
 	"\rSigningOutput\x12\x18\n" +
 	"\aencoded\x18\x01 \x01(\fR\aencoded\x12\f\n" +
 	"\x01r\x18\x02 \x01(\fR\x01r\x12\f\n" +
@@ -634,27 +774,29 @@ func file_txproto_ethereum_ethereum_proto_rawDescGZIP() []byte {
 	return file_txproto_ethereum_ethereum_proto_rawDescData
 }
 
-var file_txproto_ethereum_ethereum_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
+var file_txproto_ethereum_ethereum_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
 var file_txproto_ethereum_ethereum_proto_goTypes = []any{
 	(*Transaction)(nil),                 // 0: hdwallet.ethereum.proto.Transaction
 	(*Access)(nil),                      // 1: hdwallet.ethereum.proto.Access
-	(*SigningInput)(nil),                // 2: hdwallet.ethereum.proto.SigningInput
-	(*SigningOutput)(nil),               // 3: hdwallet.ethereum.proto.SigningOutput
-	(*Transaction_Transfer)(nil),        // 4: hdwallet.ethereum.proto.Transaction.Transfer
-	(*Transaction_ERC20Transfer)(nil),   // 5: hdwallet.ethereum.proto.Transaction.ERC20Transfer
-	(*Transaction_ContractGeneric)(nil), // 6: hdwallet.ethereum.proto.Transaction.ContractGeneric
+	(*EthAuthorization)(nil),            // 2: hdwallet.ethereum.proto.EthAuthorization
+	(*SigningInput)(nil),                // 3: hdwallet.ethereum.proto.SigningInput
+	(*SigningOutput)(nil),               // 4: hdwallet.ethereum.proto.SigningOutput
+	(*Transaction_Transfer)(nil),        // 5: hdwallet.ethereum.proto.Transaction.Transfer
+	(*Transaction_ERC20Transfer)(nil),   // 6: hdwallet.ethereum.proto.Transaction.ERC20Transfer
+	(*Transaction_ContractGeneric)(nil), // 7: hdwallet.ethereum.proto.Transaction.ContractGeneric
 }
 var file_txproto_ethereum_ethereum_proto_depIdxs = []int32{
-	4, // 0: hdwallet.ethereum.proto.Transaction.transfer:type_name -> hdwallet.ethereum.proto.Transaction.Transfer
-	5, // 1: hdwallet.ethereum.proto.Transaction.erc20_transfer:type_name -> hdwallet.ethereum.proto.Transaction.ERC20Transfer
-	6, // 2: hdwallet.ethereum.proto.Transaction.contract_generic:type_name -> hdwallet.ethereum.proto.Transaction.ContractGeneric
+	5, // 0: hdwallet.ethereum.proto.Transaction.transfer:type_name -> hdwallet.ethereum.proto.Transaction.Transfer
+	6, // 1: hdwallet.ethereum.proto.Transaction.erc20_transfer:type_name -> hdwallet.ethereum.proto.Transaction.ERC20Transfer
+	7, // 2: hdwallet.ethereum.proto.Transaction.contract_generic:type_name -> hdwallet.ethereum.proto.Transaction.ContractGeneric
 	0, // 3: hdwallet.ethereum.proto.SigningInput.transaction:type_name -> hdwallet.ethereum.proto.Transaction
 	1, // 4: hdwallet.ethereum.proto.SigningInput.access_list:type_name -> hdwallet.ethereum.proto.Access
-	5, // [5:5] is the sub-list for method output_type
-	5, // [5:5] is the sub-list for method input_type
-	5, // [5:5] is the sub-list for extension type_name
-	5, // [5:5] is the sub-list for extension extendee
-	0, // [0:5] is the sub-list for field type_name
+	2, // 5: hdwallet.ethereum.proto.SigningInput.authorization_list:type_name -> hdwallet.ethereum.proto.EthAuthorization
+	6, // [6:6] is the sub-list for method output_type
+	6, // [6:6] is the sub-list for method input_type
+	6, // [6:6] is the sub-list for extension type_name
+	6, // [6:6] is the sub-list for extension extendee
+	0, // [0:6] is the sub-list for field type_name
 }
 
 func init() { file_txproto_ethereum_ethereum_proto_init() }
@@ -673,7 +815,7 @@ func file_txproto_ethereum_ethereum_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_txproto_ethereum_ethereum_proto_rawDesc), len(file_txproto_ethereum_ethereum_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   7,
+			NumMessages:   8,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

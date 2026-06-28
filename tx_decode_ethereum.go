@@ -40,6 +40,10 @@ const (
 	EthTxEIP2930
 	// EthTxEIP1559 is a type-2 (0x02) fee-market transaction.
 	EthTxEIP1559
+	// EthTxEIP4844 is a type-3 (0x03) blob transaction (EIP-4844).
+	EthTxEIP4844
+	// EthTxEIP7702 is a type-4 (0x04) set-code transaction (EIP-7702).
+	EthTxEIP7702
 )
 
 // String returns a short human-readable name for the transaction type.
@@ -51,6 +55,10 @@ func (t EthTxType) String() string {
 		return "eip-2930"
 	case EthTxEIP1559:
 		return "eip-1559"
+	case EthTxEIP4844:
+		return "eip-4844"
+	case EthTxEIP7702:
+		return "eip-7702"
 	default:
 		return "unknown"
 	}
@@ -61,6 +69,18 @@ func (t EthTxType) String() string {
 type EthAccessTuple struct {
 	Address     string   // "0x"-prefixed 20-byte address
 	StorageKeys [][]byte // each 32 bytes
+}
+
+// EthAuthorizationTuple is one decoded EIP-7702 authorization-list entry.
+// The authorization was signed off-band by an EOA delegating its code to
+// Address. YParity is 0 or 1 (the bare recovery id of the auth signature).
+type EthAuthorizationTuple struct {
+	ChainID *big.Int // authorization's chain scope (0 = any chain)
+	Address string   // delegation target, "0x"-prefixed 20-byte address
+	Nonce   uint64   // EOA nonce at the time of signing
+	YParity uint8    // 0 or 1
+	R       *big.Int
+	S       *big.Int
 }
 
 // ERC20Call is a decoded ERC-20 method call recognised in the transaction's
@@ -84,15 +104,22 @@ type EthTxFields struct {
 	Nonce    *big.Int
 	GasPrice *big.Int // legacy + 2930
 
-	MaxPriorityFeePerGas *big.Int // 1559
-	MaxFeePerGas         *big.Int // 1559
+	MaxPriorityFeePerGas *big.Int // 1559 + 4844 + 7702
+	MaxFeePerGas         *big.Int // 1559 + 4844 + 7702
 
 	GasLimit *big.Int
 	To       string // "0x"-hex; empty = contract creation
 	Value    *big.Int
 	Data     []byte
 
-	AccessList []EthAccessTuple // 2930 + 1559
+	AccessList []EthAccessTuple // 2930 + 1559 + 4844 + 7702
+
+	// EIP-4844 fields (only set for EthTxEIP4844).
+	MaxFeePerBlobGas    *big.Int // max_fee_per_blob_gas
+	BlobVersionedHashes [][]byte // each 32 bytes; fixed-width (not quantity-stripped)
+
+	// EIP-7702 fields (only set for EthTxEIP7702).
+	AuthorizationList []EthAuthorizationTuple
 
 	// Signature scalars (present in a signed tx). YParity is the bare recovery id
 	// (0/1) for typed txs; for legacy it is the raw v as a *big.Int.
@@ -105,9 +132,15 @@ type EthTxFields struct {
 }
 
 // DecodeEthereumTx decodes a raw EVM transaction (signed or unsigned) into its
-// display fields. It branches on the first byte: 0x02 => EIP-1559, 0x01 =>
-// EIP-2930, any byte >= 0xc0 (an RLP list prefix) => legacy. Malformed or
-// truncated input returns ErrTxDecode; the function never panics.
+// display fields. It branches on the first byte:
+//
+//	0x01 => EIP-2930 access-list (type 1)
+//	0x02 => EIP-1559 fee-market (type 2)
+//	0x03 => EIP-4844 blob (type 3)
+//	0x04 => EIP-7702 set-code (type 4)
+//	>= 0xc0 (RLP list prefix) => legacy EIP-155
+//
+// Malformed or truncated input returns ErrTxDecode; the function never panics.
 func DecodeEthereumTx(raw []byte) (*EthTxFields, error) {
 	if len(raw) == 0 {
 		return nil, fmt.Errorf("%w: ethereum: empty input", ErrTxDecode)
@@ -117,6 +150,10 @@ func DecodeEthereumTx(raw []byte) (*EthTxFields, error) {
 		return decodeEthTyped(raw, EthTxEIP1559)
 	case raw[0] == 0x01:
 		return decodeEthTyped(raw, EthTxEIP2930)
+	case raw[0] == 0x03:
+		return decodeEthTyped(raw, EthTxEIP4844)
+	case raw[0] == 0x04:
+		return decodeEthTyped(raw, EthTxEIP7702)
 	case raw[0] >= 0xc0:
 		return decodeEthLegacy(raw)
 	default:
@@ -216,6 +253,69 @@ func decodeEthTyped(raw []byte, typ EthTxType) (*EthTxFields, error) {
 		if len(l) == 12 {
 			f.V, f.R, f.S = quantity(l[9]), quantity(l[10]), quantity(l[11])
 		}
+	case EthTxEIP4844:
+		// [chainId, nonce, maxPriority, maxFee, gasLimit, to, value, data,
+		//  accessList, maxFeePerBlobGas, blobVersionedHashes, (v, r, s)]
+		if len(l) != 11 && len(l) != 14 {
+			return nil, fmt.Errorf("%w: ethereum eip-4844: expected 11 or 14 fields, got %d", ErrTxDecode, len(l))
+		}
+		f.ChainID = quantity(l[0])
+		f.Nonce = quantity(l[1])
+		f.MaxPriorityFeePerGas = quantity(l[2])
+		f.MaxFeePerGas = quantity(l[3])
+		f.GasLimit = quantity(l[4])
+		to, err := decodeEthTo(l[5])
+		if err != nil {
+			return nil, err
+		}
+		f.To = to
+		f.Value = quantity(l[6])
+		f.Data = leafBytes(l[7])
+		al, err := decodeAccessList(l[8])
+		if err != nil {
+			return nil, err
+		}
+		f.AccessList = al
+		f.MaxFeePerBlobGas = quantity(l[9])
+		blobHashes, err := decodeBlobVersionedHashes(l[10])
+		if err != nil {
+			return nil, err
+		}
+		f.BlobVersionedHashes = blobHashes
+		if len(l) == 14 {
+			f.V, f.R, f.S = quantity(l[11]), quantity(l[12]), quantity(l[13])
+		}
+	case EthTxEIP7702:
+		// [chainId, nonce, maxPriority, maxFee, gasLimit, to, value, data,
+		//  accessList, authorizationList, (v, r, s)]
+		if len(l) != 10 && len(l) != 13 {
+			return nil, fmt.Errorf("%w: ethereum eip-7702: expected 10 or 13 fields, got %d", ErrTxDecode, len(l))
+		}
+		f.ChainID = quantity(l[0])
+		f.Nonce = quantity(l[1])
+		f.MaxPriorityFeePerGas = quantity(l[2])
+		f.MaxFeePerGas = quantity(l[3])
+		f.GasLimit = quantity(l[4])
+		to, err := decodeEthTo(l[5])
+		if err != nil {
+			return nil, err
+		}
+		f.To = to
+		f.Value = quantity(l[6])
+		f.Data = leafBytes(l[7])
+		al, err := decodeAccessList(l[8])
+		if err != nil {
+			return nil, err
+		}
+		f.AccessList = al
+		authList, err := decodeAuthorizationList(l[9])
+		if err != nil {
+			return nil, err
+		}
+		f.AuthorizationList = authList
+		if len(l) == 13 {
+			f.V, f.R, f.S = quantity(l[10]), quantity(l[11]), quantity(l[12])
+		}
 	default:
 		return nil, fmt.Errorf("%w: ethereum: unsupported typed tx", ErrTxDecode)
 	}
@@ -255,6 +355,71 @@ func decodeAccessList(item RLPItem) ([]EthAccessTuple, error) {
 			keys = append(keys, kb)
 		}
 		out = append(out, EthAccessTuple{Address: "0x" + bytesToHex(addr), StorageKeys: keys})
+	}
+	return out, nil
+}
+
+// decodeBlobVersionedHashes decodes the EIP-4844 blob_versioned_hashes RLP
+// list item. Each hash is a fixed 32-byte string (NOT quantity-stripped). An
+// empty list returns nil.
+func decodeBlobVersionedHashes(item RLPItem) ([][]byte, error) {
+	if !item.IsList {
+		return nil, fmt.Errorf("%w: ethereum eip-4844: blob_versioned_hashes is not a list", ErrTxDecode)
+	}
+	if len(item.List) == 0 {
+		return nil, nil
+	}
+	out := make([][]byte, 0, len(item.List))
+	for i, h := range item.List {
+		b := leafBytes(h)
+		if len(b) != 32 {
+			return nil, fmt.Errorf("%w: ethereum eip-4844: blob_versioned_hash[%d] must be 32 bytes, got %d", ErrTxDecode, i, len(b))
+		}
+		out = append(out, b)
+	}
+	return out, nil
+}
+
+// decodeAuthorizationList decodes the EIP-7702 authorization_list RLP list
+// item. Each authorization is:
+//
+//	[chain_id (qty), address (20 bytes), nonce (qty), y_parity (qty), r (qty), s (qty)]
+//
+// An empty list returns nil.
+func decodeAuthorizationList(item RLPItem) ([]EthAuthorizationTuple, error) {
+	if !item.IsList {
+		return nil, fmt.Errorf("%w: ethereum eip-7702: authorization_list is not a list", ErrTxDecode)
+	}
+	if len(item.List) == 0 {
+		return nil, nil
+	}
+	out := make([]EthAuthorizationTuple, 0, len(item.List))
+	for i, entry := range item.List {
+		if !entry.IsList || len(entry.List) != 6 {
+			return nil, fmt.Errorf("%w: ethereum eip-7702: authorization[%d]: expected 6-field list, got %d", ErrTxDecode, i, listLen(entry))
+		}
+		addr := leafBytes(entry.List[1])
+		if len(addr) != 20 {
+			return nil, fmt.Errorf("%w: ethereum eip-7702: authorization[%d]: address must be 20 bytes, got %d", ErrTxDecode, i, len(addr))
+		}
+		nonceBig := quantity(entry.List[2])
+		var nonce uint64
+		if nonceBig != nil && nonceBig.IsUint64() {
+			nonce = nonceBig.Uint64()
+		}
+		yParityBig := quantity(entry.List[3])
+		var yParity uint8
+		if yParityBig != nil && yParityBig.Sign() != 0 {
+			yParity = 1
+		}
+		out = append(out, EthAuthorizationTuple{
+			ChainID: quantity(entry.List[0]),
+			Address: "0x" + bytesToHex(addr),
+			Nonce:   nonce,
+			YParity: yParity,
+			R:       quantity(entry.List[4]),
+			S:       quantity(entry.List[5]),
+		})
 	}
 	return out, nil
 }
