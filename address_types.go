@@ -198,6 +198,8 @@ func encodeP2TR(hrp string, pub []byte) (string, error) {
 // BitcoinAddressKind describes the script type of a Bitcoin-family address.
 type BitcoinAddressKind int
 
+// BitcoinAddressKindUnknown is the zero value returned when the address format
+// is not recognised for the given symbol.
 const (
 	BitcoinAddressKindUnknown    BitcoinAddressKind = iota
 	BitcoinAddressKindP2PKH                         // 1… (base58check, version 0x00 for BTC)

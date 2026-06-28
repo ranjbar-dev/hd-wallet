@@ -190,6 +190,8 @@ func (ww *WatchWallet) publicKey(change, index uint32) ([]byte, error) {
 // XPubVersion describes the address type implied by an extended public key prefix.
 type XPubVersion int
 
+// XPubVersionUnknown is the zero value returned when the extended-key prefix
+// is not recognised as any of the known BIP-32 version bytes.
 const (
 	XPubVersionUnknown    XPubVersion = iota
 	XPubVersionLegacy                 // xpub/tpub — BIP-44 P2PKH
