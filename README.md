@@ -181,9 +181,13 @@ Verified against authoritative signing vectors for:
 | **EVM** | legacy (EIP-155) + EIP-2930 (access list) + EIP-1559 + **EIP-4844** (type-3 blob tx: `max_fee_per_blob_gas` + `blob_versioned_hashes`) + **EIP-7702** (type-4 set-code tx: `authorization_list`), native + ERC-20 + arbitrary contract call + contract creation (deploy). Select the format with `tx_mode` (exported `hdwallet.EthTxModeLegacy`/`EthTxModeEIP2930`/`EthTxModeEIP1559`/`EthTxModeEIP4844`/`EthTxModeEIP7702`). All registered EVM chains. |
 | **Tron** | TRX transfer + TRC-20 token transfer (TriggerSmartContract) |
 | **XRP** | Payment |
-| **Cosmos** | bank `MsgSend`, staking `MsgDelegate`/`MsgUndelegate`, `MsgWithdrawDelegatorReward`, multi-message (protobuf direct mode). All standard secp256k1 Cosmos chains, plus **EVMOS** (ethermint eth_secp256k1: keccak256 SignDoc + ethermint pubkey type URL). Other ethermint chains (INJ/CANTO/ZETA) stay roadmap — Injective uses a different pubkey type URL, so each needs its own vector. |
+| **Cosmos** | bank `MsgSend`, staking `MsgDelegate`/`MsgUndelegate`, `MsgWithdrawDelegatorReward`, multi-message (protobuf direct mode). All standard secp256k1 Cosmos chains, plus **EVMOS** and **INJ** (ethermint eth_secp256k1: keccak256 SignDoc + chain-specific pubkey type URL — INJ uses an uncompressed key). Other ethermint chains (CANTO/ZETA/ONE) stay roadmap — each needs its own vector. |
 | **Solana** | system transfer + SPL token transfer (TransferChecked) |
-| **Bitcoin** | BTC/LTC SegWit: spends **P2WPKH** (BIP-143) and **Taproot key-path** (BIP-341 / BIP-340 Schnorr) inputs; outputs to any address type; deterministic coin-selection + change. Verified against `btcd` (P2WPKH byte-identical; Taproot sighash + BIP-340 verify) and the BIP-143 spec vector. |
+| **Bitcoin / UTXO** | BTC/LTC spends across **all four** single-key input types — legacy **P2PKH**, nested **P2SH-P2WPKH** (BIP-49), native **P2WPKH** (BIP-143), and **Taproot key-path** (BIP-341 / BIP-340 Schnorr); outputs to any address type; deterministic coin-selection + change. The same engine signs the UTXO altcoins (DOGE/DASH/BCH/ZEC and DGB/SYS/VIA/STRAX/QTUM/RVN/FIRO/MONA/PIVX). Verified against `btcd` and the BIP-143 spec vector. |
+| **Bitcoin multisig** | P2SH and P2WSH **m-of-n** (BIP-67 sorted keys), partial-sign + finalize via BIP-174 PSBT (`BuildMultisigPSBT`/`SignMultisigPSBT`/`FinalizeMultisigPSBT`/`ExtractMultisigTx`). Pinned to `btcd`. |
+| **Stellar (XLM)** | Payment (`TransactionV0` XDR envelope). Pinned to the Trust Wallet Core Stellar vector. |
+| **Algorand (ALGO)** | Payment (canonical msgpack, `"TX"`-prefixed ed25519). Pinned to the TWC Algorand vector. |
+| **Aptos (APTOS)** | Entry-function transfer (BCS + `APTOS::RawTransaction` prehash). Pinned to the TWC Aptos vector. |
 
 ```go
 import ethpb "github.com/ranjbar-dev/hd-wallet/txproto/ethereum"
@@ -191,8 +195,8 @@ import ethpb "github.com/ranjbar-dev/hd-wallet/txproto/ethereum"
 out, _ := w.SignTransaction(hdwallet.ETH, 0, &ethpb.SigningInput{ /* … */ })
 ```
 
-> Bitcoin spending currently covers P2WPKH and Taproot key-path inputs; legacy
-> P2PKH and nested P2SH-P2WPKH input spending remain on the roadmap.
+> Bitcoin spending covers all four standard single-key input types (P2PKH,
+> P2SH-P2WPKH, P2WPKH, Taproot key-path) plus P2SH/P2WSH multisig via PSBT.
 
 ### What you must provide (no network I/O)
 
@@ -270,6 +274,26 @@ ok, _ := hdwallet.VerifyRawMessage(hdwallet.ETH, pub, digest, sig)
 // ed25519 chains: pass the raw message; EdDSA hashes internally.
 sig, _ = w.SignRawMessage(hdwallet.SOL, 0, []byte("any length"))
 ```
+
+### Amount formatting
+
+Convert between human-readable amounts and base units using each chain's native
+decimals (from the registry) — or explicit decimals for tokens (ERC-20/SPL/TRC-20,
+whose decimals are token-specific and supplied by you). All `big.Int` /
+decimal-string math, no float:
+
+```go
+d, _ := hdwallet.NativeDecimals(hdwallet.ETH)            // 18
+s   := hdwallet.FormatAmount(hdwallet.ETH, weiBigInt)    // "1.5"
+wei, _ := hdwallet.ParseAmount(hdwallet.ETH, "1.5")      // *big.Int
+
+// Token amounts: pass the token's own decimals.
+usdc := hdwallet.FormatUnits(rawBigInt, 6)               // "12.34"
+raw, _ := hdwallet.ParseUnits("12.34", 6)
+```
+
+> Native decimals come from `CoinInfo(symbol).Decimals`; **token** decimals are
+> the client's responsibility (token lists are out of scope).
 
 ### Address validation & parsing
 
