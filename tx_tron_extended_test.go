@@ -1,7 +1,9 @@
 package hdwallet
 
 import (
+	"bytes"
 	"encoding/hex"
+	"errors"
 	"testing"
 
 	txtron "github.com/ranjbar-dev/hd-wallet/txproto/tron"
@@ -374,4 +376,466 @@ func TestSignTxTronWithdrawExpireUnfreeze(t *testing.T) {
 
 	out := assertTronOutput(t, w, in)
 	assertTronRoundTrip(t, out, tronWithdrawExpireUnfreezeType, "TJRyWwFs9wTFGZg3JbrVriFbNfCug5tDeC")
+}
+
+// TestSignTxTronTriggerSmartContract tests generic TriggerSmartContract (type 31)
+// with non-empty calldata and a non-zero call_value (TRX sent with the call).
+// The self-consistency check (txID == sha256(raw_data)) and the round-trip decoder
+// are the correctness anchors; no external TWC vector exists for the generic path.
+func TestSignTxTronTriggerSmartContract(t *testing.T) {
+	w := tronTestWallet(t)
+	defer w.Destroy()
+
+	// Arbitrary calldata: a simple function call with one uint256 argument.
+	calldata := mustHexTx(t, "a9059cbb"+ // transfer(address,uint256) selector
+		"000000000000000000000000521ea197907927725ef36d70f25f850d1659c7c7"+ // padded recipient (20-byte form)
+		"00000000000000000000000000000000000000000000000000000000000003e8") // 1000
+
+	in := &txtron.SigningInput{
+		Transaction: &txtron.Transaction{
+			Timestamp:   1539295479000,
+			Expiration:  1539331479000,
+			BlockHeader: tronTestBlockHeader(t),
+			FeeLimit:    1_000_000,
+			ContractOneof: &txtron.Transaction_TriggerSmartContract{
+				TriggerSmartContract: &txtron.TriggerSmartContract{
+					OwnerAddress:    "415cd0fb0ab3ce40f3051414c604b27756e69e43db",
+					ContractAddress: "41521ea197907927725ef36d70f25f850d1659c7c7",
+					CallValue:       100_000, // 0.1 TRX in SUN
+					Data:            calldata,
+				},
+			},
+		},
+	}
+
+	out := assertTronOutput(t, w, in)
+	c := assertTronRoundTrip(t, out, tronTriggerSmartContractType, "TJRyWwFs9wTFGZg3JbrVriFbNfCug5tDeC")
+
+	// Verify decoded calldata round-trips correctly.
+	if !bytes.Equal(c.Data, calldata) {
+		t.Fatalf("data round-trip mismatch:\n got  %x\n want %x", c.Data, calldata)
+	}
+	// Verify decoded call_value round-trips correctly.
+	if c.CallValue != 100_000 {
+		t.Fatalf("call_value = %d, want 100000", c.CallValue)
+	}
+	// Verify zero-valued fields are absent (proto3 default omission).
+	if c.CallTokenValue != 0 {
+		t.Fatalf("call_token_value = %d, want 0", c.CallTokenValue)
+	}
+	if c.TokenId != 0 {
+		t.Fatalf("token_id = %d, want 0", c.TokenId)
+	}
+}
+
+// TestSignTxTronFreezeBalance tests legacy Stake 1.0 FreezeBalanceContract (type 11).
+// Two sub-tests: self-freeze (BANDWIDTH, no receiver) and delegated freeze (ENERGY,
+// with receiver). No external TWC vector — correctness is anchored by
+// self-consistency (txID == sha256(raw_data)) and the decode round-trip.
+func TestSignTxTronFreezeBalance(t *testing.T) {
+	t.Run("self-freeze", func(t *testing.T) {
+		w := tronTestWallet(t)
+		defer w.Destroy()
+
+		in := &txtron.SigningInput{
+			Transaction: &txtron.Transaction{
+				Timestamp:   1539295479000,
+				Expiration:  1539331479000,
+				BlockHeader: tronTestBlockHeader(t),
+				ContractOneof: &txtron.Transaction_FreezeBalance{
+					FreezeBalance: &txtron.FreezeBalanceContract{
+						OwnerAddress:   "415cd0fb0ab3ce40f3051414c604b27756e69e43db",
+						FrozenBalance:  1_000_000,
+						FrozenDuration: 3,
+						Resource:       txtron.ResourceCode_BANDWIDTH,
+						// receiver_address intentionally empty (self-freeze)
+					},
+				},
+			},
+		}
+
+		out := assertTronOutput(t, w, in)
+		c := assertTronRoundTrip(t, out, tronFreezeBalanceType, "TJRyWwFs9wTFGZg3JbrVriFbNfCug5tDeC")
+		if c.FrozenBalance != 1_000_000 {
+			t.Fatalf("frozen_balance = %d, want 1000000", c.FrozenBalance)
+		}
+		if c.FrozenDuration != 3 {
+			t.Fatalf("frozen_duration = %d, want 3", c.FrozenDuration)
+		}
+		if c.Resource != 0 {
+			t.Fatalf("resource = %d, want 0 (BANDWIDTH)", c.Resource)
+		}
+		if c.ReceiverAddress != "" {
+			t.Fatalf("receiver_address = %q, want empty (self-freeze)", c.ReceiverAddress)
+		}
+	})
+
+	t.Run("delegated-freeze", func(t *testing.T) {
+		w := tronTestWallet(t)
+		defer w.Destroy()
+
+		in := &txtron.SigningInput{
+			Transaction: &txtron.Transaction{
+				Timestamp:   1539295479000,
+				Expiration:  1539331479000,
+				BlockHeader: tronTestBlockHeader(t),
+				ContractOneof: &txtron.Transaction_FreezeBalance{
+					FreezeBalance: &txtron.FreezeBalanceContract{
+						OwnerAddress:    "415cd0fb0ab3ce40f3051414c604b27756e69e43db",
+						FrozenBalance:   2_000_000,
+						FrozenDuration:  0,
+						Resource:        txtron.ResourceCode_ENERGY,
+						ReceiverAddress: "41521ea197907927725ef36d70f25f850d1659c7c7",
+					},
+				},
+			},
+		}
+
+		out := assertTronOutput(t, w, in)
+		c := assertTronRoundTrip(t, out, tronFreezeBalanceType, "TJRyWwFs9wTFGZg3JbrVriFbNfCug5tDeC")
+		if c.FrozenBalance != 2_000_000 {
+			t.Fatalf("frozen_balance = %d, want 2000000", c.FrozenBalance)
+		}
+		if c.FrozenDuration != 0 {
+			t.Fatalf("frozen_duration = %d, want 0", c.FrozenDuration)
+		}
+		if c.Resource != 1 {
+			t.Fatalf("resource = %d, want 1 (ENERGY)", c.Resource)
+		}
+		if c.ReceiverAddress == "" {
+			t.Fatal("receiver_address is empty, want a delegated address")
+		}
+	})
+}
+
+// TestSignTxTronUnfreezeBalance tests legacy Stake 1.0 UnfreezeBalanceContract
+// (type 12). Two sub-tests: self-unfreeze (BANDWIDTH, no receiver) and
+// delegated-unfreeze (ENERGY, with receiver). No external TWC vector —
+// correctness is anchored by self-consistency (txID == sha256(raw_data)) and
+// the decode round-trip.
+func TestSignTxTronUnfreezeBalance(t *testing.T) {
+	t.Run("self", func(t *testing.T) {
+		w := tronTestWallet(t)
+		defer w.Destroy()
+
+		in := &txtron.SigningInput{
+			Transaction: &txtron.Transaction{
+				Timestamp:   1539295479000,
+				Expiration:  1539331479000,
+				BlockHeader: tronTestBlockHeader(t),
+				ContractOneof: &txtron.Transaction_UnfreezeBalance{
+					UnfreezeBalance: &txtron.UnfreezeBalanceContract{
+						OwnerAddress: "415cd0fb0ab3ce40f3051414c604b27756e69e43db",
+						Resource:     txtron.ResourceCode_BANDWIDTH,
+						// receiver_address intentionally empty (self-unfreeze)
+					},
+				},
+			},
+		}
+
+		out := assertTronOutput(t, w, in)
+		c := assertTronRoundTrip(t, out, tronUnfreezeBalanceType, "TJRyWwFs9wTFGZg3JbrVriFbNfCug5tDeC")
+		if c.Resource != 0 {
+			t.Fatalf("resource = %d, want 0 (BANDWIDTH)", c.Resource)
+		}
+		if c.ReceiverAddress != "" {
+			t.Fatalf("receiver_address = %q, want empty (self-unfreeze)", c.ReceiverAddress)
+		}
+	})
+
+	t.Run("delegated", func(t *testing.T) {
+		w := tronTestWallet(t)
+		defer w.Destroy()
+
+		in := &txtron.SigningInput{
+			Transaction: &txtron.Transaction{
+				Timestamp:   1539295479000,
+				Expiration:  1539331479000,
+				BlockHeader: tronTestBlockHeader(t),
+				ContractOneof: &txtron.Transaction_UnfreezeBalance{
+					UnfreezeBalance: &txtron.UnfreezeBalanceContract{
+						OwnerAddress:    "415cd0fb0ab3ce40f3051414c604b27756e69e43db",
+						Resource:        txtron.ResourceCode_ENERGY,
+						ReceiverAddress: "41521ea197907927725ef36d70f25f850d1659c7c7",
+					},
+				},
+			},
+		}
+
+		out := assertTronOutput(t, w, in)
+		c := assertTronRoundTrip(t, out, tronUnfreezeBalanceType, "TJRyWwFs9wTFGZg3JbrVriFbNfCug5tDeC")
+		if c.Resource != 1 {
+			t.Fatalf("resource = %d, want 1 (ENERGY)", c.Resource)
+		}
+		if c.ReceiverAddress == "" {
+			t.Fatal("receiver_address is empty, want a delegated address")
+		}
+	})
+}
+
+// TestSignTxTronUnfreezeAsset tests UnfreezeAssetContract (type 14).
+// No external TWC vector — correctness is anchored by self-consistency
+// (txID == sha256(raw_data)) and the decode round-trip.
+func TestSignTxTronUnfreezeAsset(t *testing.T) {
+	w := tronTestWallet(t)
+	defer w.Destroy()
+
+	in := &txtron.SigningInput{
+		Transaction: &txtron.Transaction{
+			Timestamp:   1539295479000,
+			Expiration:  1539331479000,
+			BlockHeader: tronTestBlockHeader(t),
+			ContractOneof: &txtron.Transaction_UnfreezeAsset{
+				UnfreezeAsset: &txtron.UnfreezeAssetContract{
+					OwnerAddress: "415cd0fb0ab3ce40f3051414c604b27756e69e43db",
+				},
+			},
+		},
+	}
+
+	out := assertTronOutput(t, w, in)
+	assertTronRoundTrip(t, out, tronUnfreezeAssetType, "TJRyWwFs9wTFGZg3JbrVriFbNfCug5tDeC")
+}
+
+// TestSignTxTronWithdrawBalance tests WithdrawBalanceContract (type 13),
+// which claims SR / voting rewards. No external TWC vector — correctness is
+// anchored by self-consistency (txID == sha256(raw_data)) and the decode
+// round-trip confirming the owner address survives intact.
+func TestSignTxTronWithdrawBalance(t *testing.T) {
+	w := tronTestWallet(t)
+	defer w.Destroy()
+
+	in := &txtron.SigningInput{
+		Transaction: &txtron.Transaction{
+			Timestamp:   1539295479000,
+			Expiration:  1539331479000,
+			BlockHeader: tronTestBlockHeader(t),
+			ContractOneof: &txtron.Transaction_WithdrawBalance{
+				WithdrawBalance: &txtron.WithdrawBalanceContract{
+					OwnerAddress: "415cd0fb0ab3ce40f3051414c604b27756e69e43db",
+				},
+			},
+		},
+	}
+
+	out := assertTronOutput(t, w, in)
+	assertTronRoundTrip(t, out, tronWithdrawBalanceType, "TJRyWwFs9wTFGZg3JbrVriFbNfCug5tDeC")
+}
+
+// TestSignTxTronVoteAsset tests VoteAssetContract (TRC-10 asset voting, type 3)
+// with two vote addresses, support=true, and count=5. No external TWC vector —
+// correctness is anchored by self-consistency (txID == sha256(raw_data)) and the
+// decode round-trip.
+func TestSignTxTronVoteAsset(t *testing.T) {
+	w := tronTestWallet(t)
+	defer w.Destroy()
+
+	in := &txtron.SigningInput{
+		Transaction: &txtron.Transaction{
+			Timestamp:   1539295479000,
+			Expiration:  1539331479000,
+			BlockHeader: tronTestBlockHeader(t),
+			ContractOneof: &txtron.Transaction_VoteAsset{
+				VoteAsset: &txtron.VoteAssetContract{
+					OwnerAddress: "415cd0fb0ab3ce40f3051414c604b27756e69e43db",
+					VoteAddress: []string{
+						"415cd0fb0ab3ce40f3051414c604b27756e69e43db",
+						"41521ea197907927725ef36d70f25f850d1659c7c7",
+					},
+					Support: true,
+					Count:   5,
+				},
+			},
+		},
+	}
+
+	out := assertTronOutput(t, w, in)
+	c := assertTronRoundTrip(t, out, tronVoteAssetType, "TJRyWwFs9wTFGZg3JbrVriFbNfCug5tDeC")
+	if len(c.VoteAddresses) != 2 {
+		t.Fatalf("vote_addresses = %d, want 2", len(c.VoteAddresses))
+	}
+	if !c.Support {
+		t.Fatal("support = false, want true")
+	}
+	if c.Count != 5 {
+		t.Fatalf("count = %d, want 5", c.Count)
+	}
+}
+
+// TestSignTxTronTriggerSmartContractCrossCheck verifies that signing a
+// TransferTRC20Contract and signing a generic TriggerSmartContract with
+// identical owner, token contract, and manually-built ABI calldata produce
+// the same txID — proving the two code paths produce byte-identical raw_data.
+func TestSignTxTronTriggerSmartContractCrossCheck(t *testing.T) {
+	// Use the TRC-20 TWC-pinned test's private key and addresses so the
+	// cross-check is anchored to the known-good wantID from that test.
+	w, err := FromPrivateKeyBytes(
+		mustHexTx(t, "2d8f68944bdbfbc0769542fba8fc2d2a3de67393334471624364c7006da2aa54"),
+		Secp256k1,
+	)
+	if err != nil {
+		t.Fatalf("FromPrivateKeyBytes: %v", err)
+	}
+	defer w.Destroy()
+
+	bh := &txtron.BlockHeader{
+		Timestamp:      1539295479000,
+		TxTrieRoot:     mustHexTx(t, "64288c2db0641316762a99dbb02ef7c90f968b60f9f2e410835980614332f86d"),
+		ParentHash:     mustHexTx(t, "00000000002f7b3af4f5f8b9e23a30c530f719f165b742e7358536b280eead2d"),
+		Number:         3111739,
+		WitnessAddress: mustHexTx(t, "415863f6091b8e71766da808b1dd3159790f61de7d"),
+		Version:        3,
+	}
+
+	const (
+		ownerAddr    = "TJRyWwFs9wTFGZg3JbrVriFbNfCug5tDeC"
+		contractAddr = "THTR75o8xXAgCTQqpiot2AFRAjvW1tSbVV"
+		toAddr       = "TW1dU4L3eNm7Lw8WvieLKEHpXWAussRG9Z"
+	)
+	amount := []byte{0x03, 0xe8} // 1000
+
+	// Sign via TransferTRC20Contract (the known-good high-level path).
+	inTRC20 := &txtron.SigningInput{
+		Transaction: &txtron.Transaction{
+			Timestamp:   1539295479000,
+			BlockHeader: bh,
+			ContractOneof: &txtron.Transaction_TransferTrc20{
+				TransferTrc20: &txtron.TransferTRC20Contract{
+					OwnerAddress:    ownerAddr,
+					ContractAddress: contractAddr,
+					ToAddress:       toAddr,
+					Amount:          amount,
+				},
+			},
+		},
+	}
+	outTRC20 := assertTronOutput(t, w, inTRC20)
+	idTRC20 := hex.EncodeToString(outTRC20.GetId())
+
+	// Sanity-check against the pinned TWC vector.
+	const wantID = "0d644290e3cf554f6219c7747f5287589b6e7e30e1b02793b48ba362da6a5058"
+	if idTRC20 != wantID {
+		t.Fatalf("TRC-20 txID mismatch:\n got  %s\n want %s", idTRC20, wantID)
+	}
+
+	// Build the identical calldata manually and sign via generic TriggerSmartContract.
+	recipientBytes, err := tronAddressBytes(toAddr)
+	if err != nil {
+		t.Fatalf("tronAddressBytes: %v", err)
+	}
+	calldata, err := tronTRC20TransferData(recipientBytes, amount)
+	if err != nil {
+		t.Fatalf("tronTRC20TransferData: %v", err)
+	}
+
+	inGeneric := &txtron.SigningInput{
+		Transaction: &txtron.Transaction{
+			Timestamp:   1539295479000,
+			BlockHeader: bh,
+			ContractOneof: &txtron.Transaction_TriggerSmartContract{
+				TriggerSmartContract: &txtron.TriggerSmartContract{
+					OwnerAddress:    ownerAddr,
+					ContractAddress: contractAddr,
+					Data:            calldata,
+					// call_value=0, call_token_value=0, token_id=0 → all omitted
+				},
+			},
+		},
+	}
+	outGeneric := assertTronOutput(t, w, inGeneric)
+	idGeneric := hex.EncodeToString(outGeneric.GetId())
+
+	// The two txIDs must be identical — same raw_data, same sha256.
+	if idGeneric != idTRC20 {
+		t.Fatalf("generic trigger txID != TRC-20 txID:\n generic %s\n trc-20  %s", idGeneric, idTRC20)
+	}
+}
+
+// TestSignTxTronRawJSON verifies that signing a pre-built node JSON transaction
+// (raw_json mode) produces exactly the same txID and signature as signing the
+// same transaction via the normal typed path.
+func TestSignTxTronRawJSON(t *testing.T) {
+	w := tronTestWallet(t)
+	defer w.Destroy()
+
+	// Build and sign the transaction the normal typed way first.
+	in1 := &txtron.SigningInput{
+		Transaction: &txtron.Transaction{
+			Timestamp:   1539295479000,
+			Expiration:  1539331479000,
+			BlockHeader: tronTestBlockHeader(t),
+			ContractOneof: &txtron.Transaction_Transfer{
+				Transfer: &txtron.TransferContract{
+					OwnerAddress: "415cd0fb0ab3ce40f3051414c604b27756e69e43db",
+					ToAddress:    "41521ea197907927725ef36d70f25f850d1659c7c7",
+					Amount:       1000,
+				},
+			},
+		},
+	}
+	out1 := assertTronOutput(t, w, in1)
+
+	// Encode the signed output's raw_data as hex and txID as hex.
+	rawHex := hex.EncodeToString(out1.GetRawData())
+	idHex := hex.EncodeToString(out1.GetId())
+
+	// Build the raw_json signing input that a DApp / node would provide.
+	jsonStr := `{"txID":"` + idHex + `","raw_data_hex":"` + rawHex + `"}`
+	in2 := &txtron.SigningInput{RawJson: jsonStr}
+
+	out2Msg, err := w.SignTransaction(TRX, 0, in2)
+	if err != nil {
+		t.Fatalf("SignTransaction (raw_json): %v", err)
+	}
+	out2, ok := out2Msg.(*txtron.SigningOutput)
+	if !ok {
+		t.Fatalf("output type = %T, want *tron.SigningOutput", out2Msg)
+	}
+
+	// txID must be byte-identical.
+	if !bytes.Equal(out2.GetId(), out1.GetId()) {
+		t.Fatalf("txID mismatch:\n raw_json  %x\n typed     %x", out2.GetId(), out1.GetId())
+	}
+	// Signature must be byte-identical (same key, same digest, RFC 6979 determinism).
+	if !bytes.Equal(out2.GetSignature(), out1.GetSignature()) {
+		t.Fatalf("signature mismatch:\n raw_json  %x\n typed     %x", out2.GetSignature(), out1.GetSignature())
+	}
+}
+
+// TestSignTxTronRawJSONHashMismatch verifies that a deliberately wrong txID in
+// the raw_json causes SignTransaction to return an error wrapping ErrTxInput.
+func TestSignTxTronRawJSONHashMismatch(t *testing.T) {
+	w := tronTestWallet(t)
+	defer w.Destroy()
+
+	// Build a valid signed tx to obtain a real raw_data_hex.
+	in1 := &txtron.SigningInput{
+		Transaction: &txtron.Transaction{
+			Timestamp:   1539295479000,
+			Expiration:  1539331479000,
+			BlockHeader: tronTestBlockHeader(t),
+			ContractOneof: &txtron.Transaction_Transfer{
+				Transfer: &txtron.TransferContract{
+					OwnerAddress: "415cd0fb0ab3ce40f3051414c604b27756e69e43db",
+					ToAddress:    "41521ea197907927725ef36d70f25f850d1659c7c7",
+					Amount:       1000,
+				},
+			},
+		},
+	}
+	out1 := assertTronOutput(t, w, in1)
+	rawHex := hex.EncodeToString(out1.GetRawData())
+
+	// Use a deliberately wrong (all-zero) txID.
+	wrongID := "0000000000000000000000000000000000000000000000000000000000000000"
+	jsonStr := `{"txID":"` + wrongID + `","raw_data_hex":"` + rawHex + `"}`
+	in2 := &txtron.SigningInput{RawJson: jsonStr}
+
+	_, err := w.SignTransaction(TRX, 0, in2)
+	if err == nil {
+		t.Fatal("expected error for txID mismatch, got nil")
+	}
+	if !errors.Is(err, ErrTxInput) {
+		t.Fatalf("expected ErrTxInput, got: %v", err)
+	}
 }

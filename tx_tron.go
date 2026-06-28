@@ -2,7 +2,9 @@ package hdwallet
 
 import (
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"google.golang.org/protobuf/encoding/protowire"
@@ -45,6 +47,7 @@ import (
 const (
 	tronTransferType               = 1
 	tronTransferAssetType          = 2
+	tronVoteAssetType              = 3
 	tronVoteWitnessType            = 4
 	tronTriggerSmartContractType   = 31
 	tronFreezeBalanceV2Type        = 54
@@ -52,12 +55,17 @@ const (
 	tronUnfreezeBalanceV2Type      = 55
 	tronDelegateResourceType       = 57
 	tronUndelegateResourceType     = 58
+	tronFreezeBalanceType          = 11
+	tronUnfreezeBalanceType        = 12
+	tronWithdrawBalanceType        = 13
+	tronUnfreezeAssetType          = 14
 )
 
 // google.protobuf.Any type_url strings for each contract type.
 const (
 	tronTransferTypeURL               = "type.googleapis.com/protocol.TransferContract"
 	tronTransferAssetTypeURL          = "type.googleapis.com/protocol.TransferAssetContract"
+	tronVoteAssetTypeURL              = "type.googleapis.com/protocol.VoteAssetContract"
 	tronVoteWitnessTypeURL            = "type.googleapis.com/protocol.VoteWitnessContract"
 	tronTriggerSmartContractTypeURL   = "type.googleapis.com/protocol.TriggerSmartContract"
 	tronFreezeBalanceV2TypeURL        = "type.googleapis.com/protocol.FreezeBalanceV2Contract"
@@ -65,11 +73,19 @@ const (
 	tronUnfreezeBalanceV2TypeURL      = "type.googleapis.com/protocol.UnfreezeBalanceV2Contract"
 	tronDelegateResourceTypeURL       = "type.googleapis.com/protocol.DelegateResourceContract"
 	tronUndelegateResourceTypeURL     = "type.googleapis.com/protocol.UndelegateResourceContract"
+	tronFreezeBalanceTypeURL          = "type.googleapis.com/protocol.FreezeBalanceContract"
+	tronUnfreezeBalanceTypeURL        = "type.googleapis.com/protocol.UnfreezeBalanceContract"
+	tronUnfreezeAssetTypeURL          = "type.googleapis.com/protocol.UnfreezeAssetContract"
+	tronWithdrawBalanceTypeURL        = "type.googleapis.com/protocol.WithdrawBalanceContract"
 )
 
 // signTronTx builds, signs and serializes a Tron transaction (TRX transfer or
 // TRC-20 token transfer).
 func (w *HDWallet) signTronTx(symbol Symbol, index uint32, in *txtron.SigningInput) (*txtron.SigningOutput, error) {
+	if in.GetRawJson() != "" {
+		return w.signTronRawJSON(symbol, index, in.GetRawJson())
+	}
+
 	tx := in.GetTransaction()
 	if tx == nil {
 		return nil, fmt.Errorf("%w: tron: missing transaction", ErrTxInput)
@@ -144,7 +160,18 @@ func tronContractMsg(tx *txtron.Transaction) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		return tronTriggerSmartContractMsg(owner, contract, data), nil
+		return tronTriggerSmartContractMsg(owner, contract, data, 0, 0, 0), nil
+	case tx.GetTriggerSmartContract() != nil:
+		t := tx.GetTriggerSmartContract()
+		owner, err := tronAddressBytes(t.GetOwnerAddress())
+		if err != nil {
+			return nil, fmt.Errorf("%w: tron: owner_address: %v", ErrTxInput, err)
+		}
+		contract, err := tronAddressBytes(t.GetContractAddress())
+		if err != nil {
+			return nil, fmt.Errorf("%w: tron: contract_address: %v", ErrTxInput, err)
+		}
+		return tronTriggerSmartContractMsg(owner, contract, t.GetData(), t.GetCallValue(), t.GetCallTokenValue(), t.GetTokenId()), nil
 	case tx.GetTransferAsset() != nil:
 		t := tx.GetTransferAsset()
 		owner, err := tronAddressBytes(t.GetOwnerAddress())
@@ -216,6 +243,63 @@ func tronContractMsg(tx *txtron.Transaction) ([]byte, error) {
 			return nil, fmt.Errorf("%w: tron: owner_address: %v", ErrTxInput, err)
 		}
 		return tronWithdrawExpireUnfreezeMsg(owner), nil
+	case tx.GetFreezeBalance() != nil:
+		t := tx.GetFreezeBalance()
+		owner, err := tronAddressBytes(t.GetOwnerAddress())
+		if err != nil {
+			return nil, fmt.Errorf("%w: tron: owner_address: %v", ErrTxInput, err)
+		}
+		var receiver []byte
+		if t.GetReceiverAddress() != "" {
+			receiver, err = tronAddressBytes(t.GetReceiverAddress())
+			if err != nil {
+				return nil, fmt.Errorf("%w: tron: receiver_address: %v", ErrTxInput, err)
+			}
+		}
+		return tronFreezeBalanceMsg(owner, t.GetFrozenBalance(), t.GetFrozenDuration(), int32(t.GetResource()), receiver), nil
+	case tx.GetUnfreezeBalance() != nil:
+		t := tx.GetUnfreezeBalance()
+		owner, err := tronAddressBytes(t.GetOwnerAddress())
+		if err != nil {
+			return nil, fmt.Errorf("%w: tron: owner_address: %v", ErrTxInput, err)
+		}
+		var receiver []byte
+		if t.GetReceiverAddress() != "" {
+			receiver, err = tronAddressBytes(t.GetReceiverAddress())
+			if err != nil {
+				return nil, fmt.Errorf("%w: tron: receiver_address: %v", ErrTxInput, err)
+			}
+		}
+		return tronUnfreezeBalanceMsg(owner, int32(t.GetResource()), receiver), nil
+	case tx.GetUnfreezeAsset() != nil:
+		t := tx.GetUnfreezeAsset()
+		owner, err := tronAddressBytes(t.GetOwnerAddress())
+		if err != nil {
+			return nil, fmt.Errorf("%w: tron: owner_address: %v", ErrTxInput, err)
+		}
+		return tronUnfreezeAssetMsg(owner), nil
+	case tx.GetWithdrawBalance() != nil:
+		t := tx.GetWithdrawBalance()
+		owner, err := tronAddressBytes(t.GetOwnerAddress())
+		if err != nil {
+			return nil, fmt.Errorf("%w: tron: owner_address: %v", ErrTxInput, err)
+		}
+		return tronWithdrawBalanceMsg(owner), nil
+	case tx.GetVoteAsset() != nil:
+		t := tx.GetVoteAsset()
+		owner, err := tronAddressBytes(t.GetOwnerAddress())
+		if err != nil {
+			return nil, fmt.Errorf("%w: tron: owner_address: %v", ErrTxInput, err)
+		}
+		voteAddrs := make([][]byte, 0, len(t.GetVoteAddress()))
+		for i, addr := range t.GetVoteAddress() {
+			b, err := tronAddressBytes(addr)
+			if err != nil {
+				return nil, fmt.Errorf("%w: tron: vote_address[%d]: %v", ErrTxInput, i, err)
+			}
+			voteAddrs = append(voteAddrs, b)
+		}
+		return tronVoteAssetMsg(owner, voteAddrs, t.GetSupport(), t.GetCount()), nil
 	default:
 		return nil, fmt.Errorf("%w: tron: no supported contract set", ErrTxInput)
 	}
@@ -235,16 +319,32 @@ func tronTransferContractMsg(owner, to []byte, amount int64) []byte {
 }
 
 // tronTriggerSmartContractMsg builds the Contract {1: type=TriggerSmartContract,
-// 2: Any} for a smart-contract call. call_value (field 3) is omitted (zero).
-func tronTriggerSmartContractMsg(owner, contractAddr, data []byte) []byte {
-	// TriggerSmartContract: {1: owner_address, 2: contract_address, 4: data}.
+// 2: Any} for a smart-contract call. Fields are appended in ascending order;
+// zero-valued varint fields and empty bytes fields are omitted (proto3 defaults).
+func tronTriggerSmartContractMsg(owner, contractAddr, data []byte, callValue, callTokenValue, tokenId int64) []byte {
+	// TriggerSmartContract: {1: owner, 2: contract, [3: call_value], [4: data],
+	//                         [5: call_token_value], [6: token_id]}.
 	var inner []byte
 	inner = protowire.AppendTag(inner, 1, protowire.BytesType)
 	inner = protowire.AppendBytes(inner, owner)
 	inner = protowire.AppendTag(inner, 2, protowire.BytesType)
 	inner = protowire.AppendBytes(inner, contractAddr)
-	inner = protowire.AppendTag(inner, 4, protowire.BytesType)
-	inner = protowire.AppendBytes(inner, data)
+	if callValue != 0 {
+		inner = protowire.AppendTag(inner, 3, protowire.VarintType)
+		inner = protowire.AppendVarint(inner, i64AsU64(callValue))
+	}
+	if len(data) > 0 {
+		inner = protowire.AppendTag(inner, 4, protowire.BytesType)
+		inner = protowire.AppendBytes(inner, data)
+	}
+	if callTokenValue != 0 {
+		inner = protowire.AppendTag(inner, 5, protowire.VarintType)
+		inner = protowire.AppendVarint(inner, i64AsU64(callTokenValue))
+	}
+	if tokenId != 0 {
+		inner = protowire.AppendTag(inner, 6, protowire.VarintType)
+		inner = protowire.AppendVarint(inner, i64AsU64(tokenId))
+	}
 	return tronContractWrap(tronTriggerSmartContractType, tronTriggerSmartContractTypeURL, inner)
 }
 
@@ -391,6 +491,91 @@ func tronWithdrawExpireUnfreezeMsg(owner []byte) []byte {
 	return tronContractWrap(tronWithdrawExpireUnfreezeType, tronWithdrawExpireUnfreezeTypeURL, inner)
 }
 
+// tronUnfreezeAssetMsg builds UnfreezeAssetContract: {1: owner}.
+func tronUnfreezeAssetMsg(owner []byte) []byte {
+	var inner []byte
+	inner = protowire.AppendTag(inner, 1, protowire.BytesType)
+	inner = protowire.AppendBytes(inner, owner)
+	return tronContractWrap(tronUnfreezeAssetType, tronUnfreezeAssetTypeURL, inner)
+}
+
+// tronWithdrawBalanceMsg builds WithdrawBalanceContract: {1: owner}.
+func tronWithdrawBalanceMsg(owner []byte) []byte {
+	var inner []byte
+	inner = protowire.AppendTag(inner, 1, protowire.BytesType)
+	inner = protowire.AppendBytes(inner, owner)
+	return tronContractWrap(tronWithdrawBalanceType, tronWithdrawBalanceTypeURL, inner)
+}
+
+// tronVoteAssetMsg builds VoteAssetContract (TRC-10 asset voting).
+// On-chain inner layout: {1: owner, 2*: vote_addr (flat repeated bytes),
+// [3: support varint], [5: count varint]}.
+// Fields are in ascending order: 1, 2, 3, 5.
+// Note: on-chain field number for count is 5, not proto field 4.
+func tronVoteAssetMsg(owner []byte, voteAddrs [][]byte, support bool, count int32) []byte {
+	var inner []byte
+	inner = protowire.AppendTag(inner, 1, protowire.BytesType)
+	inner = protowire.AppendBytes(inner, owner)
+	for _, addr := range voteAddrs {
+		inner = protowire.AppendTag(inner, 2, protowire.BytesType)
+		inner = protowire.AppendBytes(inner, addr)
+	}
+	if support {
+		inner = protowire.AppendTag(inner, 3, protowire.VarintType)
+		inner = protowire.AppendVarint(inner, 1)
+	}
+	if count != 0 {
+		inner = protowire.AppendTag(inner, 5, protowire.VarintType)
+		inner = protowire.AppendVarint(inner, i32AsU64(count))
+	}
+	return tronContractWrap(tronVoteAssetType, tronVoteAssetTypeURL, inner)
+}
+
+// tronFreezeBalanceMsg builds the legacy FreezeBalanceContract (Stake 1.0):
+// on-chain inner layout: {1: owner, 2: frozen_balance, [3: frozen_duration],
+// [10: resource], [15: receiver_address]}.
+// Fields are in ascending order; varint fields are omitted when zero,
+// bytes fields are omitted when empty (proto3 default-omission).
+func tronFreezeBalanceMsg(owner []byte, frozenBalance, frozenDuration int64, resource int32, receiver []byte) []byte {
+	var inner []byte
+	inner = protowire.AppendTag(inner, 1, protowire.BytesType)
+	inner = protowire.AppendBytes(inner, owner)
+	inner = protowire.AppendTag(inner, 2, protowire.VarintType)
+	inner = protowire.AppendVarint(inner, i64AsU64(frozenBalance))
+	if frozenDuration != 0 {
+		inner = protowire.AppendTag(inner, 3, protowire.VarintType)
+		inner = protowire.AppendVarint(inner, i64AsU64(frozenDuration))
+	}
+	if resource != 0 {
+		inner = protowire.AppendTag(inner, 10, protowire.VarintType)
+		inner = protowire.AppendVarint(inner, i32AsU64(resource))
+	}
+	if len(receiver) > 0 {
+		inner = protowire.AppendTag(inner, 15, protowire.BytesType)
+		inner = protowire.AppendBytes(inner, receiver)
+	}
+	return tronContractWrap(tronFreezeBalanceType, tronFreezeBalanceTypeURL, inner)
+}
+
+// tronUnfreezeBalanceMsg builds the legacy UnfreezeBalanceContract (Stake 1.0):
+// on-chain inner layout: {1: owner, [10: resource], [15: receiver_address]}.
+// Fields are in ascending order; resource is omitted when 0 (BANDWIDTH),
+// receiver is omitted when empty (self-unfreeze).
+func tronUnfreezeBalanceMsg(owner []byte, resource int32, receiver []byte) []byte {
+	var inner []byte
+	inner = protowire.AppendTag(inner, 1, protowire.BytesType)
+	inner = protowire.AppendBytes(inner, owner)
+	if resource != 0 {
+		inner = protowire.AppendTag(inner, 10, protowire.VarintType)
+		inner = protowire.AppendVarint(inner, i32AsU64(resource))
+	}
+	if len(receiver) > 0 {
+		inner = protowire.AppendTag(inner, 15, protowire.BytesType)
+		inner = protowire.AppendBytes(inner, receiver)
+	}
+	return tronContractWrap(tronUnfreezeBalanceType, tronUnfreezeBalanceTypeURL, inner)
+}
+
 // tronRawData serializes the on-chain Transaction.raw message around a prebuilt
 // Contract message. Zero-valued expiration/timestamp/fee_limit are omitted, per
 // proto3 serialization (matching Trust Wallet Core).
@@ -497,4 +682,40 @@ func tronAddressBytes(s string) ([]byte, error) {
 	default:
 		return nil, fmt.Errorf("unexpected address length %d", len(raw))
 	}
+}
+
+// signTronRawJSON signs a pre-built Tron transaction provided as node/DApp JSON
+// (the wallet-connect flow). It extracts raw_data_hex, computes txID =
+// sha256(raw_data), optionally verifies that txID matches the supplied txID
+// field, then signs and returns the output.
+func (w *HDWallet) signTronRawJSON(symbol Symbol, index uint32, jsonStr string) (*txtron.SigningOutput, error) {
+	// Unmarshal only the fields we need.
+	var parsed struct {
+		TxID       string `json:"txID"`
+		RawDataHex string `json:"raw_data_hex"`
+	}
+	if err := json.Unmarshal([]byte(jsonStr), &parsed); err != nil {
+		return nil, fmt.Errorf("%w: tron: raw_json: %v", ErrTxInput, err)
+	}
+	if parsed.RawDataHex == "" {
+		return nil, fmt.Errorf("%w: tron: raw_json: missing raw_data_hex", ErrTxInput)
+	}
+	rawData, err := hex.DecodeString(parsed.RawDataHex)
+	if err != nil {
+		return nil, fmt.Errorf("%w: tron: raw_json: invalid raw_data_hex: %v", ErrTxInput, err)
+	}
+	id := sha256Sum(rawData)
+	// Fund-critical guard: if txID is present, it MUST match our computed hash.
+	if parsed.TxID != "" && hex.EncodeToString(id) != strings.ToLower(parsed.TxID) {
+		return nil, fmt.Errorf("%w: tron: raw_json: txID mismatch", ErrTxInput)
+	}
+	sig, err := w.SignIndex(symbol, index, id)
+	if err != nil {
+		return nil, fmt.Errorf("%w: tron: %v", ErrTxInput, err)
+	}
+	rec := sig.Recoverable()
+	if rec == nil {
+		return nil, fmt.Errorf("%w: %s is not a secp256k1 coin", ErrTxInput, symbol)
+	}
+	return &txtron.SigningOutput{Id: id, Signature: rec, RawData: rawData}, nil
 }

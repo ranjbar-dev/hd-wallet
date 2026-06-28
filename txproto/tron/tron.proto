@@ -82,6 +82,51 @@ message VoteWitnessContract {
   repeated Vote votes = 2;
 }
 
+// Legacy Stake 1.0: freeze TRX to obtain resources (BANDWIDTH or ENERGY).
+message FreezeBalanceContract {
+  string owner_address    = 1; // base58check (T...)
+  int64  frozen_balance   = 2; // SUN (1 TRX = 1,000,000 SUN)
+  int64  frozen_duration  = 3; // days
+  ResourceCode resource   = 4; // BANDWIDTH or ENERGY
+  string receiver_address = 5; // optional delegate target; "" = self
+}
+
+// Legacy Stake 1.0: unfreeze previously frozen TRX.
+message UnfreezeBalanceContract {
+  string owner_address    = 1; // base58check (T...)
+  ResourceCode resource   = 2; // BANDWIDTH or ENERGY (default BANDWIDTH)
+  string receiver_address = 3; // optional delegate target; "" = self
+}
+
+// Unfreeze TRC-10 (legacy asset) balance.
+message UnfreezeAssetContract {
+  string owner_address = 1; // base58check (T...)
+}
+
+// Claim SR / voting rewards (WithdrawBalanceContract).
+message WithdrawBalanceContract {
+  string owner_address = 1; // base58check (T...)
+}
+
+// TRC-10 asset voting (VoteAssetContract).
+message VoteAssetContract {
+  string owner_address = 1;        // base58check (T...) or hex
+  repeated string vote_address = 2; // T... or hex
+  bool support = 3;
+  int32 count = 4;
+}
+
+// Generic smart-contract call (TriggerSmartContract). Supports TRX value,
+// arbitrary calldata, and TRC-10 value attachment.
+message TriggerSmartContract {
+  string owner_address = 1;    // T... or hex
+  string contract_address = 2; // T... or hex
+  int64 call_value = 3;        // TRX (SUN) sent with the call
+  bytes data = 4;              // raw calldata
+  int64 call_token_value = 5;  // TRC-10 amount sent with the call
+  int64 token_id = 6;          // TRC-10 token id
+}
+
 // Block header reference values, used to compute ref_block_bytes / ref_block_hash.
 message BlockHeader {
   int64 timestamp = 1;
@@ -109,12 +154,19 @@ message Transaction {
     UndelegateResourceContract undelegate_resource = 11;
     VoteWitnessContract vote_witness = 12;
     WithdrawExpireUnfreezeContract withdraw_expire_unfreeze = 13;
+    TriggerSmartContract trigger_smart_contract = 14;
+    FreezeBalanceContract freeze_balance = 15;
+    UnfreezeBalanceContract unfreeze_balance = 16;
+    UnfreezeAssetContract unfreeze_asset = 17;
+    WithdrawBalanceContract withdraw_balance = 18;
+    VoteAssetContract vote_asset = 19;
   }
 }
 
 // SigningInput mirrors a minimal subset of TW.Tron.Proto.SigningInput.
 message SigningInput {
   Transaction transaction = 1;
+  string raw_json = 2;   // raw transaction JSON from a Tron node / DApp
 }
 
 // SigningOutput mirrors a minimal subset of TW.Tron.Proto.SigningOutput.

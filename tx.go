@@ -236,11 +236,13 @@ func ValidateSigningInput(symbol Symbol, input proto.Message) error {
 		if !ok {
 			return fmt.Errorf("%w: %s expects *tron.SigningInput", ErrTxInput, symbol)
 		}
-		if in.Transaction == nil || in.Transaction.BlockHeader == nil || in.Transaction.BlockHeader.Number == 0 {
-			return fmt.Errorf("%w: %s: transaction.block_header.number is required", ErrTxInput, symbol)
-		}
-		if in.Transaction.Expiration == 0 {
-			return fmt.Errorf("%w: %s: transaction.expiration is required", ErrTxInput, symbol)
+		if in.GetRawJson() == "" {
+			if in.Transaction == nil || in.Transaction.BlockHeader == nil || in.Transaction.BlockHeader.Number == 0 {
+				return fmt.Errorf("%w: %s: transaction.block_header.number is required", ErrTxInput, symbol)
+			}
+			if in.Transaction.Expiration == 0 {
+				return fmt.Errorf("%w: %s: transaction.expiration is required", ErrTxInput, symbol)
+			}
 		}
 	case familyRipple:
 		in, ok := input.(*txripple.SigningInput)

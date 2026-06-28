@@ -33,7 +33,7 @@ type TronVote struct {
 // TronContract is one decoded contract entry. Type is the Tron ContractType enum
 // value; the populated fields depend on it.
 type TronContract struct {
-	Type     int32  // 1=Transfer, 2=TransferAsset, 4=VoteWitness, 31=TriggerSmartContract, 54=FreezeV2, 55=UnfreezeV2, 56=WithdrawExpireUnfreeze, 57=DelegateResource, 58=UndelegateResource
+	Type     int32  // 1=Transfer, 2=TransferAsset, 3=VoteAsset, 4=VoteWitness, 11=FreezeBalance, 12=UnfreezeBalance, 13=WithdrawBalance, 14=UnfreezeAsset, 31=TriggerSmartContract, 54=FreezeV2, 55=UnfreezeV2, 56=WithdrawExpireUnfreeze, 57=DelegateResource, 58=UndelegateResource
 	TypeName string // human-readable contract type name, "" if unknown
 	TypeURL  string // the google.protobuf.Any type_url
 
@@ -49,9 +49,13 @@ type TronContract struct {
 	// TriggerSmartContract.
 	ContractAddress string // base58check "T..." address
 	Data            []byte // raw call data (e.g. TRC-20 transfer calldata)
+	CallValue       int64  // TRX (SUN) sent with the call; 0 if absent
+	CallTokenValue  int64  // TRC-10 amount sent with the call; 0 if absent
+	TokenId         int64  // TRC-10 token id; 0 if absent
 
-	// FreezeBalanceV2Contract / UnfreezeBalanceV2Contract.
+	// FreezeBalanceV2Contract / UnfreezeBalanceV2Contract / FreezeBalanceContract.
 	FrozenBalance   int64
+	FrozenDuration  int64 // days (FreezeBalanceContract only)
 	UnfreezeBalance int64
 	Resource        int32 // 0=BANDWIDTH, 1=ENERGY
 
@@ -62,6 +66,11 @@ type TronContract struct {
 
 	// VoteWitnessContract.
 	Votes []TronVote
+
+	// VoteAssetContract.
+	VoteAddresses []string // base58check "T..." addresses
+	Support       bool
+	Count         int32
 }
 
 // TronTxFields holds the decoded, display-ready fields of a Tron transaction's
@@ -203,6 +212,27 @@ func decodeTronContract(b []byte) (TronContract, error) {
 				VoteCount:   int64(cnt), // #nosec G115 -- protobuf int64 varint bit-reinterpretation
 			})
 		}
+	case tronVoteAssetType:
+		c.TypeName = "VoteAssetContract"
+		ownerBytes, _ := pbFieldBytes(inner, 1)
+		owner, err := tronRenderAddress(ownerBytes)
+		if err != nil {
+			return TronContract{}, fmt.Errorf("%w: tron vote_asset owner: %v", ErrTxDecode, err)
+		}
+		c.OwnerAddress = owner
+		for _, ab := range pbFieldAll(inner, 2) {
+			addr, err := tronRenderAddress(ab)
+			if err != nil {
+				return TronContract{}, fmt.Errorf("%w: tron vote_asset address: %v", ErrTxDecode, err)
+			}
+			c.VoteAddresses = append(c.VoteAddresses, addr)
+		}
+		if v, ok := pbFieldVarint(inner, 3); ok {
+			c.Support = v != 0
+		}
+		if v, ok := pbFieldVarint(inner, 5); ok {
+			c.Count = int32(v) // #nosec G115 -- small positive value
+		}
 	case tronTriggerSmartContractType:
 		c.TypeName = "TriggerSmartContract"
 		ownerBytes, _ := pbFieldBytes(inner, 1)
@@ -217,8 +247,17 @@ func decodeTronContract(b []byte) (TronContract, error) {
 		}
 		c.OwnerAddress = owner
 		c.ContractAddress = contract
+		if v, ok := pbFieldVarint(inner, 3); ok {
+			c.CallValue = int64(v) // #nosec G115 -- protobuf int64 varint bit-reinterpretation
+		}
 		if data, ok := pbFieldBytes(inner, 4); ok {
 			c.Data = append([]byte(nil), data...)
+		}
+		if v, ok := pbFieldVarint(inner, 5); ok {
+			c.CallTokenValue = int64(v) // #nosec G115 -- protobuf int64 varint bit-reinterpretation
+		}
+		if v, ok := pbFieldVarint(inner, 6); ok {
+			c.TokenId = int64(v) // #nosec G115 -- protobuf int64 varint bit-reinterpretation
 		}
 	case tronFreezeBalanceV2Type:
 		c.TypeName = "FreezeBalanceV2Contract"
@@ -301,6 +340,64 @@ func decodeTronContract(b []byte) (TronContract, error) {
 			}
 			c.ReceiverAddress = recv
 		}
+	case tronFreezeBalanceType:
+		c.TypeName = "FreezeBalanceContract"
+		ownerBytes, _ := pbFieldBytes(inner, 1)
+		owner, err := tronRenderAddress(ownerBytes)
+		if err != nil {
+			return TronContract{}, fmt.Errorf("%w: tron freeze_balance owner: %v", ErrTxDecode, err)
+		}
+		c.OwnerAddress = owner
+		if v, ok := pbFieldVarint(inner, 2); ok {
+			c.FrozenBalance = int64(v) // #nosec G115 -- protobuf int64 varint bit-reinterpretation
+		}
+		if v, ok := pbFieldVarint(inner, 3); ok {
+			c.FrozenDuration = int64(v) // #nosec G115 -- protobuf int64 varint bit-reinterpretation
+		}
+		if v, ok := pbFieldVarint(inner, 10); ok {
+			c.Resource = int32(v) // #nosec G115 -- ResourceCode enum
+		}
+		if recvBytes, ok := pbFieldBytes(inner, 15); ok {
+			recv, err := tronRenderAddress(recvBytes)
+			if err != nil {
+				return TronContract{}, fmt.Errorf("%w: tron freeze_balance receiver: %v", ErrTxDecode, err)
+			}
+			c.ReceiverAddress = recv
+		}
+	case tronUnfreezeBalanceType:
+		c.TypeName = "UnfreezeBalanceContract"
+		ownerBytes, _ := pbFieldBytes(inner, 1)
+		owner, err := tronRenderAddress(ownerBytes)
+		if err != nil {
+			return TronContract{}, fmt.Errorf("%w: tron unfreeze_balance owner: %v", ErrTxDecode, err)
+		}
+		c.OwnerAddress = owner
+		if v, ok := pbFieldVarint(inner, 10); ok {
+			c.Resource = int32(v) // #nosec G115 -- ResourceCode enum
+		}
+		if recvBytes, ok := pbFieldBytes(inner, 15); ok {
+			recv, err := tronRenderAddress(recvBytes)
+			if err != nil {
+				return TronContract{}, fmt.Errorf("%w: tron unfreeze_balance receiver: %v", ErrTxDecode, err)
+			}
+			c.ReceiverAddress = recv
+		}
+	case tronUnfreezeAssetType:
+		c.TypeName = "UnfreezeAssetContract"
+		ownerBytes, _ := pbFieldBytes(inner, 1)
+		owner, err := tronRenderAddress(ownerBytes)
+		if err != nil {
+			return TronContract{}, fmt.Errorf("%w: tron unfreeze_asset owner: %v", ErrTxDecode, err)
+		}
+		c.OwnerAddress = owner
+	case tronWithdrawBalanceType:
+		c.TypeName = "WithdrawBalanceContract"
+		ownerBytes, _ := pbFieldBytes(inner, 1)
+		owner, err := tronRenderAddress(ownerBytes)
+		if err != nil {
+			return TronContract{}, fmt.Errorf("%w: tron withdraw_balance owner: %v", ErrTxDecode, err)
+		}
+		c.OwnerAddress = owner
 	default:
 		// Unknown contract type: surface type/url only.
 	}

@@ -179,7 +179,7 @@ Verified against authoritative signing vectors for:
 | Family | Coverage |
 |---|---|
 | **EVM** | legacy (EIP-155) + EIP-2930 (access list) + EIP-1559 + **EIP-4844** (type-3 blob tx: `max_fee_per_blob_gas` + `blob_versioned_hashes`) + **EIP-7702** (type-4 set-code tx: `authorization_list`), native + ERC-20 + arbitrary contract call + contract creation (deploy). Select the format with `tx_mode` (exported `hdwallet.EthTxModeLegacy`/`EthTxModeEIP2930`/`EthTxModeEIP1559`/`EthTxModeEIP4844`/`EthTxModeEIP7702`). All registered EVM chains. |
-| **Tron** | TRX transfer + TRC-20 token transfer (TriggerSmartContract) |
+| **Tron** | TRX transfer (`TransferContract`) + TRC-10 transfer (`TransferAssetContract`) + TRC-20 transfer + generic `TriggerSmartContract` (arbitrary call with `call_value`/`data`/`call_token_value`/`token_id`) + legacy Stake 1.0 `FreezeBalanceContract`/`UnfreezeBalanceContract` + `UnfreezeAssetContract` + `WithdrawBalanceContract` + `VoteAssetContract`; **raw_json mode** signs a node/DApp-provided pre-built transaction (`raw_data_hex` + txID guard) for wallet-connect flows |
 | **XRP** | Payment |
 | **Cosmos** | bank `MsgSend`, staking `MsgDelegate`/`MsgUndelegate`, `MsgWithdrawDelegatorReward`, multi-message (protobuf direct mode). All standard secp256k1 Cosmos chains, plus **EVMOS** and **INJ** (ethermint eth_secp256k1: keccak256 SignDoc + chain-specific pubkey type URL — INJ uses an uncompressed key). Other ethermint chains (CANTO/ZETA/ONE) stay roadmap — each needs its own vector. |
 | **Solana** | system transfer + SPL token transfer (TransferChecked) |
