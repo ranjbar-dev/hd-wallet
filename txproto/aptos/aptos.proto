@@ -1,0 +1,46 @@
+syntax = "proto3";
+
+package hdwallet.aptos.proto;
+
+option go_package = "github.com/ranjbar-dev/hd-wallet/txproto/aptos";
+
+// EntryFunction payload for an Aptos transaction.
+message EntryFunction {
+  // 32-byte module address (raw bytes, not hex string).
+  bytes module_address = 1;
+  // Module name, e.g. "aptos_account".
+  string module_name = 2;
+  // Function name, e.g. "transfer".
+  string function_name = 3;
+  // BCS-encoded TypeTag bytes for each type argument. Empty for most transfers.
+  repeated bytes type_args = 4;
+  // Raw argument bytes. Each arg is already BCS-length-prefixed when it is a
+  // byte sequence; the signer re-wraps them with ULEB128(len) + bytes.
+  repeated bytes args = 5;
+}
+
+// SigningInput mirrors a minimal subset of TW.Aptos.Proto.SigningInput.
+message SigningInput {
+  // Account sequence number (uint64 LE in BCS).
+  uint64 sequence_number = 1;
+  // Gas limit.
+  uint64 max_gas_amount = 2;
+  // Gas unit price in octas.
+  uint64 gas_unit_price = 3;
+  // Transaction expiration (Unix timestamp in seconds).
+  uint64 expiration_timestamp_secs = 4;
+  // Chain ID (u8).
+  uint32 chain_id = 5;
+  // The entry function payload.
+  EntryFunction entry_function = 6;
+}
+
+// SigningOutput mirrors a minimal subset of TW.Aptos.Proto.SigningOutput.
+message SigningOutput {
+  // BCS-encoded SignedTransaction bytes.
+  bytes raw_txn = 1;
+  // Hex of raw_txn.
+  string encoded = 2;
+  // Error message; empty on success.
+  string error = 3;
+}

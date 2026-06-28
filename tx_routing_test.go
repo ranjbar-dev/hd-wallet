@@ -48,7 +48,7 @@ func TestTxFamilyRouting(t *testing.T) {
 		}
 	}
 	// Single-chain families.
-	for s, want := range map[Symbol]txFamily{TRX: familyTron, XRP: familyRipple, SOL: familySolana, BTC: familyBitcoin, LTC: familyBitcoin} {
+	for s, want := range map[Symbol]txFamily{TRX: familyTron, XRP: familyRipple, SOL: familySolana, BTC: familyBitcoin, LTC: familyBitcoin, XLM: familyStellar} {
 		if got := txFamilyOf(s); got != want {
 			t.Errorf("txFamilyOf(%s) = %v, want %v", s, got, want)
 		}

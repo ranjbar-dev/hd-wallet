@@ -178,12 +178,16 @@ Verified against authoritative signing vectors for:
 
 | Family | Coverage |
 |---|---|
-| **EVM** | legacy (EIP-155) + EIP-2930 (access list) + EIP-1559, native + ERC-20 + arbitrary contract call + contract creation (deploy) + EIP-2930/1559 access lists. Select the format with `tx_mode` (exported `hdwallet.EthTxModeLegacy`/`EthTxModeEIP2930`/`EthTxModeEIP1559`). All registered EVM chains. |
+| **EVM** | legacy (EIP-155) + EIP-2930 (access list) + EIP-1559 + **EIP-4844** (type-3 blob tx: `max_fee_per_blob_gas` + `blob_versioned_hashes`) + **EIP-7702** (type-4 set-code tx: `authorization_list`), native + ERC-20 + arbitrary contract call + contract creation (deploy). Select the format with `tx_mode` (exported `hdwallet.EthTxModeLegacy`/`EthTxModeEIP2930`/`EthTxModeEIP1559`/`EthTxModeEIP4844`/`EthTxModeEIP7702`). All registered EVM chains. |
 | **Tron** | TRX transfer + TRC-20 token transfer (TriggerSmartContract) |
 | **XRP** | Payment |
-| **Cosmos** | bank `MsgSend`, staking `MsgDelegate`/`MsgUndelegate`, `MsgWithdrawDelegatorReward`, multi-message (protobuf direct mode). All standard secp256k1 Cosmos chains, plus **EVMOS** (ethermint eth_secp256k1: keccak256 SignDoc + ethermint pubkey type URL). Other ethermint chains (INJ/CANTO/ZETA) stay roadmap — Injective uses a different pubkey type URL, so each needs its own vector. |
+| **Cosmos** | bank `MsgSend`, staking `MsgDelegate`/`MsgUndelegate`, `MsgWithdrawDelegatorReward`, multi-message (protobuf direct mode). All standard secp256k1 Cosmos chains, plus **EVMOS** and **INJ** (ethermint eth_secp256k1: keccak256 SignDoc + chain-specific pubkey type URL — INJ uses an uncompressed key). Other ethermint chains (CANTO/ZETA/ONE) stay roadmap — each needs its own vector. |
 | **Solana** | system transfer + SPL token transfer (TransferChecked) |
-| **Bitcoin** | BTC/LTC SegWit: spends **P2WPKH** (BIP-143) and **Taproot key-path** (BIP-341 / BIP-340 Schnorr) inputs; outputs to any address type; deterministic coin-selection + change. Verified against `btcd` (P2WPKH byte-identical; Taproot sighash + BIP-340 verify) and the BIP-143 spec vector. |
+| **Bitcoin / UTXO** | BTC/LTC spends across **all four** single-key input types — legacy **P2PKH**, nested **P2SH-P2WPKH** (BIP-49), native **P2WPKH** (BIP-143), and **Taproot key-path** (BIP-341 / BIP-340 Schnorr); outputs to any address type; deterministic coin-selection + change. The same engine signs the UTXO altcoins (DOGE/DASH/BCH/ZEC and DGB/SYS/VIA/STRAX/QTUM/RVN/FIRO/MONA/PIVX). Verified against `btcd` and the BIP-143 spec vector. |
+| **Bitcoin multisig** | P2SH and P2WSH **m-of-n** (BIP-67 sorted keys), partial-sign + finalize via BIP-174 PSBT (`BuildMultisigPSBT`/`SignMultisigPSBT`/`FinalizeMultisigPSBT`/`ExtractMultisigTx`). Pinned to `btcd`. |
+| **Stellar (XLM)** | Payment (`TransactionV0` XDR envelope). Pinned to the Trust Wallet Core Stellar vector. |
+| **Algorand (ALGO)** | Payment (canonical msgpack, `"TX"`-prefixed ed25519). Pinned to the TWC Algorand vector. |
+| **Aptos (APTOS)** | Entry-function transfer (BCS + `APTOS::RawTransaction` prehash). Pinned to the TWC Aptos vector. |
 
 ```go
 import ethpb "github.com/ranjbar-dev/hd-wallet/txproto/ethereum"
@@ -191,8 +195,29 @@ import ethpb "github.com/ranjbar-dev/hd-wallet/txproto/ethereum"
 out, _ := w.SignTransaction(hdwallet.ETH, 0, &ethpb.SigningInput{ /* … */ })
 ```
 
-> Bitcoin spending currently covers P2WPKH and Taproot key-path inputs; legacy
-> P2PKH and nested P2SH-P2WPKH input spending remain on the roadmap.
+> Bitcoin spending covers all four standard single-key input types (P2PKH,
+> P2SH-P2WPKH, P2WPKH, Taproot key-path) plus P2SH/P2WSH multisig via PSBT.
+
+### What you must provide (no network I/O)
+
+`SignTransaction` never calls the network. The caller supplies all chain state
+as fields on the `SigningInput` proto before signing. `providers.go` exports
+five small interfaces that formalise this contract; `doc.go` contains the full
+per-family matrix mapping each `SigningInput` field to its data source:
+
+| Interface | Used for | Chain state |
+|---|---|---|
+| `NonceProvider` | EVM, XRP, Cosmos | sender nonce / account sequence |
+| `UTXOProvider` | Bitcoin-family | unspent outputs (txid, vout, amount, scriptPubKey) |
+| `FeeOracle` | EVM, Bitcoin, XRP, Tron | gas price / sat-per-vbyte / drops |
+| `RecentBlockhashProvider` | Solana | latest confirmed blockhash |
+| `Broadcaster` | all families | post-signing submission sink |
+
+None of these interfaces are called inside the package — they exist purely for
+typing and documentation. Wire them as thin wrappers around your node RPC or
+indexer client, call each one before building the `SigningInput`, then pass the
+results in. See `example_providers_test.go` for a minimal wiring example and
+`doc.go` for the field-by-field mapping.
 
 ### Ethereum message signing (EIP-191 / EIP-712)
 
@@ -206,23 +231,69 @@ sig2, _ := w.SignTypedData(hdwallet.ETH, 0, typedDataJSON)           // EIP-712
 Plus standalone EVM tooling: `EncodeRLP`/`DecodeRLP`, `ABIEncode`/`ABIDecode`,
 `ABIFunctionSelector`, `EthereumPersonalMessageHash`, `EIP712Hash`.
 
-### Bitcoin & Solana message signing
+### Bitcoin, Solana, Cosmos & Tron message signing
 
-Non-EVM message signing, each pinned byte-for-byte to its Trust Wallet Core
-`MessageSigner` vector:
+Non-EVM message signing, each following the chain's canonical standard:
 
 ```go
 // Bitcoin "signmessage" standard → base64; verifies against a legacy P2PKH address.
+// Pinned byte-for-byte to Trust Wallet Core BitcoinMessageSigner vectors.
 sig, _  := w.SignBitcoinMessage(hdwallet.BTC, 0, []byte("test signature"))
 ok      := hdwallet.VerifyBitcoinMessage("19cAJn4Ms8jodBBGtroBNNpCZiHAWGAq7X", []byte("test signature"), sig)
 
 // Solana off-chain message (raw ed25519) → base58.
+// Pinned to Trust Wallet Core SolanaMessageSigner vector.
 ssig, _ := w.SignSolanaMessage(hdwallet.SOL, 0, []byte("Hello world"))
 sok     := hdwallet.VerifySolanaMessage(addr, []byte("Hello world"), ssig)
+
+// Cosmos ADR-36 arbitrary-message signing → base64 (65-byte recoverable secp256k1).
+// Follows the CosmJS / Keplr makeADR36AminoSignDoc + serializeSignDoc pipeline;
+// ecrecover is used for verification (no separate public key needed).
+signer, _ := w.Address(hdwallet.ATOM)
+csig, _ := w.SignCosmosADR36(hdwallet.ATOM, 0, signer, []byte("arbitrary cosmos data"))
+cok     := hdwallet.VerifyCosmosADR36(signer, []byte("arbitrary cosmos data"), csig)
+
+// Tron TIP-191 message signing → "0x…" hex (65-byte R‖S‖V, V ∈ {27,28}).
+// Matches TronWeb trx.signMessageV2; uses keccak256("\x19TRON Signed Message:\n32" ‖ keccak256(msg)).
+tsig, _ := w.SignTronMessage(hdwallet.TRX, 0, []byte("Hello World"))
+tok     := hdwallet.VerifyTronMessage(tronAddr, []byte("Hello World"), tsig)
 ```
 
-> Cosmos ADR-36 arbitrary-message signing is on the roadmap (no authoritative
-> Trust Wallet Core vector to verify against yet).
+### Chain-neutral raw message signing
+
+For advanced use cases, `SignRawMessage` / `VerifyRawMessage` route through the
+correct curve for any registered symbol without a chain-specific envelope:
+
+```go
+// secp256k1 chains: pass the 32-byte digest you pre-hashed.
+digest := hdwallet.Keccak256([]byte("raw data"))
+sig, _ := w.SignRawMessage(hdwallet.ETH, 0, digest)
+pub, _ := w.PublicKey(hdwallet.ETH)
+ok, _ := hdwallet.VerifyRawMessage(hdwallet.ETH, pub, digest, sig)
+
+// ed25519 chains: pass the raw message; EdDSA hashes internally.
+sig, _ = w.SignRawMessage(hdwallet.SOL, 0, []byte("any length"))
+```
+
+### Amount formatting
+
+Convert between human-readable amounts and base units using each chain's native
+decimals (from the registry) — or explicit decimals for tokens (ERC-20/SPL/TRC-20,
+whose decimals are token-specific and supplied by you). All `big.Int` /
+decimal-string math, no float:
+
+```go
+d, _ := hdwallet.NativeDecimals(hdwallet.ETH)            // 18
+s   := hdwallet.FormatAmount(hdwallet.ETH, weiBigInt)    // "1.5"
+wei, _ := hdwallet.ParseAmount(hdwallet.ETH, "1.5")      // *big.Int
+
+// Token amounts: pass the token's own decimals.
+usdc := hdwallet.FormatUnits(rawBigInt, 6)               // "12.34"
+raw, _ := hdwallet.ParseUnits("12.34", 6)
+```
+
+> Native decimals come from `CoinInfo(symbol).Decimals`; **token** decimals are
+> the client's responsibility (token lists are out of scope).
 
 ### Address validation & parsing
 
@@ -377,10 +448,9 @@ because a fund-critical address must match an authoritative vector first:
 Deferred signing features: Bitcoin transaction building now spends **P2WPKH** and
 **Taproot key-path** inputs (BTC/LTC); still deferred are **legacy P2PKH** and
 **nested P2SH-P2WPKH** input spending (pre-BIP-143 / wrapped-witness sighash). The
-**ethermint-keyed Cosmos** chains beyond EVMOS (INJ/CANTO/ZETA — each needs its
-own vector since the pubkey type URL enters the signed bytes) — see
-`tx_families.go`; and **Cosmos ADR-36** message signing — see
-`message_cosmos_test.go`.
+**ethermint-keyed Cosmos** chains beyond EVMOS and INJ (CANTO/ZETA/ONE — each needs
+its own vector since the pubkey type URL enters the signed bytes) — see
+`tx_families.go`.
 
 Contributions with test vectors welcome.
 
@@ -455,10 +525,15 @@ go test -race -cover ./...
 | Function / method | Purpose |
 |---|---|
 | `(*HDWallet) SignTransaction(symbol, index, proto.Message) (proto.Message, error)` | Build+sign a raw tx (EVM/Tron/XRP/Cosmos/Solana; no broadcast). |
+| `BroadcastPayload(symbol, proto.Message) (string, error)` | Convert a `SignTransaction` output to the exact string each chain's RPC endpoint expects: `"0x"+hex` for EVM, bare hex for Bitcoin/UTXO, base64 for Solana and Cosmos, a TronGrid JSON object for Tron, uppercase hex for XRP. |
+| `TransactionID(proto.Message) (string, error)` | Extract the canonical transaction id from any `SignTransaction` output, normalised to lower-case hex (or base58 for Solana). |
 | `(*HDWallet) SignMessage(symbol, index, []byte) ([]byte, error)` | EIP-191 `personal_sign` → 65-byte r‖s‖v. |
 | `(*HDWallet) SignTypedData(symbol, index, []byte) ([]byte, error)` | EIP-712 typed-data signature. |
 | `(*HDWallet) SignBitcoinMessage(symbol, index, []byte) (string, error)` | Bitcoin `signmessage` → base64. With `VerifyBitcoinMessage`. |
 | `(*HDWallet) SignSolanaMessage(symbol, index, []byte) (string, error)` | Solana off-chain message → base58. With `VerifySolanaMessage`. |
+| `(*HDWallet) SignCosmosADR36(symbol, index, signer, []byte) (string, error)` | Cosmos ADR-36 arbitrary-message → base64 (65-byte recoverable). With `VerifyCosmosADR36`. |
+| `(*HDWallet) SignTronMessage(symbol, index, []byte) (string, error)` | Tron TIP-191 message → `0x…` hex (V ∈ {27,28}). With `VerifyTronMessage`. |
+| `(*HDWallet) SignRawMessage(symbol, index, []byte) (*Signature, error)` | Chain-neutral: ECDSA 32-byte digest or ed25519 raw message. With `VerifyRawMessage`. |
 | `RecoverEthereumAddress([]byte, []byte) (string, error)` · `VerifyEthereumMessage` / `…TypedData` | Recover/verify EIP-191/712 signers. |
 | `EncodeRLP`/`DecodeRLP` · `ABIEncode`/`ABIDecode` · `ABIFunctionSelector` · `EIP712Hash` | Standalone EVM encoding utilities. |
 
@@ -469,6 +544,16 @@ go test -race -cover ./...
 | `IsValidAddress(symbol, addr) bool` · `ValidateAddress(symbol, addr) error` | Validate an address for a network. |
 | `ParseAddress(symbol, addr) ([]byte, error)` | Decode an address to its payload. |
 | `AddressFromPublicKey(symbol, pub) (string, error)` | Derive an address from an external public key. |
+
+**Mnemonic entry-screen helpers (pure functions, no secrets):**
+
+| Function | Purpose |
+|---|---|
+| `WordlistPrefix(prefix string) []string` | Up to 8 BIP-39 English words starting with prefix — for autocomplete. |
+| `IsValidWord(word string) bool` | Reports whether a word is in the BIP-39 English wordlist. |
+| `SuggestFinalWords(words []string) ([]string, error)` | Given the first 11/14/17/20/23 words, returns all valid final words (128 completions for a 12-word mnemonic). |
+| `MnemonicStrength(mnemonic string) (bits, words int, err error)` | Validates a mnemonic and reports its entropy size and word count. |
+| `ValidateMnemonic(string) error` · `ValidateMnemonicBytes([]byte) error` | Validate without building a wallet. |
 
 `Symbol` is a typed string enum; the package exports a constant for every
 supported network (`hdwallet.BTC`, `hdwallet.ETH`, `hdwallet.SOL`, …). Pass these

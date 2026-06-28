@@ -51,6 +51,26 @@ message Access {
   repeated bytes stored_keys = 2;
 }
 
+// EthAuthorization is one EIP-7702 authorization-list entry. The EOA that
+// wants to delegate its code to `address` signs [chain_id, address, nonce]
+// off-band (using keccak256(0x05 || rlp([chain_id, address, nonce]))), and
+// the resulting (y_parity, r, s) plus the delegation target are carried here.
+// All fields are required; the tx signer does NOT sign the authorization tuple.
+message EthAuthorization {
+  // Chain id for which this authorization is valid, big-endian bytes.
+  bytes chain_id = 1;
+  // Delegation target ("0x"-prefixed hex, 20 bytes).
+  string address = 2;
+  // Authorizing EOA nonce at the time of authorization.
+  uint64 nonce = 3;
+  // y_parity of the authorization signature (0 or 1).
+  uint32 y_parity = 4;
+  // r component of the authorization signature, 32 bytes big-endian.
+  bytes r = 5;
+  // s component of the authorization signature, 32 bytes big-endian.
+  bytes s = 6;
+}
+
 // SigningInput mirrors a minimal subset of TW.Ethereum.Proto.SigningInput.
 message SigningInput {
   // Chain id, big-endian bytes (EIP-155).
@@ -59,7 +79,8 @@ message SigningInput {
   // Sender nonce, big-endian bytes.
   bytes nonce = 2;
 
-  // Transaction type: 0 = legacy, 1 = EIP-2930 (access list), 2 = EIP-1559.
+  // Transaction type: 0 = legacy, 1 = EIP-2930 (access list), 2 = EIP-1559,
+  // 3 = EIP-4844 (blob), 4 = EIP-7702 (set-code).
   uint32 tx_mode = 3;
 
   // Legacy gas price, big-endian bytes (tx_mode == 0).
@@ -85,6 +106,22 @@ message SigningInput {
   // (EIP-2930) and tx_mode 2 (EIP-1559); ignored for legacy (tx_mode 0). An
   // empty list reproduces the no-access-list encoding exactly.
   repeated Access access_list = 10;
+
+  // EIP-4844: max fee per blob gas (a.k.a. maxFeePerBlobGas), big-endian
+  // bytes. Required for tx_mode 3 (EIP-4844); ignored otherwise.
+  bytes max_fee_per_blob_gas = 11;
+
+  // EIP-4844: versioned blob hashes. Each entry must be exactly 32 bytes;
+  // the first byte is the version (0x01 for KZG commitments per EIP-4844).
+  // At least one hash is required for tx_mode 3; ignored otherwise.
+  // The network-wrapper (blobs, commitments, proofs) is out of scope — only
+  // the tx envelope is signed here.
+  repeated bytes blob_versioned_hashes = 12;
+
+  // EIP-7702: authorization list. Required for tx_mode 4 (EIP-7702); ignored
+  // otherwise. Each entry is a pre-signed delegation authorization from an EOA
+  // that wishes to set its code to point at a contract address.
+  repeated EthAuthorization authorization_list = 13;
 }
 
 // SigningOutput mirrors a minimal subset of TW.Ethereum.Proto.SigningOutput.
