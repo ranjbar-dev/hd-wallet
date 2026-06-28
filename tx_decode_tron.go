@@ -51,7 +51,7 @@ type TronContract struct {
 	Data            []byte // raw call data (e.g. TRC-20 transfer calldata)
 	CallValue       int64  // TRX (SUN) sent with the call; 0 if absent
 	CallTokenValue  int64  // TRC-10 amount sent with the call; 0 if absent
-	TokenId         int64  // TRC-10 token id; 0 if absent
+	TokenID         int64  // TRC-10 token id; 0 if absent
 
 	// FreezeBalanceV2Contract / UnfreezeBalanceV2Contract / FreezeBalanceContract.
 	FrozenBalance   int64
@@ -257,7 +257,7 @@ func decodeTronContract(b []byte) (TronContract, error) {
 			c.CallTokenValue = int64(v) // #nosec G115 -- protobuf int64 varint bit-reinterpretation
 		}
 		if v, ok := pbFieldVarint(inner, 6); ok {
-			c.TokenId = int64(v) // #nosec G115 -- protobuf int64 varint bit-reinterpretation
+			c.TokenID = int64(v) // #nosec G115 -- protobuf int64 varint bit-reinterpretation
 		}
 	case tronFreezeBalanceV2Type:
 		c.TypeName = "FreezeBalanceV2Contract"

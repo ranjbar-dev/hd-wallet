@@ -423,8 +423,8 @@ func TestSignTxTronTriggerSmartContract(t *testing.T) {
 	if c.CallTokenValue != 0 {
 		t.Fatalf("call_token_value = %d, want 0", c.CallTokenValue)
 	}
-	if c.TokenId != 0 {
-		t.Fatalf("token_id = %d, want 0", c.TokenId)
+	if c.TokenID != 0 {
+		t.Fatalf("token_id = %d, want 0", c.TokenID)
 	}
 }
 

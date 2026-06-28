@@ -19,9 +19,9 @@ import (
 // Spec: https://github.com/bitcoin/bips/blob/master/bip-0038.mediawiki
 
 const (
-	bip38Magic1     byte = 0x01
-	bip38Magic2     byte = 0x42
-	bip38FlagNoEC   byte = 0xC0 // top two bits always set for non-EC-multiply
+	bip38Magic1         byte = 0x01
+	bip38Magic2         byte = 0x42
+	bip38FlagNoEC       byte = 0xC0 // top two bits always set for non-EC-multiply
 	bip38FlagCompressed byte = 0x20 // bit 5: use compressed public key
 )
 

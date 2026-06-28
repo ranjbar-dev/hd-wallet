@@ -321,7 +321,7 @@ func tronTransferContractMsg(owner, to []byte, amount int64) []byte {
 // tronTriggerSmartContractMsg builds the Contract {1: type=TriggerSmartContract,
 // 2: Any} for a smart-contract call. Fields are appended in ascending order;
 // zero-valued varint fields and empty bytes fields are omitted (proto3 defaults).
-func tronTriggerSmartContractMsg(owner, contractAddr, data []byte, callValue, callTokenValue, tokenId int64) []byte {
+func tronTriggerSmartContractMsg(owner, contractAddr, data []byte, callValue, callTokenValue, tokenID int64) []byte {
 	// TriggerSmartContract: {1: owner, 2: contract, [3: call_value], [4: data],
 	//                         [5: call_token_value], [6: token_id]}.
 	var inner []byte
@@ -341,9 +341,9 @@ func tronTriggerSmartContractMsg(owner, contractAddr, data []byte, callValue, ca
 		inner = protowire.AppendTag(inner, 5, protowire.VarintType)
 		inner = protowire.AppendVarint(inner, i64AsU64(callTokenValue))
 	}
-	if tokenId != 0 {
+	if tokenID != 0 {
 		inner = protowire.AppendTag(inner, 6, protowire.VarintType)
-		inner = protowire.AppendVarint(inner, i64AsU64(tokenId))
+		inner = protowire.AppendVarint(inner, i64AsU64(tokenID))
 	}
 	return tronContractWrap(tronTriggerSmartContractType, tronTriggerSmartContractTypeURL, inner)
 }
