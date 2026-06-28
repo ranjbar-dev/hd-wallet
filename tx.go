@@ -28,6 +28,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	txalgo "github.com/ranjbar-dev/hd-wallet/txproto/algorand"
+	txaptos "github.com/ranjbar-dev/hd-wallet/txproto/aptos"
 	txbtc "github.com/ranjbar-dev/hd-wallet/txproto/bitcoin"
 	txcosmos "github.com/ranjbar-dev/hd-wallet/txproto/cosmos"
 	txeth "github.com/ranjbar-dev/hd-wallet/txproto/ethereum"
@@ -59,6 +60,7 @@ const (
 	familySolana
 	familyBitcoin
 	familyAlgorand
+	familyAptos // APTOS: BCS + SHA3-256("APTOS::RawTransaction")||bcs
 )
 
 // txFamilyOf maps a symbol to its transaction-building family. EVM and standard
@@ -89,6 +91,8 @@ func txFamilyOf(symbol Symbol) txFamily {
 		return familyBitcoin
 	case ALGO:
 		return familyAlgorand
+	case APTOS:
+		return familyAptos
 	default:
 		return familyNone
 	}
@@ -156,6 +160,12 @@ func (w *HDWallet) SignTransaction(symbol Symbol, index uint32, input proto.Mess
 			return nil, fmt.Errorf("%w: %s expects *algorand.SigningInput", ErrTxInput, symbol)
 		}
 		return w.signALGOTx(symbol, index, in)
+	case familyAptos:
+		in, ok := input.(*txaptos.SigningInput)
+		if !ok {
+			return nil, fmt.Errorf("%w: %s expects *aptos.SigningInput", ErrTxInput, symbol)
+		}
+		return w.signAptosTx(symbol, index, in)
 	default:
 		return nil, fmt.Errorf("%w: %s", ErrTxUnsupported, symbol)
 	}
@@ -246,6 +256,14 @@ func ValidateSigningInput(symbol Symbol, input proto.Message) error {
 		}
 		if in.Fee == 0 {
 			return fmt.Errorf("%w: %s: fee is required", ErrTxInput, symbol)
+		}
+	case familyAptos:
+		in, ok := input.(*txaptos.SigningInput)
+		if !ok {
+			return fmt.Errorf("%w: %s expects *aptos.SigningInput", ErrTxInput, symbol)
+		}
+		if in.GetEntryFunction() == nil {
+			return fmt.Errorf("%w: %s: entry_function is required", ErrTxInput, symbol)
 		}
 	default:
 		return fmt.Errorf("%w: %s", ErrTxUnsupported, symbol)
