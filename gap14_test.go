@@ -66,7 +66,7 @@ func TestParseBounds(t *testing.T) {
 		addr string
 	}{
 		{ETH, "0x000000000000000000000000000000000000000"}, // 41 chars, 1 short
-		{SOL, "1"},     // way too short for base58->32 bytes
+		{SOL, "1"},           // way too short for base58->32 bytes
 		{ATOM, "cosmos1abc"}, // too short payload
 		{ADA, "addr1abc"},    // too short payload
 	}

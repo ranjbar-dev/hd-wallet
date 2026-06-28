@@ -178,20 +178,20 @@ func TestDecodeSolanaComputeBudget(t *testing.T) {
 	binary.LittleEndian.PutUint32(data[1:5], 200000)
 
 	var msg []byte
-	msg = append(msg, 1, 0, 1)                 // header: 1 signer, 0 readonly signed, 1 readonly unsigned
-	msg = append(msg, solanaCompactU16(2)...)   // 2 account keys
+	msg = append(msg, 1, 0, 1)                // header: 1 signer, 0 readonly signed, 1 readonly unsigned
+	msg = append(msg, solanaCompactU16(2)...) // 2 account keys
 	msg = append(msg, fromKey...)
 	msg = append(msg, cbKey...)
-	msg = append(msg, make([]byte, 32)...)      // recent blockhash (zeros)
-	msg = append(msg, solanaCompactU16(1)...)   // 1 instruction
-	msg = append(msg, 1)                        // programIdIndex = 1 (compute budget)
-	msg = append(msg, solanaCompactU16(0)...)   // 0 accounts
-	msg = append(msg, solanaCompactU16(5)...)   // 5 bytes data
+	msg = append(msg, make([]byte, 32)...)    // recent blockhash (zeros)
+	msg = append(msg, solanaCompactU16(1)...) // 1 instruction
+	msg = append(msg, 1)                      // programIdIndex = 1 (compute budget)
+	msg = append(msg, solanaCompactU16(0)...) // 0 accounts
+	msg = append(msg, solanaCompactU16(5)...) // 5 bytes data
 	msg = append(msg, data...)
 
 	var tx []byte
-	tx = append(tx, solanaCompactU16(1)...)     // 1 signature
-	tx = append(tx, make([]byte, 64)...)        // fake signature (zeros)
+	tx = append(tx, solanaCompactU16(1)...) // 1 signature
+	tx = append(tx, make([]byte, 64)...)    // fake signature (zeros)
 	tx = append(tx, msg...)
 
 	f, err := DecodeSolanaTx(tx)

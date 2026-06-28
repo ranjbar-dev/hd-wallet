@@ -509,11 +509,11 @@ func TestCPFPFee(t *testing.T) {
 		targetSatPerVB float64
 		wantFee        int64
 	}{
-		{"parent meets target", 2000, 200, 150, 5.0, 250},    // need ceil(350*5)=1750, parent paid 2000 → child=0 → 250... wait
-		{"parent underpays", 500, 200, 150, 5.0, 1250},       // need ceil(350*5)=1750, child=1750-500=1250
-		{"parent exactly meets", 1750, 200, 150, 5.0, 0},     // need 1750, paid 1750 → 0
-		{"parent overpays", 2000, 200, 150, 5.0, 0},          // need 1750, paid 2000 → 0
-		{"fractional rate", 100, 100, 100, 1.5, 200},         // need ceil(200*1.5)=300, child=200
+		{"parent meets target", 2000, 200, 150, 5.0, 250}, // need ceil(350*5)=1750, parent paid 2000 → child=0 → 250... wait
+		{"parent underpays", 500, 200, 150, 5.0, 1250},    // need ceil(350*5)=1750, child=1750-500=1250
+		{"parent exactly meets", 1750, 200, 150, 5.0, 0},  // need 1750, paid 1750 → 0
+		{"parent overpays", 2000, 200, 150, 5.0, 0},       // need 1750, paid 2000 → 0
+		{"fractional rate", 100, 100, 100, 1.5, 200},      // need ceil(200*1.5)=300, child=200
 	}
 	// Fix the "parent meets target" case: ceil(350*5)=1750, paid=2000 → 0
 	cases[0].wantFee = 0

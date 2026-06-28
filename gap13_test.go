@@ -77,7 +77,10 @@ func TestCoinDecimals(t *testing.T) {
 }
 
 func TestCoinFamily(t *testing.T) {
-	cases := []struct{ sym Symbol; want string }{
+	cases := []struct {
+		sym  Symbol
+		want string
+	}{
 		{ETH, "evm"},
 		{BNB, "evm"},
 		{BTC, "bitcoin-utxo"},

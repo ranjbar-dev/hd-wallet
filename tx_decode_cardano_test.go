@@ -105,8 +105,8 @@ func TestDecodeCardanoTxMalformed(t *testing.T) {
 	cases := map[string][]byte{
 		"empty":        {},
 		"not cbor":     {0xff, 0xff},
-		"not array":    {0xa0},   // CBOR empty map, not an array
-		"body not map": badBody,  // array containing an integer, not a map
+		"not array":    {0xa0},  // CBOR empty map, not an array
+		"body not map": badBody, // array containing an integer, not a map
 	}
 	for name, b := range cases {
 		t.Run(name, func(t *testing.T) {
