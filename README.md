@@ -470,6 +470,16 @@ go test -race -cover ./...
 | `ParseAddress(symbol, addr) ([]byte, error)` | Decode an address to its payload. |
 | `AddressFromPublicKey(symbol, pub) (string, error)` | Derive an address from an external public key. |
 
+**Mnemonic entry-screen helpers (pure functions, no secrets):**
+
+| Function | Purpose |
+|---|---|
+| `WordlistPrefix(prefix string) []string` | Up to 8 BIP-39 English words starting with prefix — for autocomplete. |
+| `IsValidWord(word string) bool` | Reports whether a word is in the BIP-39 English wordlist. |
+| `SuggestFinalWords(words []string) ([]string, error)` | Given the first 11/14/17/20/23 words, returns all valid final words (128 completions for a 12-word mnemonic). |
+| `MnemonicStrength(mnemonic string) (bits, words int, err error)` | Validates a mnemonic and reports its entropy size and word count. |
+| `ValidateMnemonic(string) error` · `ValidateMnemonicBytes([]byte) error` | Validate without building a wallet. |
+
 `Symbol` is a typed string enum; the package exports a constant for every
 supported network (`hdwallet.BTC`, `hdwallet.ETH`, `hdwallet.SOL`, …). Pass these
 constants instead of raw strings for compile-time safety. `Symbol` also has
