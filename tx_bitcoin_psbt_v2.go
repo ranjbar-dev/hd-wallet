@@ -66,15 +66,15 @@ type psbtV2Packet struct {
 }
 
 type psbtV2In struct {
-	prevTxid    []byte // 32 bytes, internal order
-	prevIndex   uint32
-	sequence    uint32 // 0xffffffff if unset
-	witnessUtxo *wire.TxOut
-	partialSigs []psbtPartialSig
-	redeemScript    []byte
-	taprootKeySig   []byte
-	finalScriptSig  []byte
-	finalWitness    [][]byte
+	prevTxid       []byte // 32 bytes, internal order
+	prevIndex      uint32
+	sequence       uint32 // 0xffffffff if unset
+	witnessUtxo    *wire.TxOut
+	partialSigs    []psbtPartialSig
+	redeemScript   []byte
+	taprootKeySig  []byte
+	finalScriptSig []byte
+	finalWitness   [][]byte
 }
 
 type psbtPartialSig struct {
@@ -447,7 +447,7 @@ func parsePSBTV2(data []byte) (*psbtV2Packet, error) {
 			if e != nil {
 				return nil, fmt.Errorf("%w: psbt v2: input count: %v", ErrTxInput, e)
 			}
-			nIn = int(n)   // #nosec G115 -- PSBT can't have 2^31+ inputs; data size bounds this
+			nIn = int(n) // #nosec G115 -- PSBT can't have 2^31+ inputs; data size bounds this
 		case psbtV2KeyOutputCount:
 			n, _, e := psbt2CompactSize(val)
 			if e != nil {
@@ -572,7 +572,7 @@ func psbt2ReadKV(data []byte, pos int) (key, val []byte, next int, err error) {
 		return nil, nil, pos, fmt.Errorf("key truncated")
 	}
 	key = data[pos : pos+int(kLen)] // #nosec G115 -- bounded by the check above
-	pos += int(kLen)                 // #nosec G115 -- same
+	pos += int(kLen)                // #nosec G115 -- same
 
 	vLen, n, e := psbt2CompactSize(data[pos:])
 	if e != nil {
@@ -583,7 +583,7 @@ func psbt2ReadKV(data []byte, pos int) (key, val []byte, next int, err error) {
 		return nil, nil, pos, fmt.Errorf("value truncated")
 	}
 	val = data[pos : pos+int(vLen)] // #nosec G115 -- bounded by the check above
-	pos += int(vLen)                 // #nosec G115 -- same
+	pos += int(vLen)                // #nosec G115 -- same
 	return key, val, pos, nil
 }
 

@@ -202,10 +202,10 @@ type BitcoinAddressKind int
 // is not recognised for the given symbol.
 const (
 	BitcoinAddressKindUnknown    BitcoinAddressKind = iota // address type could not be determined
-	BitcoinAddressKindP2PKH                               // 1… (base58check, version 0x00 for BTC)
-	BitcoinAddressKindP2SHP2WPKH                          // 3… (base58check, version 0x05 for BTC)
-	BitcoinAddressKindP2WPKH                              // bc1q… (bech32, witness v0, 20-byte program)
-	BitcoinAddressKindP2TR                                // bc1p… (bech32m, witness v1, 32-byte program)
+	BitcoinAddressKindP2PKH                                // 1… (base58check, version 0x00 for BTC)
+	BitcoinAddressKindP2SHP2WPKH                           // 3… (base58check, version 0x05 for BTC)
+	BitcoinAddressKindP2WPKH                               // bc1q… (bech32, witness v0, 20-byte program)
+	BitcoinAddressKindP2TR                                 // bc1p… (bech32m, witness v1, 32-byte program)
 )
 
 // DetectBitcoinAddressKind returns the address type for a Bitcoin-family
