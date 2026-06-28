@@ -4,7 +4,7 @@ import "math/big"
 
 // UserOperation is the ERC-4337 v0.6 struct submitted to the EntryPoint.
 type UserOperation struct {
-	Sender               []byte   // 20-byte address
+	Sender               []byte // 20-byte address
 	Nonce                *big.Int
 	InitCode             []byte
 	CallData             []byte

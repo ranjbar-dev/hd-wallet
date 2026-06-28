@@ -345,7 +345,8 @@ var ckbSecp256k1CodeHash = []byte{
 }
 
 // encodeCKB builds a CKB full address (bech32m, HRP "ckb"):
-//   payload = 0x00 || code_hash (32) || hash_type 0x01 (type) || args (20 = blake2b-160 of pubkey)
+//
+//	payload = 0x00 || code_hash (32) || hash_type 0x01 (type) || args (20 = blake2b-160 of pubkey)
 func encodeCKB(pub []byte) (string, error) {
 	args := blake2b160(pub)
 	payload := make([]byte, 0, 54)

@@ -146,13 +146,13 @@ func xrpTrustSetFields(in *txripple.SigningInput, ts *txripple.TrustSet, account
 		return nil, fmt.Errorf("%w: ripple: trustset limit: %v", ErrTxInput, err)
 	}
 	fields := []xrpField{
-		{typeCode: 1, fieldCode: 2, value: xrpUint16(20)},                           // TransactionType = TrustSet
-		{typeCode: 2, fieldCode: 2, value: xrpUint32(in.GetFlags())},                // Flags
-		{typeCode: 2, fieldCode: 4, value: xrpUint32(in.GetSequence())},             // Sequence
-		{typeCode: 2, fieldCode: 27, value: xrpUint32(in.GetLastLedgerSequence())},  // LastLedgerSequence
-		{typeCode: 6, fieldCode: 3, value: limit},                                   // LimitAmount (issued)
-		{typeCode: 6, fieldCode: 8, value: xrpAmount(i64AsU64(in.GetFee()))},        // Fee
-		{typeCode: 7, fieldCode: 3, value: xrpBlob(pub)},                            // SigningPubKey
+		{typeCode: 1, fieldCode: 2, value: xrpUint16(20)},                          // TransactionType = TrustSet
+		{typeCode: 2, fieldCode: 2, value: xrpUint32(in.GetFlags())},               // Flags
+		{typeCode: 2, fieldCode: 4, value: xrpUint32(in.GetSequence())},            // Sequence
+		{typeCode: 2, fieldCode: 27, value: xrpUint32(in.GetLastLedgerSequence())}, // LastLedgerSequence
+		{typeCode: 6, fieldCode: 3, value: limit},                                  // LimitAmount (issued)
+		{typeCode: 6, fieldCode: 8, value: xrpAmount(i64AsU64(in.GetFee()))},       // Fee
+		{typeCode: 7, fieldCode: 3, value: xrpBlob(pub)},                           // SigningPubKey
 		{typeCode: 8, fieldCode: 1, value: xrpAccountID(account)},                  // Account
 	}
 	xrpSortFields(fields)
