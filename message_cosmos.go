@@ -54,6 +54,13 @@ func cosmosADR36SignBytes(signer string, data []byte) []byte {
 // (e.g. ATOM, OSMO); other curves return ErrNotRecoverable. The derived
 // private key is wiped immediately after signing and never leaves the package.
 func (w *HDWallet) SignCosmosADR36(symbol Symbol, index uint32, signer string, data []byte) (string, error) {
+	// Reject a signer that is not a well-formed bech32 address before embedding it
+	// in the amino-JSON sign document. The bech32 charset (lower-case alphanumeric
+	// plus the "1" separator) contains no JSON metacharacters, so a successful
+	// decode guarantees signer cannot break out of or inject into the document.
+	if hrp, _, err := bech32.Decode(signer); err != nil || hrp == "" {
+		return "", fmt.Errorf("hdwallet: SignCosmosADR36 %s: signer must be a valid bech32 address", symbol)
+	}
 	signBytes := cosmosADR36SignBytes(signer, data)
 	h := sha256.Sum256(signBytes)
 	sig, err := w.SignIndex(symbol, index, h[:])

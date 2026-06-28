@@ -53,6 +53,27 @@ func TestSignCosmosADR36RoundTrip(t *testing.T) {
 	}
 }
 
+// TestSignCosmosADR36RejectsInvalidSigner ensures a signer that is not a valid
+// bech32 address (e.g. one carrying JSON metacharacters) is rejected before it
+// can be embedded in the amino-JSON sign document — preventing JSON injection.
+func TestSignCosmosADR36RejectsInvalidSigner(t *testing.T) {
+	w, err := FromMnemonic(canonicalMnemonic)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer w.Destroy()
+
+	for _, signer := range []string{
+		`cosmos1foo","evil":"`, // JSON-injection attempt
+		"not bech32",
+		"",
+	} {
+		if _, err := w.SignCosmosADR36(ATOM, 0, signer, []byte("x")); err == nil {
+			t.Errorf("expected error for invalid signer %q", signer)
+		}
+	}
+}
+
 // TestSignCosmosADR36WrongCurve verifies that a non-secp256k1 coin returns an
 // error (Cosmos ADR-36 requires a recoverable secp256k1 signature).
 func TestSignCosmosADR36WrongCurve(t *testing.T) {
