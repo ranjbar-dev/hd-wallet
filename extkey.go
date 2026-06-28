@@ -193,10 +193,10 @@ type XPubVersion int
 // XPubVersionUnknown is the zero value returned when the extended-key prefix
 // is not recognised as any of the known BIP-32 version bytes.
 const (
-	XPubVersionUnknown    XPubVersion = iota
-	XPubVersionLegacy                 // xpub/tpub — BIP-44 P2PKH
-	XPubVersionP2SHP2WPKH             // ypub/upub — BIP-49 P2SH-P2WPKH
-	XPubVersionP2WPKH                 // zpub/vpub — BIP-84 native SegWit
+	XPubVersionUnknown    XPubVersion = iota // prefix did not match a known xpub version
+	XPubVersionLegacy                        // xpub/tpub — BIP-44 P2PKH
+	XPubVersionP2SHP2WPKH                    // ypub/upub — BIP-49 P2SH-P2WPKH
+	XPubVersionP2WPKH                        // zpub/vpub — BIP-84 native SegWit
 )
 
 // version byte arrays for BIP-32 extended key prefixes (mainnet + testnet)
