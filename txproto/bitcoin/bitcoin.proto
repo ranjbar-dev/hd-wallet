@@ -4,6 +4,22 @@ package hdwallet.bitcoin.proto;
 
 option go_package = "github.com/ranjbar-dev/hd-wallet/txproto/bitcoin";
 
+// InputSelector controls the order in which UTXOs are considered for coin
+// selection. The default (SELECT_IN_ORDER) preserves the order supplied by
+// the caller, matching the historical behaviour.
+enum InputSelector {
+  SELECT_IN_ORDER = 0; // preserve caller-supplied order (default)
+  SELECT_ASCENDING  = 1; // sort UTXOs by amount ascending  (smallest first)
+  SELECT_DESCENDING = 2; // sort UTXOs by amount descending (largest first)
+  USE_ALL           = 3; // include every UTXO; still produces a change output
+}
+
+// An additional recipient output beyond the primary to_address.
+message OutputAddress {
+  string to_address = 1; // recipient address (any standard script type)
+  int64 amount = 2;      // value in satoshis; must be > 0
+}
+
 // A single unspent transaction output available to spend.
 message UnspentTransaction {
   // Previous output point.
@@ -16,6 +32,12 @@ message UnspentTransaction {
 
   // scriptPubKey of the UTXO (P2WPKH: OP_0 <20-byte-hash>).
   bytes script = 5;
+
+  // If set, derive this UTXO's signing key at this address index instead of
+  // the tx-level index passed to SignTransaction. Allows a single transaction
+  // to sweep UTXOs controlled by different derivation indices of the same
+  // wallet (e.g. receive + change addresses).
+  optional uint32 key_index = 6;
 }
 
 // SigningInput mirrors a minimal subset of TW.Bitcoin.Proto.SigningInput,
@@ -44,6 +66,28 @@ message SigningInput {
 
   // If set, send everything (minus fee) to to_address; no change output.
   bool use_max_amount = 8;
+
+  // Optional zero-amount OP_RETURN data payload (<= 80 bytes; standardness limit).
+  bytes output_op_return = 9;
+
+  // Additional recipients beyond to_address; each amount must be > 0.
+  // Cannot be combined with use_max_amount.
+  repeated OutputAddress extra_outputs = 10;
+
+  // UTXO selection strategy (default SELECT_IN_ORDER).
+  InputSelector input_selector = 11;
+
+  // If true, always emit the change output even when its value is below the
+  // dust threshold (by default sub-threshold change is folded into the fee).
+  bool disable_dust_filter = 12;
+
+  // If > 0, overrides the built-in 546 sat dust threshold.
+  int64 fixed_dust_threshold = 13;
+
+  // If true, include every available UTXO even when fewer would cover the
+  // target amount; still produces a normal change output (unlike
+  // use_max_amount which sends everything to the recipient).
+  bool use_max_utxo = 14;
 }
 
 // One selected/used output point in the final transaction.

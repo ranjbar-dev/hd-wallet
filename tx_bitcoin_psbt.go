@@ -22,12 +22,13 @@ package hdwallet
 // exact same raw transaction bytes as SignTransaction — proven in
 // tx_bitcoin_psbt_test.go.
 //
-// PSBT inputs carry only a witness UTXO (BIP-143 sufficient), so the segwit input
-// types are supported: native P2WPKH, nested P2SH-P2WPKH and Taproot key-path.
-// Legacy P2PKH is intentionally not offered through the PSBT flow because BIP-174
-// requires the full previous transaction (NonWitnessUtxo) for a non-witness
-// input, which the SigningInput proto does not carry; spend legacy inputs via the
-// direct SignTransaction path instead.
+// Supported input types: native P2WPKH, nested P2SH-P2WPKH, Taproot key-path,
+// and legacy P2PKH. For P2PKH, BIP-174 requires a NonWitnessUtxo (the full
+// previous transaction); since the SigningInput proto does not carry one, a
+// synthetic prev-tx is constructed using the same multisigFakePrevTx pattern as
+// the multisig flow. The legacy sighash (CalcSignatureHash) does not inspect the
+// previous-transaction content — only the unsigned tx and the subscript (the
+// P2PKH scriptPubKey) enter the preimage — so the synthetic tx is safe.
 
 import (
 	"bytes"
@@ -45,8 +46,8 @@ import (
 // serialized packet. Coin selection (planBitcoinTx) chooses which UTXOs become
 // inputs and computes the recipient/change outputs exactly as the direct signer
 // would, so a subsequent SignPSBT/FinalizePSBT/ExtractPSBTTx produces the same
-// transaction. Every chosen input must be a segwit type (P2WPKH, P2SH-P2WPKH or
-// P2TR); a legacy P2PKH input returns ErrTxInput.
+// transaction. Supported input types: P2WPKH, P2SH-P2WPKH, P2TR, and legacy
+// P2PKH (via a synthetic NonWitnessUtxo using multisigFakePrevTx).
 func BuildPSBT(symbol Symbol, in *txbtc.SigningInput) ([]byte, error) {
 	if _, ok := btcAddrParams[symbol]; !ok {
 		return nil, fmt.Errorf("%w: %s", ErrTxUnsupported, symbol)
@@ -102,7 +103,18 @@ func newUnsignedPacket(plan *btcPlan) (*psbt.Packet, error) {
 	}
 	for i, in := range plan.inputs {
 		if isP2PKH(in.script) {
-			return nil, fmt.Errorf("%w: bitcoin: psbt does not support legacy P2PKH input %d (no prev tx in proto); use SignTransaction", ErrTxInput, i)
+			// BIP-174 requires a NonWitnessUtxo for legacy (non-witness) inputs.
+			// The proto does not carry the full previous transaction, so we build a
+			// synthetic one using the same pattern as the multisig P2SH path.
+			// CalcSignatureHash does not inspect the previous-tx content; only the
+			// unsigned tx and the P2PKH subscript enter the sighash preimage.
+			// We pass in.vout so TxOut[in.vout] holds our script (the btcd finalizer
+			// reads NonWitnessUtxo.TxOut[PreviousOutPoint.Index]).
+			fakePrevTx := multisigFakePrevTx(in.vout, in.amount, in.script)
+			if err := updater.AddInNonWitnessUtxo(fakePrevTx, i); err != nil {
+				return nil, fmt.Errorf("hdwallet: bitcoin: psbt non-witness utxo: %w", err)
+			}
+			continue
 		}
 		if err := updater.AddInWitnessUtxo(wire.NewTxOut(in.amount, in.script), i); err != nil {
 			return nil, fmt.Errorf("hdwallet: bitcoin: psbt witness utxo: %w", err)
@@ -151,14 +163,54 @@ func (w *HDWallet) signPacketInputs(symbol Symbol, index uint32, packet *psbt.Pa
 	}
 
 	for i := range packet.Inputs {
-		script := packet.Inputs[i].WitnessUtxo.PkScript
-		amount := packet.Inputs[i].WitnessUtxo.Value
+		pIn := &packet.Inputs[i]
+
+		// Resolve the scriptPubKey. For witness inputs it comes from WitnessUtxo;
+		// for legacy P2PKH inputs it comes from the NonWitnessUtxo.
+		var script []byte
+		var amount int64
+		if pIn.WitnessUtxo != nil {
+			script = pIn.WitnessUtxo.PkScript
+			amount = pIn.WitnessUtxo.Value
+		} else if pIn.NonWitnessUtxo != nil {
+			outIdx := packet.UnsignedTx.TxIn[i].PreviousOutPoint.Index
+			if int(outIdx) >= len(pIn.NonWitnessUtxo.TxOut) { // #nosec G115 -- bounded by wire.MsgTx output count
+				return fmt.Errorf("%w: bitcoin: psbt input %d NonWitnessUtxo outIdx out of range", ErrTxInput, i)
+			}
+			script = pIn.NonWitnessUtxo.TxOut[outIdx].PkScript
+			amount = pIn.NonWitnessUtxo.TxOut[outIdx].Value
+		} else {
+			return fmt.Errorf("%w: bitcoin: psbt input %d missing both WitnessUtxo and NonWitnessUtxo", ErrTxInput, i)
+		}
+		_ = amount // used below for segwit branches
+
 		switch {
+		case isP2PKH(script):
+			keyhash := script[3:23] // 76 a9 14 <20-byte hash> 88 ac
+			if !bytesEqual(hash160(pub), keyhash) {
+				return fmt.Errorf("%w: bitcoin: psbt input %d not controlled by key", ErrTxInput, i)
+			}
+			// Legacy sighash: the P2PKH scriptPubKey is the subscript.
+			// CalcSignatureHash operates on the wire tx directly without
+			// inspecting the NonWitnessUtxo content, so the synthetic prev-tx is safe.
+			legacyHash, err := txscript.CalcSignatureHash(script, txscript.SigHashAll, packet.UnsignedTx, i)
+			if err != nil {
+				return fmt.Errorf("hdwallet: bitcoin: psbt p2pkh sighash: %w", err)
+			}
+			derSig, err := w.btcDERSig(symbol, index, legacyHash, SigHashAll)
+			if err != nil {
+				return err
+			}
+			// Bypass updater.Sign (it verifies NonWitnessUtxo.TxHash() == PreviousOutPoint.Hash,
+			// a check the synthetic fake-prev-tx cannot satisfy). Append the
+			// PartialSig directly — the same bypass used for P2SH multisig.
+			pIn.PartialSigs = append(pIn.PartialSigs, &psbt.PartialSig{PubKey: pub, Signature: derSig})
+
 		case isP2WPKH(script):
 			if !bytesEqual(hash160(pub), script[2:]) {
 				return fmt.Errorf("%w: bitcoin: psbt input %d not controlled by key", ErrTxInput, i)
 			}
-			if err := w.psbtSignWitnessV0(symbol, index, updater, sigHashes, packet.UnsignedTx, i, amount, nil, pub); err != nil {
+			if err := w.psbtSignWitnessV0(symbol, index, updater, sigHashes, packet.UnsignedTx, i, pIn.WitnessUtxo.Value, nil, pub); err != nil {
 				return err
 			}
 		case isP2SHP2WPKH(script):
@@ -166,7 +218,7 @@ func (w *HDWallet) signPacketInputs(symbol Symbol, index uint32, packet *psbt.Pa
 			if !bytesEqual(hash160(redeem), script[2:22]) {
 				return fmt.Errorf("%w: bitcoin: psbt input %d is not a standard P2SH-P2WPKH for key", ErrTxInput, i)
 			}
-			if err := w.psbtSignWitnessV0(symbol, index, updater, sigHashes, packet.UnsignedTx, i, amount, redeem, pub); err != nil {
+			if err := w.psbtSignWitnessV0(symbol, index, updater, sigHashes, packet.UnsignedTx, i, pIn.WitnessUtxo.Value, redeem, pub); err != nil {
 				return err
 			}
 		case isP2TR(script):
@@ -242,16 +294,27 @@ func (w *HDWallet) psbtSignTaproot(symbol Symbol, index uint32, packet *psbt.Pac
 	return nil
 }
 
-// psbtPrevOutFetcher builds the prevout fetcher every BIP-143/341 sighash needs,
-// from each input's WitnessUtxo.
+// psbtPrevOutFetcher builds the prevout fetcher every BIP-143/341 sighash needs.
+// For witness inputs the WitnessUtxo is used directly; for legacy P2PKH inputs
+// the prevout is taken from the NonWitnessUtxo at the appropriate output index.
+// P2PKH inputs are not signed by CalcWitnessSigHash, but NewTxSigHashes still
+// needs a fetcher that covers all inputs, so non-witness prevouts are also added.
 func psbtPrevOutFetcher(packet *psbt.Packet) (txscript.PrevOutputFetcher, error) {
 	prevOuts := make(map[wire.OutPoint]*wire.TxOut, len(packet.Inputs))
 	for i := range packet.Inputs {
-		wu := packet.Inputs[i].WitnessUtxo
-		if wu == nil {
-			return nil, fmt.Errorf("%w: bitcoin: psbt input %d missing witness utxo", ErrTxInput, i)
+		pIn := &packet.Inputs[i]
+		outPoint := packet.UnsignedTx.TxIn[i].PreviousOutPoint
+		if pIn.WitnessUtxo != nil {
+			prevOuts[outPoint] = pIn.WitnessUtxo
+		} else if pIn.NonWitnessUtxo != nil {
+			outIdx := outPoint.Index
+			if int(outIdx) >= len(pIn.NonWitnessUtxo.TxOut) { // #nosec G115 -- bounded by wire.MsgTx output count
+				return nil, fmt.Errorf("%w: bitcoin: psbt input %d NonWitnessUtxo outIdx out of range", ErrTxInput, i)
+			}
+			prevOuts[outPoint] = pIn.NonWitnessUtxo.TxOut[outIdx]
+		} else {
+			return nil, fmt.Errorf("%w: bitcoin: psbt input %d missing both WitnessUtxo and NonWitnessUtxo", ErrTxInput, i)
 		}
-		prevOuts[packet.UnsignedTx.TxIn[i].PreviousOutPoint] = wu
 	}
 	return txscript.NewMultiPrevOutFetcher(prevOuts), nil
 }

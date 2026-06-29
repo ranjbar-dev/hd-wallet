@@ -27,6 +27,7 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"fmt"
+	"sort"
 
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/btcsuite/btcd/btcec/v2/schnorr"
@@ -49,15 +50,37 @@ const btcDefaultSequence uint32 = 0xffffffff
 // to 0xFFFFFFFD will carry that sequence through to the signed transaction.
 const BTCSequenceRBF uint32 = 0xFFFFFFFD
 
+// SigHashAll, SigHashNone, SigHashSingle and SigHashAnyoneCanPay are the
+// standard Bitcoin SIGHASH flag bits used in SigningInput.HashType. A complete
+// hash_type value is formed by OR-ing one base type (bits 0–4) with optional
+// modifier bits: bit 7 (0x80) = AnyoneCanPay, bit 6 (0x40) = FORKID (BCH).
+//
+// Common combinations:
+//
+//	0x01  SIGHASH_ALL                  — default; all inputs, all outputs
+//	0x41  SIGHASH_ALL|FORKID           — BCH default
+//	0x02  SIGHASH_NONE                 — no outputs committed
+//	0x03  SIGHASH_SINGLE               — only input's paired output committed
+//	0x81  SIGHASH_ALL|ANYONECANPAY     — only signing input; all outputs
+//	0x83  SIGHASH_SINGLE|ANYONECANPAY  — only signing input; paired output
+const (
+	SigHashAll          uint32 = 0x01
+	SigHashNone         uint32 = 0x02
+	SigHashSingle       uint32 = 0x03
+	SigHashAnyoneCanPay uint32 = 0x80
+)
+
 // btcInput is one transaction input with the data needed to sign it.
 type btcInput struct {
-	txid      []byte // 32-byte txid in internal (little-endian) byte order
-	vout      uint32
-	sequence  uint32
-	amount    int64
-	script    []byte   // scriptPubKey of the output being spent
-	scriptSig []byte   // unlocking script (legacy P2PKH / nested P2SH-P2WPKH); empty for native segwit
-	witness   [][]byte // witness stack (segwit inputs); nil for pure-legacy inputs
+	txid        []byte // 32-byte txid in internal (little-endian) byte order
+	vout        uint32
+	sequence    uint32
+	amount      int64
+	script      []byte   // scriptPubKey of the output being spent
+	scriptSig   []byte   // unlocking script (legacy P2PKH / nested P2SH-P2WPKH); empty for native segwit
+	witness     [][]byte // witness stack (segwit inputs); nil for pure-legacy inputs
+	keyIndex    uint32   // per-input derivation index (only meaningful when hasKeyIndex is true)
+	hasKeyIndex bool     // true when keyIndex is explicitly set by the UTXO's key_index field
 }
 
 // btcOutput is one transaction output.
@@ -66,8 +89,10 @@ type btcOutput struct {
 	script []byte
 }
 
-// signBitcoinTx builds, signs and serializes a Bitcoin/Litecoin SegWit
-// transaction. All UTXOs are assumed controlled by the (symbol,index) key.
+// signBitcoinTx builds, signs and serializes a Bitcoin/Litecoin transaction.
+// By default all UTXOs are signed with the (symbol,index) key. When a UTXO
+// carries an explicit key_index field, that derivation index is used for that
+// input instead, allowing a single tx to sweep UTXOs from multiple indices.
 func (w *HDWallet) signBitcoinTx(symbol Symbol, index uint32, in *txbtc.SigningInput) (*txbtc.SigningOutput, error) {
 	// Zcash uses an entirely different (Sapling v4 / ZIP-243) wire format and
 	// sighash, so it has its own builder rather than the standard Bitcoin path.
@@ -82,14 +107,6 @@ func (w *HDWallet) signBitcoinTx(symbol Symbol, index uint32, in *txbtc.SigningI
 	}
 	if in.GetToAddress() == "" {
 		return nil, fmt.Errorf("%w: bitcoin: missing to_address", ErrTxInput)
-	}
-
-	pub, err := w.PublicKeyIndex(symbol, index)
-	if err != nil {
-		return nil, err
-	}
-	if len(pub) != 33 {
-		return nil, fmt.Errorf("%w: bitcoin: expected 33-byte compressed key", ErrTxInput)
 	}
 
 	toScript, err := bitcoinDecodeScript(symbol, in.GetToAddress())
@@ -110,7 +127,21 @@ func (w *HDWallet) signBitcoinTx(symbol Symbol, index uint32, in *txbtc.SigningI
 	locktime := in.GetLockTime()
 
 	for i := range plan.inputs {
-		if err := w.signBitcoinInput(symbol, index, pub, plan.inputs, plan.outputs, i, version, locktime, hashType); err != nil {
+		// Resolve the derivation index for this specific input. When the UTXO
+		// carries an explicit key_index, use it; otherwise fall back to the
+		// tx-level index supplied by the caller.
+		inputIndex := index
+		if plan.inputs[i].hasKeyIndex {
+			inputIndex = plan.inputs[i].keyIndex
+		}
+		inputPub, err := w.PublicKeyIndex(symbol, inputIndex)
+		if err != nil {
+			return nil, err
+		}
+		if len(inputPub) != 33 {
+			return nil, fmt.Errorf("%w: bitcoin: expected 33-byte compressed key for input %d", ErrTxInput, i)
+		}
+		if err := w.signBitcoinInput(symbol, inputIndex, inputPub, plan.inputs, plan.outputs, i, version, locktime, hashType); err != nil {
 			return nil, err
 		}
 	}
@@ -148,6 +179,13 @@ func (w *HDWallet) signBitcoinInput(symbol Symbol, index uint32, pub []byte, inp
 			scriptCode := append(btcVarInt(uint64(len(script))), script...)
 			digest = bip143Sighash(inputs, outputs, i, scriptCode, version, locktime, hashType)
 		} else {
+			// SIGHASH_SINGLE with the input index at or beyond the output count has
+			// no valid encoding in the legacy (pre-segwit) sighash: the output slot
+			// at idx does not exist. Reject it before calling legacySighash so the
+			// function is never asked to access outputs[idx] out of bounds.
+			if (hashType&0x1f) == SigHashSingle && i >= len(outputs) {
+				return fmt.Errorf("%w: bitcoin: SIGHASH_SINGLE input %d >= output count %d", ErrTxInput, i, len(outputs))
+			}
 			digest = legacySighash(inputs, outputs, i, script, version, locktime, hashType)
 		}
 		sigWithType, err := w.btcDERSig(symbol, index, digest, hashType)
@@ -277,37 +315,226 @@ type btcPlan struct {
 	used    []*txbtc.UsedUTXO
 }
 
-// planBitcoinTx performs simple deterministic coin selection.
+// buildOpReturn builds the scriptPubKey for an OP_RETURN output carrying data.
+// payload must not exceed 80 bytes (Bitcoin standardness limit).
+// Script layout: 0x6a (OP_RETURN) + minimal data push:
+//   - 0 < len <= 75 bytes: <0x6a> <len> <data>
+//   - 76..80 bytes:         <0x6a> <0x4c> <len> <data>  (OP_PUSHDATA1)
+func buildOpReturn(payload []byte) ([]byte, error) {
+	if len(payload) > 80 {
+		return nil, fmt.Errorf("%w: bitcoin: op_return payload exceeds 80-byte standardness limit (got %d bytes)", ErrTxInput, len(payload))
+	}
+	script := make([]byte, 0, 3+len(payload))
+	script = append(script, 0x6a) // OP_RETURN
+	if len(payload) < 76 {
+		script = append(script, byte(len(payload))) // #nosec G115 -- len < 76
+	} else {
+		script = append(script, 0x4c, byte(len(payload))) // OP_PUSHDATA1 + 1-byte len; #nosec G115 -- len in 76..80
+	}
+	script = append(script, payload...)
+	return script, nil
+}
+
+// BitcoinTxPlan is the result of a no-sign transaction planning step returned
+// by PlanBitcoinTx. It carries all information needed to show the user what a
+// subsequent SignTransaction call will do, without requiring a wallet or seed.
+type BitcoinTxPlan struct {
+	// Amount is the value of in.Amount (satoshis to send to the primary recipient).
+	Amount int64
+	// AvailableAmount is the sum of ALL UTXOs supplied in the SigningInput,
+	// regardless of how many were selected.
+	AvailableAmount int64
+	// Fee is the estimated fee in satoshis (identical to SigningOutput.Fee).
+	Fee int64
+	// Change is the change output value in satoshis, or 0 when sub-threshold
+	// dust is folded into the fee.
+	Change int64
+	// SelectedUTXO is the subset of UTXOs chosen by coin selection
+	// (identical to SigningOutput.UsedUtxo).
+	SelectedUTXO []*txbtc.UsedUTXO
+	// VsizeEstimate is the estimated virtual size (vbytes) of the transaction.
+	VsizeEstimate int64
+}
+
+// PlanBitcoinTx performs the coin-selection and fee-estimation steps for a
+// Bitcoin transaction without signing or accessing any key material. The
+// returned BitcoinTxPlan describes the selected UTXOs, fee, and change for
+// the given SigningInput using the same logic as SignTransaction.
 //
-// ponytail: naive in-order accumulate-until-covered selection; upgrade path is a
-// smarter UTXO/fee-optimising selector if fee minimisation ever matters. This is
-// not pinned to Trust Wallet's selection PLAN — only the signing/serialization of
-// the resulting tx is vector-verified.
+// PlanBitcoinTx is a pure function over the proto — it requires no wallet or
+// seed and can be called before a signing session is available.
+func PlanBitcoinTx(symbol Symbol, in *txbtc.SigningInput) (*BitcoinTxPlan, error) {
+	if !bitcoinTxSupported(symbol) {
+		return nil, fmt.Errorf("%w: %s", ErrTxUnsupported, symbol)
+	}
+	if len(in.GetUtxo()) == 0 {
+		return nil, fmt.Errorf("%w: bitcoin: no utxo provided", ErrTxInput)
+	}
+	if in.GetToAddress() == "" {
+		return nil, fmt.Errorf("%w: bitcoin: missing to_address", ErrTxInput)
+	}
+	toScript, err := bitcoinDecodeScript(symbol, in.GetToAddress())
+	if err != nil {
+		return nil, fmt.Errorf("%w: bitcoin: to_address: %v", ErrTxInput, err)
+	}
+
+	// AvailableAmount = sum of ALL UTXOs (before selection).
+	var availableAmount int64
+	for _, u := range in.GetUtxo() {
+		availableAmount += u.GetAmount()
+	}
+
+	plan, err := planBitcoinTx(symbol, in, toScript)
+	if err != nil {
+		return nil, err
+	}
+
+	// Compute the selected total from the used records.
+	var selectedTotal int64
+	for _, u := range plan.used {
+		selectedTotal += u.GetAmount()
+	}
+
+	// Change = selectedTotal − fee − (amount sent to recipients).
+	var sentAmount int64
+	if in.GetUseMaxAmount() {
+		sentAmount = selectedTotal - plan.fee // UseMaxAmount sends everything minus fee
+	} else {
+		sentAmount = in.GetAmount()
+		for _, eo := range in.GetExtraOutputs() {
+			sentAmount += eo.GetAmount()
+		}
+	}
+	change := selectedTotal - plan.fee - sentAmount
+	if change < 0 {
+		change = 0
+	}
+
+	// Vsize from the plan's actual inputs and outputs.
+	outScripts := make([][]byte, len(plan.outputs))
+	for i, o := range plan.outputs {
+		outScripts[i] = o.script
+	}
+	vsize := estimateVsize(plan.inputs, outScripts...)
+
+	return &BitcoinTxPlan{
+		Amount:          in.GetAmount(),
+		AvailableAmount: availableAmount,
+		Fee:             plan.fee,
+		Change:          change,
+		SelectedUTXO:    plan.used,
+		VsizeEstimate:   vsize,
+	}, nil
+}
+
+// sortUTXOs returns a copy of utxos sorted according to sel. SELECT_IN_ORDER
+// and USE_ALL return a shallow copy in the original order (no sort needed for
+// USE_ALL since every UTXO is selected).
+func sortUTXOs(utxos []*txbtc.UnspentTransaction, sel txbtc.InputSelector) []*txbtc.UnspentTransaction {
+	sorted := make([]*txbtc.UnspentTransaction, len(utxos))
+	copy(sorted, utxos)
+	switch sel {
+	case txbtc.InputSelector_SELECT_ASCENDING:
+		sort.Slice(sorted, func(i, j int) bool {
+			return sorted[i].GetAmount() < sorted[j].GetAmount()
+		})
+	case txbtc.InputSelector_SELECT_DESCENDING:
+		sort.Slice(sorted, func(i, j int) bool {
+			return sorted[i].GetAmount() > sorted[j].GetAmount()
+		})
+		// SELECT_IN_ORDER and USE_ALL: no reordering required.
+	}
+	return sorted
+}
+
+// planBitcoinTx performs deterministic coin selection and output construction.
+//
+// Coin selection is controlled by in.InputSelector:
+//   - SELECT_IN_ORDER (default): accumulate UTXOs in caller-supplied order.
+//   - SELECT_ASCENDING / SELECT_DESCENDING: sort by amount before accumulating.
+//   - USE_ALL (or use_max_utxo=true): select every UTXO; still produces change.
+//
+// Dust policy:
+//   - fixed_dust_threshold > 0 overrides the built-in 546-sat threshold.
+//   - disable_dust_filter = true always emits the change output when > 0.
+//
+// Output order is deterministic: [to_address, extra_outputs…, op_return, change].
 func planBitcoinTx(symbol Symbol, in *txbtc.SigningInput, toScript []byte) (*btcPlan, error) {
 	byteFee := in.GetByteFee()
 
-	if in.GetUseMaxAmount() {
-		inputs, used, total, err := selectAll(in.GetUtxo())
+	// Decode extra output scripts up front so both paths (UseMaxAmount and
+	// regular) can share the validated scripts and the aggregate amount.
+	extraOuts := in.GetExtraOutputs()
+	extraScripts := make([][]byte, len(extraOuts))
+	var extraTotal int64
+	for i, eo := range extraOuts {
+		if eo.GetAmount() <= 0 {
+			return nil, fmt.Errorf("%w: bitcoin: extra_output[%d] amount must be positive", ErrTxInput, i)
+		}
+		s, err := bitcoinDecodeScript(symbol, eo.GetToAddress())
+		if err != nil {
+			return nil, fmt.Errorf("%w: bitcoin: extra_output[%d] address: %v", ErrTxInput, i, err)
+		}
+		extraScripts[i] = s
+		extraTotal += eo.GetAmount()
+	}
+
+	// Build the optional OP_RETURN script; an empty slice means no OP_RETURN.
+	var opReturnScript []byte
+	if payload := in.GetOutputOpReturn(); len(payload) > 0 {
+		var err error
+		opReturnScript, err = buildOpReturn(payload)
 		if err != nil {
 			return nil, err
 		}
-		fee := byteFee * estimateVsize(inputs, toScript)
+	}
+
+	// Effective dust threshold: caller override takes precedence.
+	dustThreshold := btcDustThreshold
+	if in.GetFixedDustThreshold() > 0 {
+		dustThreshold = in.GetFixedDustThreshold()
+	}
+
+	// Sort a copy of the UTXO list according to the input selector.
+	utxos := sortUTXOs(in.GetUtxo(), in.GetInputSelector())
+
+	// useAllInputs is true when the caller wants every UTXO selected regardless
+	// of whether fewer would be sufficient to cover the target.
+	useAllInputs := in.GetUseMaxUtxo() || in.GetInputSelector() == txbtc.InputSelector_USE_ALL
+
+	// UseMaxAmount: select all UTXOs, send everything minus fee to the recipient
+	// (no change output).
+	if in.GetUseMaxAmount() {
+		if len(extraOuts) > 0 {
+			return nil, fmt.Errorf("%w: bitcoin: use_max_amount cannot be combined with extra_outputs", ErrTxInput)
+		}
+		inputs, used, total, err := selectAll(utxos)
+		if err != nil {
+			return nil, err
+		}
+		// Build the full output script list for vsize estimation.
+		vscripts := [][]byte{toScript}
+		if opReturnScript != nil {
+			vscripts = append(vscripts, opReturnScript)
+		}
+		fee := byteFee * estimateVsize(inputs, vscripts...)
 		send := total - fee
 		if send <= 0 {
 			return nil, fmt.Errorf("%w: bitcoin: balance %d does not cover fee %d", ErrTxInput, total, fee)
 		}
-		return &btcPlan{
-			inputs:  inputs,
-			outputs: []btcOutput{{value: send, script: toScript}},
-			fee:     fee,
-			used:    used,
-		}, nil
+		outputs := []btcOutput{{value: send, script: toScript}}
+		if opReturnScript != nil {
+			outputs = append(outputs, btcOutput{value: 0, script: opReturnScript})
+		}
+		return &btcPlan{inputs: inputs, outputs: outputs, fee: fee, used: used}, nil
 	}
 
 	amount := in.GetAmount()
 	if amount <= 0 {
 		return nil, fmt.Errorf("%w: bitcoin: amount must be positive", ErrTxInput)
 	}
+	// Total satoshis that must reach recipient outputs (excluding fee/change).
+	totalAmount := amount + extraTotal
 
 	// Decode the change script up-front (when provided) so the fee estimate
 	// reflects the real change output type, not an assumed default.
@@ -320,10 +547,77 @@ func planBitcoinTx(symbol Symbol, in *txbtc.SigningInput, toScript []byte) (*btc
 		}
 	}
 
+	// feeFor estimates the fee for a given set of accumulate inputs, always
+	// including a tentative change output in the vsize calculation so that the
+	// estimate is conservative (adding a real change output later won't
+	// cause the fee to be under-estimated).
+	feeFor := func(inputs []btcInput) int64 {
+		changeForEst := changeScript
+		if changeForEst == nil {
+			changeForEst = toScript // fall back to recipient type if no change addr
+		}
+		s := append([][]byte{toScript}, extraScripts...)
+		if opReturnScript != nil {
+			s = append(s, opReturnScript)
+		}
+		s = append(s, changeForEst)
+		return byteFee * estimateVsize(inputs, s...)
+	}
+
+	// buildBaseOutputs assembles the deterministic output list excluding change.
+	buildBaseOutputs := func() []btcOutput {
+		outs := []btcOutput{{value: amount, script: toScript}}
+		for j, eo := range extraOuts {
+			outs = append(outs, btcOutput{value: eo.GetAmount(), script: extraScripts[j]})
+		}
+		if opReturnScript != nil {
+			outs = append(outs, btcOutput{value: 0, script: opReturnScript})
+		}
+		return outs
+	}
+
+	// finalise appends the change output (or folds dust into the fee) and
+	// returns the completed plan.
+	finalise := func(inputs []btcInput, used []*txbtc.UsedUTXO, total, fee int64) (*btcPlan, error) {
+		outputs := buildBaseOutputs()
+		change := total - totalAmount - fee
+		if in.GetDisableDustFilter() {
+			// Always emit change when non-zero and a change address is available.
+			if change > 0 {
+				if changeScript == nil {
+					return nil, fmt.Errorf("%w: bitcoin: change of %d sat but no change_address provided", ErrTxInput, change)
+				}
+				outputs = append(outputs, btcOutput{value: change, script: changeScript})
+			}
+		} else if change >= dustThreshold {
+			if changeScript == nil {
+				return nil, fmt.Errorf("%w: bitcoin: change of %d sat but no change_address provided", ErrTxInput, change)
+			}
+			outputs = append(outputs, btcOutput{value: change, script: changeScript})
+		} else {
+			fee = total - totalAmount // sub-threshold change folded into the fee
+		}
+		return &btcPlan{inputs: inputs, outputs: outputs, fee: fee, used: used}, nil
+	}
+
+	// USE_ALL / use_max_utxo: select every UTXO and produce normal change.
+	if useAllInputs {
+		inputs, used, total, err := selectAll(utxos)
+		if err != nil {
+			return nil, err
+		}
+		fee := feeFor(inputs)
+		if total < totalAmount+fee {
+			return nil, fmt.Errorf("%w: bitcoin: insufficient funds (have %d, need %d + fee)", ErrTxInput, total, totalAmount)
+		}
+		return finalise(inputs, used, total, fee)
+	}
+
+	// Default: accumulate UTXOs in selector order until the target is covered.
 	var inputs []btcInput
 	var used []*txbtc.UsedUTXO
 	var total int64
-	for _, u := range in.GetUtxo() {
+	for _, u := range utxos {
 		bi, err := toBtcInput(u)
 		if err != nil {
 			return nil, err
@@ -332,31 +626,17 @@ func planBitcoinTx(symbol Symbol, in *txbtc.SigningInput, toScript []byte) (*btc
 		used = append(used, usedFrom(u))
 		total += u.GetAmount()
 
-		// Estimate assuming a change output exists (toScript + change).
-		changeForEstimate := changeScript
-		if changeForEstimate == nil {
-			changeForEstimate = toScript // fall back to recipient kind if no change addr supplied
-		}
-		fee := byteFee * estimateVsize(inputs, toScript, changeForEstimate)
-		if total < amount+fee {
+		fee := feeFor(inputs)
+		if total < totalAmount+fee {
 			continue
 		}
-		outputs := []btcOutput{{value: amount, script: toScript}}
-		change := total - amount - fee
-		if change >= btcDustThreshold {
-			if changeScript == nil {
-				return nil, fmt.Errorf("%w: bitcoin: change of %d sat but no change_address provided", ErrTxInput, change)
-			}
-			outputs = append(outputs, btcOutput{value: change, script: changeScript})
-		} else {
-			fee = total - amount // dust change folded into the fee
-		}
-		return &btcPlan{inputs: inputs, outputs: outputs, fee: fee, used: used}, nil
+		return finalise(inputs, used, total, fee)
 	}
-	return nil, fmt.Errorf("%w: bitcoin: insufficient funds (have %d, need %d + fee)", ErrTxInput, total, amount)
+	return nil, fmt.Errorf("%w: bitcoin: insufficient funds (have %d, need %d + fee)", ErrTxInput, total, totalAmount)
 }
 
-// selectAll converts every UTXO to an input (used by UseMaxAmount).
+// selectAll converts every UTXO in the slice to a btcInput (used by
+// UseMaxAmount and the USE_ALL / use_max_utxo paths).
 func selectAll(utxos []*txbtc.UnspentTransaction) ([]btcInput, []*txbtc.UsedUTXO, int64, error) {
 	var inputs []btcInput
 	var used []*txbtc.UsedUTXO
@@ -394,13 +674,18 @@ func toBtcInput(u *txbtc.UnspentTransaction) (btcInput, error) {
 	if seq == 0 {
 		seq = btcDefaultSequence
 	}
-	return btcInput{
+	bi := btcInput{
 		txid:     u.GetOutPointHash(),
 		vout:     u.GetOutPointIndex(),
 		sequence: seq,
 		amount:   u.GetAmount(),
 		script:   u.GetScript(),
-	}, nil
+	}
+	if u.KeyIndex != nil {
+		bi.keyIndex = u.GetKeyIndex()
+		bi.hasKeyIndex = true
+	}
+	return bi, nil
 }
 
 // BitcoinInputKind identifies the script type of an input being spent, for the
@@ -536,9 +821,9 @@ func outputKind(script []byte) BitcoinOutputKind {
 		return OutputP2PKH
 	case isP2SHP2WPKH(script): // 23-byte P2SH
 		return OutputP2SH
-	case isP2TR(script):
+	case isP2TR(script) || isP2WSH(script): // both are 34-byte scripts; same vsize (43 vbytes)
 		return OutputP2TR
-	default: // P2WPKH (or unknown)
+	default: // P2WPKH (or unknown, incl. OP_RETURN)
 		return OutputP2WPKH
 	}
 }
@@ -587,65 +872,144 @@ func isP2TR(script []byte) bool {
 
 // ---- sighash ----
 
-// legacySighash computes the pre-segwit (BIP-16/legacy) SIGHASH_ALL digest for
-// input idx: a copy of the unsigned tx is serialized with input idx's scriptSig
-// replaced by subScript (its scriptPubKey) and every other input's scriptSig
-// empty, no witnesses, then the 4-byte little-endian hashType is appended and the
-// result is double-SHA256'd. Only SIGHASH_ALL is supported (the only flag this
-// package signs with); other flags would need the standard input/output masking.
+// legacySighash computes the pre-segwit (BIP-16/legacy) SIGHASH digest for
+// input idx. hashType controls which inputs and outputs are committed:
+//
+//   - SIGHASH_ALL (default): all inputs with their nSequence; all outputs.
+//   - SIGHASH_NONE: all inputs; every other input's nSequence zeroed; no outputs.
+//   - SIGHASH_SINGLE: all inputs; every other input's nSequence zeroed; outputs
+//     truncated to idx+1 with outputs[0..idx-1] as empty slots (value =
+//     0xffffffffffffffff, empty script). Callers must guard idx < len(outputs)
+//     before calling; signBitcoinInput does this and returns ErrTxInput otherwise.
+//   - SIGHASH_ANYONECANPAY (bit 0x80): only input idx is included (nSequence
+//     unchanged); combined with the base type above for the outputs section.
 func legacySighash(inputs []btcInput, outputs []btcOutput, idx int, subScript []byte, version, locktime, hashType uint32) []byte {
+	base := hashType & 0x1f
+	anyoneCanPay := (hashType & SigHashAnyoneCanPay) != 0
+
 	var b []byte
 	b = append(b, btcLE32(version)...)
-	b = append(b, btcVarInt(uint64(len(inputs)))...)
-	for j, in := range inputs {
+
+	if anyoneCanPay {
+		// Only the signing input is committed; its nSequence is unchanged.
+		b = append(b, btcVarInt(1)...)
+		in := inputs[idx]
 		b = append(b, in.txid...)
 		b = append(b, btcLE32(in.vout)...)
-		if j == idx {
-			b = append(b, btcVarInt(uint64(len(subScript)))...)
-			b = append(b, subScript...)
-		} else {
-			b = append(b, 0x00) // empty scriptSig
-		}
+		b = append(b, btcVarInt(uint64(len(subScript)))...)
+		b = append(b, subScript...)
 		b = append(b, btcLE32(in.sequence)...)
+	} else {
+		b = append(b, btcVarInt(uint64(len(inputs)))...)
+		for j, in := range inputs {
+			b = append(b, in.txid...)
+			b = append(b, btcLE32(in.vout)...)
+			if j == idx {
+				b = append(b, btcVarInt(uint64(len(subScript)))...)
+				b = append(b, subScript...)
+			} else {
+				b = append(b, 0x00) // empty scriptSig
+			}
+			seq := in.sequence
+			if j != idx && (base == SigHashNone || base == SigHashSingle) {
+				seq = 0 // other inputs' nSequence zeroed for NONE and SINGLE
+			}
+			b = append(b, btcLE32(seq)...)
+		}
 	}
-	b = append(b, btcVarInt(uint64(len(outputs)))...)
-	for _, o := range outputs {
-		b = appendOutput(b, o)
+
+	// Outputs section depends on the base type.
+	switch base {
+	case SigHashNone:
+		b = append(b, btcVarInt(0)...)
+	case SigHashSingle:
+		// outputs[0..idx-1] are empty placeholders; outputs[idx] is the real output.
+		b = append(b, btcVarInt(uint64(idx+1))...) // #nosec G115 -- idx is a non-negative input index
+		for range idx {
+			b = append(b, btcLE64(0xffffffffffffffff)...) // empty slot: value = -1
+			b = append(b, btcVarInt(0)...)                // empty script
+		}
+		b = appendOutput(b, outputs[idx])
+	default: // SigHashAll (and any unknown base treated as ALL)
+		b = append(b, btcVarInt(uint64(len(outputs)))...)
+		for _, o := range outputs {
+			b = appendOutput(b, o)
+		}
 	}
+
 	b = append(b, btcLE32(locktime)...)
 	b = append(b, btcLE32(hashType)...)
 	return sha256d(b)
 }
 
-// bip143Sighash computes the BIP-143 witness v0 (P2WPKH) sighash for input idx.
+// bip143Sighash computes the BIP-143 witness v0 sighash for input idx.
 // scriptCode must already include its length prefix.
+//
+// hashPrevouts, hashSequence and hashOutputs are conditionally zeroed to honour
+// SIGHASH_NONE, SIGHASH_SINGLE and SIGHASH_ANYONECANPAY per BIP-143:
+//
+//	hashPrevouts: 32 zero bytes when ANYONECANPAY; else sha256d(all outpoints).
+//	hashSequence: 32 zero bytes when ANYONECANPAY, or base==NONE, or base==SINGLE;
+//	              else sha256d(all input nSequences).
+//	hashOutputs:  sha256d(all outputs)            when base is ALL (non-NONE/SINGLE);
+//	              sha256d(serialize(outputs[idx])) when base==SINGLE and idx in range;
+//	              32 zero bytes                   for NONE or SINGLE-out-of-range.
+//
+// Bitcoin Cash (FORKID 0x40) routes its P2PKH inputs through this function;
+// the base type is extracted with & 0x1f so FORKID does not interfere with the
+// NONE/SINGLE/ANYONECANPAY conditions.
 func bip143Sighash(inputs []btcInput, outputs []btcOutput, idx int, scriptCode []byte, version, locktime, hashType uint32) []byte {
-	prevouts := make([]byte, 0, len(inputs)*36)
-	sequences := make([]byte, 0, len(inputs)*4)
-	outs := make([]byte, 0, len(outputs)*43)
-	for _, in := range inputs {
-		prevouts = append(prevouts, in.txid...)
-		prevouts = append(prevouts, btcLE32(in.vout)...)
-		sequences = append(sequences, btcLE32(in.sequence)...)
+	base := hashType & 0x1f
+	anyoneCanPay := (hashType & SigHashAnyoneCanPay) != 0
+
+	// hashPrevouts: zero if ANYONECANPAY, else sha256d(all outpoints).
+	var hashPrevouts [32]byte
+	if !anyoneCanPay {
+		prev := make([]byte, 0, len(inputs)*36)
+		for _, in := range inputs {
+			prev = append(prev, in.txid...)
+			prev = append(prev, btcLE32(in.vout)...)
+		}
+		copy(hashPrevouts[:], sha256d(prev))
 	}
-	for _, o := range outputs {
-		outs = appendOutput(outs, o)
+
+	// hashSequence: zero unless base==ALL and not ANYONECANPAY.
+	var hashSequence [32]byte
+	if !anyoneCanPay && base != SigHashNone && base != SigHashSingle {
+		seqs := make([]byte, 0, len(inputs)*4)
+		for _, in := range inputs {
+			seqs = append(seqs, btcLE32(in.sequence)...)
+		}
+		copy(hashSequence[:], sha256d(seqs))
 	}
-	hashPrevouts := sha256d(prevouts)
-	hashSequence := sha256d(sequences)
-	hashOutputs := sha256d(outs)
+
+	// hashOutputs: all outputs for ALL; outputs[idx] for SINGLE (if in range);
+	// 32 zero bytes for NONE or out-of-range SINGLE.
+	var hashOutputs [32]byte
+	if base != SigHashNone && base != SigHashSingle {
+		outs := make([]byte, 0, len(outputs)*43)
+		for _, o := range outputs {
+			outs = appendOutput(outs, o)
+		}
+		copy(hashOutputs[:], sha256d(outs))
+	} else if base == SigHashSingle && idx < len(outputs) {
+		var out []byte
+		out = appendOutput(out, outputs[idx])
+		copy(hashOutputs[:], sha256d(out))
+	}
+	// else: NONE or SINGLE-out-of-range → hashOutputs stays [32]byte{} (zeros).
 
 	in := inputs[idx]
 	pre := make([]byte, 0, 4+32+32+36+len(scriptCode)+8+4+32+4+4)
 	pre = append(pre, btcLE32(version)...)
-	pre = append(pre, hashPrevouts...)
-	pre = append(pre, hashSequence...)
+	pre = append(pre, hashPrevouts[:]...)
+	pre = append(pre, hashSequence[:]...)
 	pre = append(pre, in.txid...)
 	pre = append(pre, btcLE32(in.vout)...)
 	pre = append(pre, scriptCode...)
 	pre = append(pre, btcLE64(i64AsU64(in.amount))...)
 	pre = append(pre, btcLE32(in.sequence)...)
-	pre = append(pre, hashOutputs...)
+	pre = append(pre, hashOutputs[:]...)
 	pre = append(pre, btcLE32(locktime)...)
 	pre = append(pre, btcLE32(hashType)...)
 	return sha256d(pre)

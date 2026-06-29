@@ -197,19 +197,8 @@ func TestPSBTRejectsLegacyAndErrors(t *testing.T) {
 	}
 	defer w.Destroy()
 
-	pub, _ := w.PublicKeyIndex(BTC, 0)
 	to, _ := w.BitcoinAddress(BTC, P2WPKH, 0, 0, 1)
 	change, _ := w.BitcoinAddress(BTC, P2WPKH, 0, 1, 0)
-
-	// Legacy P2PKH input is not supported through the PSBT flow.
-	legacy := append(append([]byte{0x76, 0xa9, 0x14}, btcutil.Hash160(pub)...), 0x88, 0xac)
-	_, err = BuildPSBT(BTC, &txbtc.SigningInput{
-		Amount: 1500, ByteFee: 1, ToAddress: to, ChangeAddress: change,
-		Utxo: []*txbtc.UnspentTransaction{{OutPointHash: mustHex(t, dummyPrevTxid), Amount: 10000, Script: legacy, OutPointSequence: 0xffffffff}},
-	})
-	if !errors.Is(err, ErrTxInput) {
-		t.Fatalf("BuildPSBT(legacy) error = %v, want ErrTxInput", err)
-	}
 
 	// Unsupported coin.
 	if _, err := BuildPSBT(ETH, &txbtc.SigningInput{}); !errors.Is(err, ErrTxUnsupported) {
@@ -220,6 +209,93 @@ func TestPSBTRejectsLegacyAndErrors(t *testing.T) {
 	if _, err := w.SignPSBT(BTC, 0, []byte("not a psbt")); !errors.Is(err, ErrTxInput) {
 		t.Fatalf("SignPSBT(garbage) error = %v, want ErrTxInput", err)
 	}
+
+	// SignPSBT with a key that does not control the P2WPKH UTXO should fail.
+	pub2, _ := w.PublicKeyIndex(BTC, 1)
+	wrongScript := append([]byte{0x00, 0x14}, btcutil.Hash160(pub2)...)
+	wrongIn := &txbtc.SigningInput{
+		Amount: 1500, ByteFee: 1, ToAddress: to, ChangeAddress: change,
+		Utxo: []*txbtc.UnspentTransaction{{OutPointHash: mustHex(t, dummyPrevTxid), Amount: 10000, Script: wrongScript, OutPointSequence: 0xffffffff}},
+	}
+	unsigned, err := BuildPSBT(BTC, wrongIn)
+	if err != nil {
+		t.Fatalf("BuildPSBT(wrong key): unexpected build error: %v", err)
+	}
+	if _, err := w.SignPSBT(BTC, 0, unsigned); !errors.Is(err, ErrTxInput) {
+		t.Fatalf("SignPSBT(wrong key) error = %v, want ErrTxInput", err)
+	}
+}
+
+// TestPSBTWithP2PKHInput proves that BuildPSBT → SignPSBT → ExtractPSBTTx works
+// for a legacy P2PKH input, and that the resulting tx bytes are identical to the
+// direct SignTransaction path (both use RFC-6979 deterministic ECDSA).
+func TestPSBTWithP2PKHInput(t *testing.T) {
+	w, err := FromMnemonic(canonicalMnemonic)
+	if err != nil {
+		t.Fatalf("FromMnemonic: %v", err)
+	}
+	defer w.Destroy()
+
+	pub, err := w.PublicKeyIndex(BTC, 0)
+	if err != nil {
+		t.Fatalf("PublicKeyIndex: %v", err)
+	}
+
+	// Build a P2PKH scriptPubKey: OP_DUP OP_HASH160 <hash160(pub)> OP_EQUALVERIFY OP_CHECKSIG
+	p2pkhScript := make([]byte, 0, 25)
+	p2pkhScript = append(p2pkhScript, 0x76, 0xa9, 0x14)
+	p2pkhScript = append(p2pkhScript, btcutil.Hash160(pub)...)
+	p2pkhScript = append(p2pkhScript, 0x88, 0xac)
+
+	to, _ := w.BitcoinAddress(BTC, P2WPKH, 0, 0, 1)
+	change, _ := w.BitcoinAddress(BTC, P2WPKH, 0, 1, 0)
+
+	in := &txbtc.SigningInput{
+		HashType:      0x01,
+		Amount:        50000,
+		ByteFee:       10,
+		ToAddress:     to,
+		ChangeAddress: change,
+		Utxo: []*txbtc.UnspentTransaction{{
+			OutPointHash:     mustHex(t, dummyPrevTxid),
+			OutPointIndex:    0,
+			OutPointSequence: 0xffffffff,
+			Amount:           100000,
+			Script:           p2pkhScript,
+		}},
+	}
+
+	// Direct path.
+	outMsg, err := w.SignTransaction(BTC, 0, in)
+	if err != nil {
+		t.Fatalf("SignTransaction: %v", err)
+	}
+	directHex := outMsg.(*txbtc.SigningOutput).EncodedHex
+
+	// PSBT path.
+	unsigned, err := BuildPSBT(BTC, in)
+	if err != nil {
+		t.Fatalf("BuildPSBT: %v", err)
+	}
+	signed, err := w.SignPSBT(BTC, 0, unsigned)
+	if err != nil {
+		t.Fatalf("SignPSBT: %v", err)
+	}
+	extracted, err := ExtractPSBTTx(signed)
+	if err != nil {
+		t.Fatalf("ExtractPSBTTx: %v", err)
+	}
+
+	if got := hex.EncodeToString(extracted); got != directHex {
+		t.Fatalf("PSBT-extracted P2PKH tx != direct signer\n psbt: %s\ndirect: %s", got, directHex)
+	}
+
+	// The extracted tx must pass btcd's script engine.
+	var msg wire.MsgTx
+	if err := msg.Deserialize(bytes.NewReader(extracted)); err != nil {
+		t.Fatalf("wire deserialize: %v", err)
+	}
+	btcEngineVerify(t, &msg, in.Utxo)
 }
 
 // TestPSBTV2RoundTripP2WPKH asserts that BuildPSBTV2 → SignPSBTV2 →

@@ -330,10 +330,13 @@ func decodeBitcoinSegwit(p btcParams, addr string) (script, payload []byte, err 
 	}
 	switch {
 	case witVer == 0 && version == bech32.Version0 && len(program) == 20:
-		// OP_0 <20-byte keyhash>
+		// OP_0 <20-byte keyhash> — P2WPKH
 		return append([]byte{0x00, 0x14}, program...), program, nil
+	case witVer == 0 && version == bech32.Version0 && len(program) == 32:
+		// OP_0 <32-byte script hash> — P2WSH
+		return append([]byte{0x00, 0x20}, program...), program, nil
 	case witVer == 1 && version == bech32.VersionM && len(program) == 32:
-		// OP_1 <32-byte output key>
+		// OP_1 <32-byte output key> — P2TR
 		return append([]byte{0x51, 0x20}, program...), program, nil
 	default:
 		return nil, nil, fmt.Errorf("unsupported witness v%d (program length %d, bech32m=%t)", witVer, len(program), version == bech32.VersionM)

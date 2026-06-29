@@ -21,6 +21,114 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+// InputSelector controls the order in which UTXOs are considered for coin
+// selection. The default (SELECT_IN_ORDER) preserves the order supplied by
+// the caller, matching the historical behaviour.
+type InputSelector int32
+
+const (
+	InputSelector_SELECT_IN_ORDER   InputSelector = 0 // preserve caller-supplied order (default)
+	InputSelector_SELECT_ASCENDING  InputSelector = 1 // sort UTXOs by amount ascending  (smallest first)
+	InputSelector_SELECT_DESCENDING InputSelector = 2 // sort UTXOs by amount descending (largest first)
+	InputSelector_USE_ALL           InputSelector = 3 // include every UTXO; still produces a change output
+)
+
+// Enum value maps for InputSelector.
+var (
+	InputSelector_name = map[int32]string{
+		0: "SELECT_IN_ORDER",
+		1: "SELECT_ASCENDING",
+		2: "SELECT_DESCENDING",
+		3: "USE_ALL",
+	}
+	InputSelector_value = map[string]int32{
+		"SELECT_IN_ORDER":   0,
+		"SELECT_ASCENDING":  1,
+		"SELECT_DESCENDING": 2,
+		"USE_ALL":           3,
+	}
+)
+
+func (x InputSelector) Enum() *InputSelector {
+	p := new(InputSelector)
+	*p = x
+	return p
+}
+
+func (x InputSelector) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (InputSelector) Descriptor() protoreflect.EnumDescriptor {
+	return file_txproto_bitcoin_bitcoin_proto_enumTypes[0].Descriptor()
+}
+
+func (InputSelector) Type() protoreflect.EnumType {
+	return &file_txproto_bitcoin_bitcoin_proto_enumTypes[0]
+}
+
+func (x InputSelector) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use InputSelector.Descriptor instead.
+func (InputSelector) EnumDescriptor() ([]byte, []int) {
+	return file_txproto_bitcoin_bitcoin_proto_rawDescGZIP(), []int{0}
+}
+
+// An additional recipient output beyond the primary to_address.
+type OutputAddress struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ToAddress     string                 `protobuf:"bytes,1,opt,name=to_address,json=toAddress,proto3" json:"to_address,omitempty"` // recipient address (any standard script type)
+	Amount        int64                  `protobuf:"varint,2,opt,name=amount,proto3" json:"amount,omitempty"`                       // value in satoshis; must be > 0
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *OutputAddress) Reset() {
+	*x = OutputAddress{}
+	mi := &file_txproto_bitcoin_bitcoin_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *OutputAddress) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*OutputAddress) ProtoMessage() {}
+
+func (x *OutputAddress) ProtoReflect() protoreflect.Message {
+	mi := &file_txproto_bitcoin_bitcoin_proto_msgTypes[0]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use OutputAddress.ProtoReflect.Descriptor instead.
+func (*OutputAddress) Descriptor() ([]byte, []int) {
+	return file_txproto_bitcoin_bitcoin_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *OutputAddress) GetToAddress() string {
+	if x != nil {
+		return x.ToAddress
+	}
+	return ""
+}
+
+func (x *OutputAddress) GetAmount() int64 {
+	if x != nil {
+		return x.Amount
+	}
+	return 0
+}
+
 // A single unspent transaction output available to spend.
 type UnspentTransaction struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -31,14 +139,19 @@ type UnspentTransaction struct {
 	// Value in satoshis.
 	Amount int64 `protobuf:"varint,4,opt,name=amount,proto3" json:"amount,omitempty"`
 	// scriptPubKey of the UTXO (P2WPKH: OP_0 <20-byte-hash>).
-	Script        []byte `protobuf:"bytes,5,opt,name=script,proto3" json:"script,omitempty"`
+	Script []byte `protobuf:"bytes,5,opt,name=script,proto3" json:"script,omitempty"`
+	// If set, derive this UTXO's signing key at this address index instead of
+	// the tx-level index passed to SignTransaction. Allows a single transaction
+	// to sweep UTXOs controlled by different derivation indices of the same
+	// wallet (e.g. receive + change addresses).
+	KeyIndex      *uint32 `protobuf:"varint,6,opt,name=key_index,json=keyIndex,proto3,oneof" json:"key_index,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *UnspentTransaction) Reset() {
 	*x = UnspentTransaction{}
-	mi := &file_txproto_bitcoin_bitcoin_proto_msgTypes[0]
+	mi := &file_txproto_bitcoin_bitcoin_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -50,7 +163,7 @@ func (x *UnspentTransaction) String() string {
 func (*UnspentTransaction) ProtoMessage() {}
 
 func (x *UnspentTransaction) ProtoReflect() protoreflect.Message {
-	mi := &file_txproto_bitcoin_bitcoin_proto_msgTypes[0]
+	mi := &file_txproto_bitcoin_bitcoin_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -63,7 +176,7 @@ func (x *UnspentTransaction) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UnspentTransaction.ProtoReflect.Descriptor instead.
 func (*UnspentTransaction) Descriptor() ([]byte, []int) {
-	return file_txproto_bitcoin_bitcoin_proto_rawDescGZIP(), []int{0}
+	return file_txproto_bitcoin_bitcoin_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *UnspentTransaction) GetOutPointHash() []byte {
@@ -101,6 +214,13 @@ func (x *UnspentTransaction) GetScript() []byte {
 	return nil
 }
 
+func (x *UnspentTransaction) GetKeyIndex() uint32 {
+	if x != nil && x.KeyIndex != nil {
+		return *x.KeyIndex
+	}
+	return 0
+}
+
 // SigningInput mirrors a minimal subset of TW.Bitcoin.Proto.SigningInput,
 // restricted to P2WPKH (BIP-143) spending.
 type SigningInput struct {
@@ -120,14 +240,30 @@ type SigningInput struct {
 	// Locktime (default 0).
 	LockTime uint32 `protobuf:"varint,7,opt,name=lock_time,json=lockTime,proto3" json:"lock_time,omitempty"`
 	// If set, send everything (minus fee) to to_address; no change output.
-	UseMaxAmount  bool `protobuf:"varint,8,opt,name=use_max_amount,json=useMaxAmount,proto3" json:"use_max_amount,omitempty"`
+	UseMaxAmount bool `protobuf:"varint,8,opt,name=use_max_amount,json=useMaxAmount,proto3" json:"use_max_amount,omitempty"`
+	// Optional zero-amount OP_RETURN data payload (<= 80 bytes; standardness limit).
+	OutputOpReturn []byte `protobuf:"bytes,9,opt,name=output_op_return,json=outputOpReturn,proto3" json:"output_op_return,omitempty"`
+	// Additional recipients beyond to_address; each amount must be > 0.
+	// Cannot be combined with use_max_amount.
+	ExtraOutputs []*OutputAddress `protobuf:"bytes,10,rep,name=extra_outputs,json=extraOutputs,proto3" json:"extra_outputs,omitempty"`
+	// UTXO selection strategy (default SELECT_IN_ORDER).
+	InputSelector InputSelector `protobuf:"varint,11,opt,name=input_selector,json=inputSelector,proto3,enum=hdwallet.bitcoin.proto.InputSelector" json:"input_selector,omitempty"`
+	// If true, always emit the change output even when its value is below the
+	// dust threshold (by default sub-threshold change is folded into the fee).
+	DisableDustFilter bool `protobuf:"varint,12,opt,name=disable_dust_filter,json=disableDustFilter,proto3" json:"disable_dust_filter,omitempty"`
+	// If > 0, overrides the built-in 546 sat dust threshold.
+	FixedDustThreshold int64 `protobuf:"varint,13,opt,name=fixed_dust_threshold,json=fixedDustThreshold,proto3" json:"fixed_dust_threshold,omitempty"`
+	// If true, include every available UTXO even when fewer would cover the
+	// target amount; still produces a normal change output (unlike
+	// use_max_amount which sends everything to the recipient).
+	UseMaxUtxo    bool `protobuf:"varint,14,opt,name=use_max_utxo,json=useMaxUtxo,proto3" json:"use_max_utxo,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *SigningInput) Reset() {
 	*x = SigningInput{}
-	mi := &file_txproto_bitcoin_bitcoin_proto_msgTypes[1]
+	mi := &file_txproto_bitcoin_bitcoin_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -139,7 +275,7 @@ func (x *SigningInput) String() string {
 func (*SigningInput) ProtoMessage() {}
 
 func (x *SigningInput) ProtoReflect() protoreflect.Message {
-	mi := &file_txproto_bitcoin_bitcoin_proto_msgTypes[1]
+	mi := &file_txproto_bitcoin_bitcoin_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -152,7 +288,7 @@ func (x *SigningInput) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SigningInput.ProtoReflect.Descriptor instead.
 func (*SigningInput) Descriptor() ([]byte, []int) {
-	return file_txproto_bitcoin_bitcoin_proto_rawDescGZIP(), []int{1}
+	return file_txproto_bitcoin_bitcoin_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *SigningInput) GetHashType() uint32 {
@@ -211,6 +347,48 @@ func (x *SigningInput) GetUseMaxAmount() bool {
 	return false
 }
 
+func (x *SigningInput) GetOutputOpReturn() []byte {
+	if x != nil {
+		return x.OutputOpReturn
+	}
+	return nil
+}
+
+func (x *SigningInput) GetExtraOutputs() []*OutputAddress {
+	if x != nil {
+		return x.ExtraOutputs
+	}
+	return nil
+}
+
+func (x *SigningInput) GetInputSelector() InputSelector {
+	if x != nil {
+		return x.InputSelector
+	}
+	return InputSelector_SELECT_IN_ORDER
+}
+
+func (x *SigningInput) GetDisableDustFilter() bool {
+	if x != nil {
+		return x.DisableDustFilter
+	}
+	return false
+}
+
+func (x *SigningInput) GetFixedDustThreshold() int64 {
+	if x != nil {
+		return x.FixedDustThreshold
+	}
+	return 0
+}
+
+func (x *SigningInput) GetUseMaxUtxo() bool {
+	if x != nil {
+		return x.UseMaxUtxo
+	}
+	return false
+}
+
 // One selected/used output point in the final transaction.
 type UsedUTXO struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -223,7 +401,7 @@ type UsedUTXO struct {
 
 func (x *UsedUTXO) Reset() {
 	*x = UsedUTXO{}
-	mi := &file_txproto_bitcoin_bitcoin_proto_msgTypes[2]
+	mi := &file_txproto_bitcoin_bitcoin_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -235,7 +413,7 @@ func (x *UsedUTXO) String() string {
 func (*UsedUTXO) ProtoMessage() {}
 
 func (x *UsedUTXO) ProtoReflect() protoreflect.Message {
-	mi := &file_txproto_bitcoin_bitcoin_proto_msgTypes[2]
+	mi := &file_txproto_bitcoin_bitcoin_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -248,7 +426,7 @@ func (x *UsedUTXO) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UsedUTXO.ProtoReflect.Descriptor instead.
 func (*UsedUTXO) Descriptor() ([]byte, []int) {
-	return file_txproto_bitcoin_bitcoin_proto_rawDescGZIP(), []int{2}
+	return file_txproto_bitcoin_bitcoin_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *UsedUTXO) GetOutPointHash() []byte {
@@ -294,7 +472,7 @@ type SigningOutput struct {
 
 func (x *SigningOutput) Reset() {
 	*x = SigningOutput{}
-	mi := &file_txproto_bitcoin_bitcoin_proto_msgTypes[3]
+	mi := &file_txproto_bitcoin_bitcoin_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -306,7 +484,7 @@ func (x *SigningOutput) String() string {
 func (*SigningOutput) ProtoMessage() {}
 
 func (x *SigningOutput) ProtoReflect() protoreflect.Message {
-	mi := &file_txproto_bitcoin_bitcoin_proto_msgTypes[3]
+	mi := &file_txproto_bitcoin_bitcoin_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -319,7 +497,7 @@ func (x *SigningOutput) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SigningOutput.ProtoReflect.Descriptor instead.
 func (*SigningOutput) Descriptor() ([]byte, []int) {
-	return file_txproto_bitcoin_bitcoin_proto_rawDescGZIP(), []int{3}
+	return file_txproto_bitcoin_bitcoin_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *SigningOutput) GetEncoded() []byte {
@@ -368,13 +546,20 @@ var File_txproto_bitcoin_bitcoin_proto protoreflect.FileDescriptor
 
 const file_txproto_bitcoin_bitcoin_proto_rawDesc = "" +
 	"\n" +
-	"\x1dtxproto/bitcoin/bitcoin.proto\x12\x16hdwallet.bitcoin.proto\"\xc0\x01\n" +
+	"\x1dtxproto/bitcoin/bitcoin.proto\x12\x16hdwallet.bitcoin.proto\"F\n" +
+	"\rOutputAddress\x12\x1d\n" +
+	"\n" +
+	"to_address\x18\x01 \x01(\tR\ttoAddress\x12\x16\n" +
+	"\x06amount\x18\x02 \x01(\x03R\x06amount\"\xf0\x01\n" +
 	"\x12UnspentTransaction\x12$\n" +
 	"\x0eout_point_hash\x18\x01 \x01(\fR\foutPointHash\x12&\n" +
 	"\x0fout_point_index\x18\x02 \x01(\rR\routPointIndex\x12,\n" +
 	"\x12out_point_sequence\x18\x03 \x01(\rR\x10outPointSequence\x12\x16\n" +
 	"\x06amount\x18\x04 \x01(\x03R\x06amount\x12\x16\n" +
-	"\x06script\x18\x05 \x01(\fR\x06script\"\xa7\x02\n" +
+	"\x06script\x18\x05 \x01(\fR\x06script\x12 \n" +
+	"\tkey_index\x18\x06 \x01(\rH\x00R\bkeyIndex\x88\x01\x01B\f\n" +
+	"\n" +
+	"_key_index\"\xef\x04\n" +
 	"\fSigningInput\x12\x1b\n" +
 	"\thash_type\x18\x01 \x01(\rR\bhashType\x12\x16\n" +
 	"\x06amount\x18\x02 \x01(\x03R\x06amount\x12\x19\n" +
@@ -384,7 +569,15 @@ const file_txproto_bitcoin_bitcoin_proto_rawDesc = "" +
 	"\x0echange_address\x18\x05 \x01(\tR\rchangeAddress\x12>\n" +
 	"\x04utxo\x18\x06 \x03(\v2*.hdwallet.bitcoin.proto.UnspentTransactionR\x04utxo\x12\x1b\n" +
 	"\tlock_time\x18\a \x01(\rR\blockTime\x12$\n" +
-	"\x0euse_max_amount\x18\b \x01(\bR\fuseMaxAmount\"p\n" +
+	"\x0euse_max_amount\x18\b \x01(\bR\fuseMaxAmount\x12(\n" +
+	"\x10output_op_return\x18\t \x01(\fR\x0eoutputOpReturn\x12J\n" +
+	"\rextra_outputs\x18\n" +
+	" \x03(\v2%.hdwallet.bitcoin.proto.OutputAddressR\fextraOutputs\x12L\n" +
+	"\x0einput_selector\x18\v \x01(\x0e2%.hdwallet.bitcoin.proto.InputSelectorR\rinputSelector\x12.\n" +
+	"\x13disable_dust_filter\x18\f \x01(\bR\x11disableDustFilter\x120\n" +
+	"\x14fixed_dust_threshold\x18\r \x01(\x03R\x12fixedDustThreshold\x12 \n" +
+	"\fuse_max_utxo\x18\x0e \x01(\bR\n" +
+	"useMaxUtxo\"p\n" +
 	"\bUsedUTXO\x12$\n" +
 	"\x0eout_point_hash\x18\x01 \x01(\fR\foutPointHash\x12&\n" +
 	"\x0fout_point_index\x18\x02 \x01(\rR\routPointIndex\x12\x16\n" +
@@ -396,7 +589,12 @@ const file_txproto_bitcoin_bitcoin_proto_rawDesc = "" +
 	"encodedHex\x12\x10\n" +
 	"\x03fee\x18\x04 \x01(\x03R\x03fee\x12=\n" +
 	"\tused_utxo\x18\x05 \x03(\v2 .hdwallet.bitcoin.proto.UsedUTXOR\busedUtxo\x12\x14\n" +
-	"\x05error\x18\x06 \x01(\tR\x05errorB2Z0github.com/ranjbar-dev/hd-wallet/txproto/bitcoinb\x06proto3"
+	"\x05error\x18\x06 \x01(\tR\x05error*^\n" +
+	"\rInputSelector\x12\x13\n" +
+	"\x0fSELECT_IN_ORDER\x10\x00\x12\x14\n" +
+	"\x10SELECT_ASCENDING\x10\x01\x12\x15\n" +
+	"\x11SELECT_DESCENDING\x10\x02\x12\v\n" +
+	"\aUSE_ALL\x10\x03B2Z0github.com/ranjbar-dev/hd-wallet/txproto/bitcoinb\x06proto3"
 
 var (
 	file_txproto_bitcoin_bitcoin_proto_rawDescOnce sync.Once
@@ -410,21 +608,26 @@ func file_txproto_bitcoin_bitcoin_proto_rawDescGZIP() []byte {
 	return file_txproto_bitcoin_bitcoin_proto_rawDescData
 }
 
-var file_txproto_bitcoin_bitcoin_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_txproto_bitcoin_bitcoin_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_txproto_bitcoin_bitcoin_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
 var file_txproto_bitcoin_bitcoin_proto_goTypes = []any{
-	(*UnspentTransaction)(nil), // 0: hdwallet.bitcoin.proto.UnspentTransaction
-	(*SigningInput)(nil),       // 1: hdwallet.bitcoin.proto.SigningInput
-	(*UsedUTXO)(nil),           // 2: hdwallet.bitcoin.proto.UsedUTXO
-	(*SigningOutput)(nil),      // 3: hdwallet.bitcoin.proto.SigningOutput
+	(InputSelector)(0),         // 0: hdwallet.bitcoin.proto.InputSelector
+	(*OutputAddress)(nil),      // 1: hdwallet.bitcoin.proto.OutputAddress
+	(*UnspentTransaction)(nil), // 2: hdwallet.bitcoin.proto.UnspentTransaction
+	(*SigningInput)(nil),       // 3: hdwallet.bitcoin.proto.SigningInput
+	(*UsedUTXO)(nil),           // 4: hdwallet.bitcoin.proto.UsedUTXO
+	(*SigningOutput)(nil),      // 5: hdwallet.bitcoin.proto.SigningOutput
 }
 var file_txproto_bitcoin_bitcoin_proto_depIdxs = []int32{
-	0, // 0: hdwallet.bitcoin.proto.SigningInput.utxo:type_name -> hdwallet.bitcoin.proto.UnspentTransaction
-	2, // 1: hdwallet.bitcoin.proto.SigningOutput.used_utxo:type_name -> hdwallet.bitcoin.proto.UsedUTXO
-	2, // [2:2] is the sub-list for method output_type
-	2, // [2:2] is the sub-list for method input_type
-	2, // [2:2] is the sub-list for extension type_name
-	2, // [2:2] is the sub-list for extension extendee
-	0, // [0:2] is the sub-list for field type_name
+	2, // 0: hdwallet.bitcoin.proto.SigningInput.utxo:type_name -> hdwallet.bitcoin.proto.UnspentTransaction
+	1, // 1: hdwallet.bitcoin.proto.SigningInput.extra_outputs:type_name -> hdwallet.bitcoin.proto.OutputAddress
+	0, // 2: hdwallet.bitcoin.proto.SigningInput.input_selector:type_name -> hdwallet.bitcoin.proto.InputSelector
+	4, // 3: hdwallet.bitcoin.proto.SigningOutput.used_utxo:type_name -> hdwallet.bitcoin.proto.UsedUTXO
+	4, // [4:4] is the sub-list for method output_type
+	4, // [4:4] is the sub-list for method input_type
+	4, // [4:4] is the sub-list for extension type_name
+	4, // [4:4] is the sub-list for extension extendee
+	0, // [0:4] is the sub-list for field type_name
 }
 
 func init() { file_txproto_bitcoin_bitcoin_proto_init() }
@@ -432,18 +635,20 @@ func file_txproto_bitcoin_bitcoin_proto_init() {
 	if File_txproto_bitcoin_bitcoin_proto != nil {
 		return
 	}
+	file_txproto_bitcoin_bitcoin_proto_msgTypes[1].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_txproto_bitcoin_bitcoin_proto_rawDesc), len(file_txproto_bitcoin_bitcoin_proto_rawDesc)),
-			NumEnums:      0,
-			NumMessages:   4,
+			NumEnums:      1,
+			NumMessages:   5,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
 		GoTypes:           file_txproto_bitcoin_bitcoin_proto_goTypes,
 		DependencyIndexes: file_txproto_bitcoin_bitcoin_proto_depIdxs,
+		EnumInfos:         file_txproto_bitcoin_bitcoin_proto_enumTypes,
 		MessageInfos:      file_txproto_bitcoin_bitcoin_proto_msgTypes,
 	}.Build()
 	File_txproto_bitcoin_bitcoin_proto = out.File
