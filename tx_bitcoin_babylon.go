@@ -246,7 +246,7 @@ func BuildBabylonOpReturn(stakerXonly []byte, finalityProviderXonly []byte, stak
 	if len(tag) < 76 {
 		script = append(script, byte(len(tag))) // #nosec G115 -- len(tag) < 76
 	} else {
-		script = append(script, 0x4c, byte(len(tag))) // OP_PUSHDATA1; #nosec G115 -- len in 76..80
+		script = append(script, 0x4c, byte(len(tag))) // #nosec G115 -- OP_PUSHDATA1; len capped to 76..80 by caller guard
 	}
 	script = append(script, tag...)
 	return script

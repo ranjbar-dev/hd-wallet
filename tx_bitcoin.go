@@ -329,7 +329,7 @@ func buildOpReturn(payload []byte) ([]byte, error) {
 	if len(payload) < 76 {
 		script = append(script, byte(len(payload))) // #nosec G115 -- len < 76
 	} else {
-		script = append(script, 0x4c, byte(len(payload))) // OP_PUSHDATA1 + 1-byte len; #nosec G115 -- len in 76..80
+		script = append(script, 0x4c, byte(len(payload))) // #nosec G115 -- OP_PUSHDATA1; len capped to 76..80 by caller guard
 	}
 	script = append(script, payload...)
 	return script, nil
