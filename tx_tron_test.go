@@ -91,4 +91,78 @@ func TestSignTxTronTransfer(t *testing.T) {
 	if to.GetRefBlockBytes() != wantRBB {
 		t.Fatalf("ref_block_bytes = %s, want %s", to.GetRefBlockBytes(), wantRBB)
 	}
+	if len(to.RefBlockHash) != 8 {
+		t.Errorf("RefBlockHash len = %d, want 8", len(to.RefBlockHash))
+	}
+}
+
+func TestTronMemo(t *testing.T) {
+	w, err := FromPrivateKeyBytes(
+		mustHexTx(t, "ba005cd605d8a02e3d5dfd04234cef3a3ee4f76bfbad2722d1fb5af8e12e6764"),
+		Secp256k1,
+	)
+	if err != nil {
+		t.Fatalf("FromPrivateKeyBytes: %v", err)
+	}
+	defer w.Destroy()
+
+	memo := []byte("test memo")
+	in := &txtron.SigningInput{
+		Transaction: &txtron.Transaction{
+			Timestamp:  1539295479000,
+			Expiration: 1539331479000,
+			BlockHeader: &txtron.BlockHeader{
+				Timestamp:      1539295479000,
+				TxTrieRoot:     mustHexTx(t, "64288c2db0641316762a99dbb02ef7c90f968b60f9f2e410835980614332f86d"),
+				ParentHash:     mustHexTx(t, "00000000002f7b3af4f5f8b9e23a30c530f719f165b742e7358536b280eead2d"),
+				Number:         3111739,
+				WitnessAddress: mustHexTx(t, "415863f6091b8e71766da808b1dd3159790f61de7d"),
+				Version:        3,
+			},
+			ContractOneof: &txtron.Transaction_Transfer{
+				Transfer: &txtron.TransferContract{
+					OwnerAddress: "415cd0fb0ab3ce40f3051414c604b27756e69e43db",
+					ToAddress:    "41521ea197907927725ef36d70f25f850d1659c7c7",
+					Amount:       2000000,
+				},
+			},
+			Memo: memo,
+		},
+	}
+
+	out, err := w.SignTransaction(TRX, 0, in)
+	if err != nil {
+		t.Fatalf("SignTransaction: %v", err)
+	}
+	to, ok := out.(*txtron.SigningOutput)
+	if !ok {
+		t.Fatalf("output type = %T", out)
+	}
+	if len(to.RawData) == 0 {
+		t.Fatal("empty raw_data")
+	}
+
+	// Decode and verify memo round-trips.
+	decoded, err := DecodeTronTx(to.RawData)
+	if err != nil {
+		t.Fatalf("DecodeTronTx: %v", err)
+	}
+	if string(decoded.Memo) != string(memo) {
+		t.Errorf("memo = %q, want %q", decoded.Memo, memo)
+	}
+
+	// A tx without memo should have nil Memo in decoded output.
+	in.Transaction.Memo = nil
+	outNoMemo, err := w.SignTransaction(TRX, 0, in)
+	if err != nil {
+		t.Fatalf("SignTransaction (no memo): %v", err)
+	}
+	toNoMemo := outNoMemo.(*txtron.SigningOutput)
+	decodedNoMemo, err := DecodeTronTx(toNoMemo.RawData)
+	if err != nil {
+		t.Fatalf("DecodeTronTx (no memo): %v", err)
+	}
+	if len(decodedNoMemo.Memo) != 0 {
+		t.Errorf("expected nil memo, got %q", decodedNoMemo.Memo)
+	}
 }

@@ -639,6 +639,7 @@ type VoteWitnessContract struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	OwnerAddress  string                 `protobuf:"bytes,1,opt,name=owner_address,json=ownerAddress,proto3" json:"owner_address,omitempty"` // base58check (T...)
 	Votes         []*Vote                `protobuf:"bytes,2,rep,name=votes,proto3" json:"votes,omitempty"`
+	Support       bool                   `protobuf:"varint,3,opt,name=support,proto3" json:"support,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -685,6 +686,13 @@ func (x *VoteWitnessContract) GetVotes() []*Vote {
 		return x.Votes
 	}
 	return nil
+}
+
+func (x *VoteWitnessContract) GetSupport() bool {
+	if x != nil {
+		return x.Support
+	}
+	return false
 }
 
 // Legacy Stake 1.0: freeze TRX to obtain resources (BANDWIDTH or ENERGY).
@@ -1180,6 +1188,7 @@ type Transaction struct {
 	//	*Transaction_WithdrawBalance
 	//	*Transaction_VoteAsset
 	ContractOneof isTransaction_ContractOneof `protobuf_oneof:"contract_oneof"`
+	Memo          []byte                      `protobuf:"bytes,20,opt,name=memo,proto3" json:"memo,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1384,6 +1393,13 @@ func (x *Transaction) GetVoteAsset() *VoteAssetContract {
 	return nil
 }
 
+func (x *Transaction) GetMemo() []byte {
+	if x != nil {
+		return x.Memo
+	}
+	return nil
+}
+
 type isTransaction_ContractOneof interface {
 	isTransaction_ContractOneof()
 }
@@ -1540,6 +1556,7 @@ type SigningOutput struct {
 	RefBlockBytes string                 `protobuf:"bytes,4,opt,name=ref_block_bytes,json=refBlockBytes,proto3" json:"ref_block_bytes,omitempty"`
 	Json          string                 `protobuf:"bytes,5,opt,name=json,proto3" json:"json,omitempty"` // convenience JSON
 	Error         string                 `protobuf:"bytes,6,opt,name=error,proto3" json:"error,omitempty"`
+	RefBlockHash  []byte                 `protobuf:"bytes,7,opt,name=ref_block_hash,json=refBlockHash,proto3" json:"ref_block_hash,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1616,6 +1633,13 @@ func (x *SigningOutput) GetError() string {
 	return ""
 }
 
+func (x *SigningOutput) GetRefBlockHash() []byte {
+	if x != nil {
+		return x.RefBlockHash
+	}
+	return nil
+}
+
 var File_txproto_tron_tron_proto protoreflect.FileDescriptor
 
 const file_txproto_tron_tron_proto_rawDesc = "" +
@@ -1663,10 +1687,11 @@ const file_txproto_tron_tron_proto_rawDesc = "" +
 	"\x04Vote\x12!\n" +
 	"\fvote_address\x18\x01 \x01(\tR\vvoteAddress\x12\x1d\n" +
 	"\n" +
-	"vote_count\x18\x02 \x01(\x03R\tvoteCount\"k\n" +
+	"vote_count\x18\x02 \x01(\x03R\tvoteCount\"\x85\x01\n" +
 	"\x13VoteWitnessContract\x12#\n" +
 	"\rowner_address\x18\x01 \x01(\tR\fownerAddress\x12/\n" +
-	"\x05votes\x18\x02 \x03(\v2\x19.hdwallet.tron.proto.VoteR\x05votes\"\xf6\x01\n" +
+	"\x05votes\x18\x02 \x03(\v2\x19.hdwallet.tron.proto.VoteR\x05votes\x12\x18\n" +
+	"\asupport\x18\x03 \x01(\bR\asupport\"\xf6\x01\n" +
 	"\x15FreezeBalanceContract\x12#\n" +
 	"\rowner_address\x18\x01 \x01(\tR\fownerAddress\x12%\n" +
 	"\x0efrozen_balance\x18\x02 \x01(\x03R\rfrozenBalance\x12'\n" +
@@ -1702,7 +1727,7 @@ const file_txproto_tron_tron_proto_rawDesc = "" +
 	"parentHash\x12\x16\n" +
 	"\x06number\x18\x04 \x01(\x03R\x06number\x12'\n" +
 	"\x0fwitness_address\x18\x05 \x01(\fR\x0ewitnessAddress\x12\x18\n" +
-	"\aversion\x18\x06 \x01(\x05R\aversion\"\xfa\v\n" +
+	"\aversion\x18\x06 \x01(\x05R\aversion\"\x8e\f\n" +
 	"\vTransaction\x12\x1c\n" +
 	"\ttimestamp\x18\x01 \x01(\x03R\ttimestamp\x12\x1e\n" +
 	"\n" +
@@ -1726,18 +1751,20 @@ const file_txproto_tron_tron_proto_rawDesc = "" +
 	"\x0eunfreeze_asset\x18\x11 \x01(\v2*.hdwallet.tron.proto.UnfreezeAssetContractH\x00R\runfreezeAsset\x12Y\n" +
 	"\x10withdraw_balance\x18\x12 \x01(\v2,.hdwallet.tron.proto.WithdrawBalanceContractH\x00R\x0fwithdrawBalance\x12G\n" +
 	"\n" +
-	"vote_asset\x18\x13 \x01(\v2&.hdwallet.tron.proto.VoteAssetContractH\x00R\tvoteAssetB\x10\n" +
+	"vote_asset\x18\x13 \x01(\v2&.hdwallet.tron.proto.VoteAssetContractH\x00R\tvoteAsset\x12\x12\n" +
+	"\x04memo\x18\x14 \x01(\fR\x04memoB\x10\n" +
 	"\x0econtract_oneof\"m\n" +
 	"\fSigningInput\x12B\n" +
 	"\vtransaction\x18\x01 \x01(\v2 .hdwallet.tron.proto.TransactionR\vtransaction\x12\x19\n" +
-	"\braw_json\x18\x02 \x01(\tR\arawJson\"\xaa\x01\n" +
+	"\braw_json\x18\x02 \x01(\tR\arawJson\"\xd0\x01\n" +
 	"\rSigningOutput\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\fR\x02id\x12\x1c\n" +
 	"\tsignature\x18\x02 \x01(\fR\tsignature\x12\x19\n" +
 	"\braw_data\x18\x03 \x01(\fR\arawData\x12&\n" +
 	"\x0fref_block_bytes\x18\x04 \x01(\tR\rrefBlockBytes\x12\x12\n" +
 	"\x04json\x18\x05 \x01(\tR\x04json\x12\x14\n" +
-	"\x05error\x18\x06 \x01(\tR\x05error*)\n" +
+	"\x05error\x18\x06 \x01(\tR\x05error\x12$\n" +
+	"\x0eref_block_hash\x18\a \x01(\fR\frefBlockHash*)\n" +
 	"\fResourceCode\x12\r\n" +
 	"\tBANDWIDTH\x10\x00\x12\n" +
 	"\n" +

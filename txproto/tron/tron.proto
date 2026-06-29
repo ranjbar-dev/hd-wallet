@@ -80,6 +80,7 @@ message Vote {
 message VoteWitnessContract {
   string owner_address = 1; // base58check (T...)
   repeated Vote votes = 2;
+  bool support = 3;
 }
 
 // Legacy Stake 1.0: freeze TRX to obtain resources (BANDWIDTH or ENERGY).
@@ -161,6 +162,7 @@ message Transaction {
     WithdrawBalanceContract withdraw_balance = 18;
     VoteAssetContract vote_asset = 19;
   }
+  bytes memo = 20;
 }
 
 // SigningInput mirrors a minimal subset of TW.Tron.Proto.SigningInput.
@@ -177,4 +179,5 @@ message SigningOutput {
   string ref_block_bytes = 4;
   string json = 5;      // convenience JSON
   string error = 6;
+  bytes ref_block_hash = 7;
 }

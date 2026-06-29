@@ -124,6 +124,7 @@ func (w *HDWallet) signTronTx(symbol Symbol, index uint32, in *txtron.SigningInp
 		Signature:     rec,
 		RawData:       rawData,
 		RefBlockBytes: hex.EncodeToString(refBlockBytes),
+		RefBlockHash:  refBlockHash,
 	}, nil
 }
 
@@ -235,7 +236,7 @@ func tronContractMsg(tx *txtron.Transaction) ([]byte, error) {
 			voteAddrs = append(voteAddrs, addr)
 			voteCounts = append(voteCounts, v.GetVoteCount())
 		}
-		return tronVoteWitnessMsg(owner, voteAddrs, voteCounts), nil
+		return tronVoteWitnessMsg(owner, voteAddrs, voteCounts, t.GetSupport()), nil
 	case tx.GetWithdrawExpireUnfreeze() != nil:
 		t := tx.GetWithdrawExpireUnfreeze()
 		owner, err := tronAddressBytes(t.GetOwnerAddress())
@@ -467,7 +468,7 @@ func tronUndelegateResourceMsg(owner []byte, resource int32, balance int64, rece
 }
 
 // tronVoteWitnessMsg builds VoteWitnessContract from parallel slices of addresses and counts.
-func tronVoteWitnessMsg(owner []byte, addrs [][]byte, counts []int64) []byte {
+func tronVoteWitnessMsg(owner []byte, addrs [][]byte, counts []int64, support bool) []byte {
 	var inner []byte
 	inner = protowire.AppendTag(inner, 1, protowire.BytesType)
 	inner = protowire.AppendBytes(inner, owner)
@@ -479,6 +480,10 @@ func tronVoteWitnessMsg(owner []byte, addrs [][]byte, counts []int64) []byte {
 		voteMsg = protowire.AppendVarint(voteMsg, i64AsU64(counts[i]))
 		inner = protowire.AppendTag(inner, 2, protowire.BytesType)
 		inner = protowire.AppendBytes(inner, voteMsg)
+	}
+	if support {
+		inner = protowire.AppendTag(inner, 3, protowire.VarintType)
+		inner = protowire.AppendVarint(inner, 1)
 	}
 	return tronContractWrap(tronVoteWitnessType, tronVoteWitnessTypeURL, inner)
 }
@@ -594,12 +599,16 @@ func tronRawData(in *txtron.SigningInput, contractMsg, refBlockBytes, refBlockHa
 		exp = ts + tronDefaultExpirationMs
 	}
 
-	// raw_data, fields in ascending order: 1, 4, 8, 11, 14, (18).
+	// raw_data, fields in ascending order: 1, 4, (5 memo), 8, 11, 14, (18).
 	var raw []byte
 	raw = protowire.AppendTag(raw, 1, protowire.BytesType)
 	raw = protowire.AppendBytes(raw, refBlockBytes)
 	raw = protowire.AppendTag(raw, 4, protowire.BytesType)
 	raw = protowire.AppendBytes(raw, refBlockHash)
+	if memo := tx.GetMemo(); len(memo) > 0 {
+		raw = protowire.AppendTag(raw, 5, protowire.BytesType)
+		raw = protowire.AppendBytes(raw, memo)
+	}
 	raw = protowire.AppendTag(raw, 8, protowire.VarintType)
 	raw = protowire.AppendVarint(raw, i64AsU64(exp))
 	raw = protowire.AppendTag(raw, 11, protowire.BytesType)

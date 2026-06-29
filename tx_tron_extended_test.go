@@ -839,3 +839,55 @@ func TestSignTxTronRawJSONHashMismatch(t *testing.T) {
 		t.Fatalf("expected ErrTxInput, got: %v", err)
 	}
 }
+
+func TestTronVoteWitnessSupport(t *testing.T) {
+	w := tronTestWallet(t)
+	defer w.Destroy()
+
+	bh := tronTestBlockHeader(t)
+
+	for _, tc := range []struct {
+		name    string
+		support bool
+	}{
+		{"support=false", false},
+		{"support=true", true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			in := &txtron.SigningInput{
+				Transaction: &txtron.Transaction{
+					Timestamp:   1539295479000,
+					Expiration:  1539331479000,
+					BlockHeader: bh,
+					ContractOneof: &txtron.Transaction_VoteWitness{
+						VoteWitness: &txtron.VoteWitnessContract{
+							OwnerAddress: "415cd0fb0ab3ce40f3051414c604b27756e69e43db",
+							Votes: []*txtron.Vote{
+								{VoteAddress: "41521ea197907927725ef36d70f25f850d1659c7c7", VoteCount: 1},
+							},
+							Support: tc.support,
+						},
+					},
+				},
+			}
+
+			out, err := w.SignTransaction(TRX, 0, in)
+			if err != nil {
+				t.Fatalf("SignTransaction: %v", err)
+			}
+			to := out.(*txtron.SigningOutput)
+
+			decoded, err := DecodeTronTx(to.RawData)
+			if err != nil {
+				t.Fatalf("DecodeTronTx: %v", err)
+			}
+			if len(decoded.Contracts) == 0 {
+				t.Fatal("no contracts decoded")
+			}
+			c := decoded.Contracts[0]
+			if c.Support != tc.support {
+				t.Errorf("Support = %v, want %v", c.Support, tc.support)
+			}
+		})
+	}
+}

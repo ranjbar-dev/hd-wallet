@@ -81,6 +81,7 @@ type TronTxFields struct {
 	Expiration    int64
 	Timestamp     int64
 	FeeLimit      int64 // 0 when absent
+	Memo          []byte
 	Contracts     []TronContract
 }
 
@@ -98,6 +99,9 @@ func DecodeTronTx(raw []byte) (*TronTxFields, error) {
 	}
 	if b, ok := pbFieldBytes(fields, 4); ok {
 		f.RefBlockHash = append([]byte(nil), b...)
+	}
+	if b, ok := pbFieldBytes(fields, 5); ok {
+		f.Memo = append([]byte(nil), b...)
 	}
 	if v, ok := pbFieldVarint(fields, 8); ok {
 		f.Expiration = int64(v) // #nosec G115 -- protobuf int64 varint bit-reinterpretation
@@ -211,6 +215,9 @@ func decodeTronContract(b []byte) (TronContract, error) {
 				VoteAddress: addr,
 				VoteCount:   int64(cnt), // #nosec G115 -- protobuf int64 varint bit-reinterpretation
 			})
+		}
+		if v, ok := pbFieldVarint(inner, 3); ok {
+			c.Support = v != 0
 		}
 	case tronVoteAssetType:
 		c.TypeName = "VoteAssetContract"
