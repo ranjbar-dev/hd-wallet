@@ -54,15 +54,24 @@ import (
 // SignTransaction for an EVM chain. They are the values of
 // ethereum.SigningInput.tx_mode; use them instead of bare integers.
 const (
-	EthTxModeLegacy  uint32 = 0 // EIP-155 legacy
-	EthTxModeEIP2930 uint32 = 1 // type-1 access-list
-	EthTxModeEIP1559 uint32 = 2 // type-2 fee market
-	EthTxModeEIP4844 uint32 = 3 // type-3 blob tx (EIP-4844)
-	EthTxModeEIP7702 uint32 = 4 // type-4 set-code tx (EIP-7702)
+	EthTxModeLegacy    uint32 = 0 // EIP-155 legacy
+	EthTxModeEIP2930   uint32 = 1 // type-1 access-list
+	EthTxModeEIP1559   uint32 = 2 // type-2 fee market
+	EthTxModeEIP4844   uint32 = 3 // type-3 blob tx (EIP-4844)
+	EthTxModeEIP7702   uint32 = 4 // type-4 set-code tx (EIP-7702)
+	EthTxModeUserOp    uint32 = 5 // ERC-4337 v0.6 UserOperation
+	EthTxModeUserOpV07 uint32 = 6 // ERC-4337 v0.7 UserOperation
 )
 
 // signEthereumTx builds, signs and serializes an EVM transaction.
 func (w *HDWallet) signEthereumTx(symbol Symbol, index uint32, in *txeth.SigningInput) (*txeth.SigningOutput, error) {
+	// UserOp modes are dispatched before ethDestination (they build callData differently).
+	switch in.GetTxMode() {
+	case EthTxModeUserOp:
+		return w.signEthereumUserOpV06(symbol, index, in)
+	case EthTxModeUserOpV07:
+		return w.signEthereumUserOpV07(symbol, index, in)
+	}
 	to, value, data, err := ethDestination(in)
 	if err != nil {
 		return nil, err
@@ -79,8 +88,69 @@ func (w *HDWallet) signEthereumTx(symbol Symbol, index uint32, in *txeth.Signing
 	case EthTxModeEIP7702:
 		return w.signEthereumEIP7702(symbol, index, in, to, value, data)
 	default:
-		return nil, fmt.Errorf("%w: %s unsupported tx_mode %d (want 0 legacy, 1 eip-2930, 2 eip-1559, 3 eip-4844 or 4 eip-7702)", ErrTxInput, symbol, in.GetTxMode())
+		return nil, fmt.Errorf("%w: %s unsupported tx_mode %d (want 0–4 EVM, 5 userop-v06, 6 userop-v07)", ErrTxInput, symbol, in.GetTxMode())
 	}
+}
+
+// signEthereumUserOpV06 builds and signs an ERC-4337 v0.6 UserOperation.
+// It reuses ethDestination to resolve the inner (to, value, data) triple from
+// the Transaction payload, then wraps it in SimpleAccount's execute(address,uint256,bytes)
+// callData. The userOpHash is signed via EIP-191 personal_sign. The returned
+// SigningOutput.Encoded = 65-byte signature, TxId = "0x" + userOpHash hex.
+func (w *HDWallet) signEthereumUserOpV06(symbol Symbol, index uint32, in *txeth.SigningInput) (*txeth.SigningOutput, error) {
+	meta := in.GetUserOperation()
+	if meta == nil {
+		return nil, fmt.Errorf("%w: %s: user_operation required for tx_mode 5 (UserOp v0.6)", ErrTxInput, symbol)
+	}
+	sender, err := hexToBytes(meta.GetSender())
+	if err != nil || len(sender) != 20 {
+		return nil, fmt.Errorf("%w: %s: bad user_operation.sender", ErrTxInput, symbol)
+	}
+	entryPoint, err := hexToBytes(meta.GetEntryPoint())
+	if err != nil || len(entryPoint) != 20 {
+		return nil, fmt.Errorf("%w: %s: bad user_operation.entry_point", ErrTxInput, symbol)
+	}
+	innerTo, innerValue, innerData, err := ethDestination(in)
+	if err != nil {
+		return nil, err
+	}
+	execSel := ABIFunctionSelector("execute", []string{"address", "uint256", "bytes"})
+	innerBig := new(big.Int)
+	if len(innerValue) > 0 {
+		innerBig.SetBytes(innerValue)
+	}
+	callData := abiCalldata(execSel, []ABIValue{
+		{Type: "address", Value: innerTo},
+		{Type: "uint256", Value: innerBig},
+		{Type: "bytes", Value: innerData},
+	})
+	op := &UserOperation{
+		Sender:               sender,
+		Nonce:                new(big.Int).SetBytes(in.GetNonce()),
+		InitCode:             meta.GetInitCode(),
+		CallData:             callData,
+		CallGasLimit:         new(big.Int).SetBytes(in.GetGasLimit()),
+		VerificationGasLimit: new(big.Int).SetBytes(meta.GetVerificationGasLimit()),
+		PreVerificationGas:   new(big.Int).SetBytes(meta.GetPreVerificationGas()),
+		MaxFeePerGas:         new(big.Int).SetBytes(in.GetMaxFeePerGas()),
+		MaxPriorityFeePerGas: new(big.Int).SetBytes(in.GetMaxInclusionFeePerGas()),
+		PaymasterAndData:     meta.GetPaymasterAndData(),
+	}
+	chainID := new(big.Int).SetBytes(in.GetChainId())
+	hash := UserOperationHash(op, entryPoint, chainID)
+	sig, err := w.SignMessage(symbol, index, hash)
+	if err != nil {
+		return nil, err
+	}
+	op.Signature = sig
+	return &txeth.SigningOutput{
+		Encoded:    sig,
+		R:          append([]byte(nil), sig[:32]...),
+		S:          append([]byte(nil), sig[32:64]...),
+		V:          sig[64:65],
+		EncodedHex: bytesToHex(sig),
+		TxId:       "0x" + bytesToHex(hash),
+	}, nil
 }
 
 // ethAccessList builds the RLP item for an EIP-2930 access list:
@@ -155,6 +225,110 @@ func ethDestination(in *txeth.SigningInput) (to, value, data []byte, err error) 
 			addr = a
 		}
 		return addr, append([]byte(nil), t.GetAmount()...), append([]byte(nil), t.GetData()...), nil
+	case tx.GetErc20Approve() != nil:
+		t := tx.GetErc20Approve()
+		contract, cerr := hexToBytes(in.GetToAddress())
+		if cerr != nil || len(contract) != 20 {
+			return nil, nil, nil, fmt.Errorf("%w: ethereum: bad token contract to_address", ErrTxInput)
+		}
+		spender, serr := hexToBytes(t.GetSpender())
+		if serr != nil || len(spender) != 20 {
+			return nil, nil, nil, fmt.Errorf("%w: ethereum: bad erc20 approve spender", ErrTxInput)
+		}
+		calldata := ERC20ApproveCalldata(spender, new(big.Int).SetBytes(t.GetAmount()))
+		return contract, nil, calldata, nil
+	case tx.GetErc721Transfer() != nil:
+		t := tx.GetErc721Transfer()
+		contract, cerr := hexToBytes(in.GetToAddress())
+		if cerr != nil || len(contract) != 20 {
+			return nil, nil, nil, fmt.Errorf("%w: ethereum: bad nft contract to_address", ErrTxInput)
+		}
+		from, ferr := hexToBytes(t.GetFrom())
+		if ferr != nil || len(from) != 20 {
+			return nil, nil, nil, fmt.Errorf("%w: ethereum: bad erc721 from address", ErrTxInput)
+		}
+		to, terr := hexToBytes(t.GetTo())
+		if terr != nil || len(to) != 20 {
+			return nil, nil, nil, fmt.Errorf("%w: ethereum: bad erc721 to address", ErrTxInput)
+		}
+		calldata := ERC721TransferCalldata(from, to, new(big.Int).SetBytes(t.GetTokenId()))
+		return contract, nil, calldata, nil
+	case tx.GetErc1155Transfer() != nil:
+		t := tx.GetErc1155Transfer()
+		contract, cerr := hexToBytes(in.GetToAddress())
+		if cerr != nil || len(contract) != 20 {
+			return nil, nil, nil, fmt.Errorf("%w: ethereum: bad erc1155 contract to_address", ErrTxInput)
+		}
+		from, ferr := hexToBytes(t.GetFrom())
+		if ferr != nil || len(from) != 20 {
+			return nil, nil, nil, fmt.Errorf("%w: ethereum: bad erc1155 from address", ErrTxInput)
+		}
+		to, terr := hexToBytes(t.GetTo())
+		if terr != nil || len(to) != 20 {
+			return nil, nil, nil, fmt.Errorf("%w: ethereum: bad erc1155 to address", ErrTxInput)
+		}
+		calldata := ERC1155SafeTransferCalldata(
+			from, to,
+			new(big.Int).SetBytes(t.GetTokenId()),
+			new(big.Int).SetBytes(t.GetValue()),
+			t.GetData(),
+		)
+		return contract, nil, calldata, nil
+	case tx.GetScWalletExecute() != nil:
+		sc := tx.GetScWalletExecute()
+		// Outer tx goes to the smart wallet.
+		walletAddr, waErr := hexToBytes(in.GetToAddress())
+		if waErr != nil || len(walletAddr) != 20 {
+			return nil, nil, nil, fmt.Errorf("%w: ethereum: sc_wallet_execute: bad to_address (smart wallet)", ErrTxInput)
+		}
+		// Build a synthetic SigningInput so we can reuse ethDestination for the
+		// inner transaction; inner_to_address is the actual call recipient.
+		synth := &txeth.SigningInput{
+			ToAddress:   sc.GetInnerToAddress(),
+			Transaction: sc.GetTransaction(),
+		}
+		innerTo, innerValue, innerData, iErr := ethDestination(synth)
+		if iErr != nil {
+			return nil, nil, nil, fmt.Errorf("%w: ethereum: sc_wallet_execute inner tx: %v", ErrTxInput, iErr)
+		}
+		innerBig := new(big.Int)
+		if len(innerValue) > 0 {
+			innerBig.SetBytes(innerValue)
+		}
+		calldata, cErr := scWalletExecuteCalldata(int32(sc.GetWalletType()), innerTo, innerBig, innerData)
+		if cErr != nil {
+			return nil, nil, nil, fmt.Errorf("%w: ethereum: %v", ErrTxInput, cErr)
+		}
+		// Outer tx: to = smart wallet, value = 0, data = execute calldata.
+		return walletAddr, nil, calldata, nil
+	case tx.GetScWalletBatch() != nil:
+		sc := tx.GetScWalletBatch()
+		walletAddr, waErr := hexToBytes(in.GetToAddress())
+		if waErr != nil || len(walletAddr) != 20 {
+			return nil, nil, nil, fmt.Errorf("%w: ethereum: sc_wallet_batch: bad to_address (smart wallet)", ErrTxInput)
+		}
+		calls := sc.GetCalls()
+		addrs := make([][]byte, len(calls))
+		values := make([]*big.Int, len(calls))
+		datas := make([][]byte, len(calls))
+		for i, c := range calls {
+			addr, aerr := hexToBytes(c.GetAddress())
+			if aerr != nil || len(addr) != 20 {
+				return nil, nil, nil, fmt.Errorf("%w: ethereum: sc_wallet_batch call[%d]: bad address", ErrTxInput, i)
+			}
+			addrs[i] = addr
+			v := new(big.Int)
+			if amt := c.GetAmount(); len(amt) > 0 {
+				v.SetBytes(amt)
+			}
+			values[i] = v
+			datas[i] = append([]byte(nil), c.GetPayload()...)
+		}
+		calldata, cErr := scWalletBatchCalldata(int32(sc.GetWalletType()), addrs, values, datas)
+		if cErr != nil {
+			return nil, nil, nil, fmt.Errorf("%w: ethereum: %v", ErrTxInput, cErr)
+		}
+		return walletAddr, nil, calldata, nil
 	default:
 		return nil, nil, nil, fmt.Errorf("%w: ethereum: empty transaction payload", ErrTxInput)
 	}

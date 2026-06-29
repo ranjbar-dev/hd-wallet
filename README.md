@@ -178,7 +178,7 @@ Verified against authoritative signing vectors for:
 
 | Family | Coverage |
 |---|---|
-| **EVM** | legacy (EIP-155) + EIP-2930 (access list) + EIP-1559 + **EIP-4844** (type-3 blob tx: `max_fee_per_blob_gas` + `blob_versioned_hashes`) + **EIP-7702** (type-4 set-code tx: `authorization_list`), native + ERC-20 + arbitrary contract call + contract creation (deploy). Select the format with `tx_mode` (exported `hdwallet.EthTxModeLegacy`/`EthTxModeEIP2930`/`EthTxModeEIP1559`/`EthTxModeEIP4844`/`EthTxModeEIP7702`). All registered EVM chains. |
+| **EVM** | legacy (EIP-155) + EIP-2930 (access list) + EIP-1559 + **EIP-4844** (type-3 blob tx: `max_fee_per_blob_gas` + `blob_versioned_hashes`) + **EIP-7702** (type-4 set-code tx: `authorization_list`), native + ERC-20 + arbitrary contract call + contract creation (deploy). Select the format with `tx_mode` (exported `hdwallet.EthTxModeLegacy`/`EthTxModeEIP2930`/`EthTxModeEIP1559`/`EthTxModeEIP4844`/`EthTxModeEIP7702`). Structured token intents via proto oneofs: **ERC-20 approve** (`ERC20Approve`), **ERC-721 transfer** (`ERC721Transfer`), **ERC-1155 transfer** (`ERC1155Transfer`) — each tested with Legacy + EIP-1559 TWC-vector-pinned tests. **ERC-4337 account abstraction**: UserOperation v0.6 (`EthTxModeUserOp` = 5, `SigningInput.user_operation` field 14) and v0.7 (`EthTxModeUserOpV07` = 6, `SigningInput.user_operation_v0_7` field 15, packed `uint128` `accountGasLimits`/`gasFees`). **Smart-wallet batch intents**: `SCWalletExecute` (single call, field 7) and `SCWalletBatch` (batched calls, field 8) for three wallet types — `SC_SIMPLE_ACCOUNT` (`execute`/`executeBatch(address[],uint256[],bytes[])`), `BIZ_4337` (`executeBatch(address[],bytes[])`), and `BIZ` (`executeBatch(address[],uint256[],bytes[])`). All registered EVM chains. |
 | **Tron** | TRX transfer (`TransferContract`) + TRC-10 transfer (`TransferAssetContract`) + TRC-20 transfer + generic `TriggerSmartContract` (arbitrary call with `call_value`/`data`/`call_token_value`/`token_id`) + legacy Stake 1.0 `FreezeBalanceContract`/`UnfreezeBalanceContract` + `UnfreezeAssetContract` + `WithdrawBalanceContract` + `VoteAssetContract`; **raw_json mode** signs a node/DApp-provided pre-built transaction (`raw_data_hex` + txID guard) for wallet-connect flows |
 | **XRP** | Payment |
 | **Cosmos** | bank `MsgSend`, staking `MsgDelegate`/`MsgUndelegate`, `MsgWithdrawDelegatorReward`, multi-message (protobuf direct mode). All standard secp256k1 Cosmos chains, plus **EVMOS** and **INJ** (ethermint eth_secp256k1: keccak256 SignDoc + chain-specific pubkey type URL — INJ uses an uncompressed key). Other ethermint chains (CANTO/ZETA/ONE) stay roadmap — each needs its own vector. |
@@ -232,6 +232,19 @@ sig2, _ := w.SignTypedData(hdwallet.ETH, 0, typedDataJSON)           // EIP-712
 
 Plus standalone EVM tooling: `EncodeRLP`/`DecodeRLP`, `ABIEncode`/`ABIDecode`,
 `ABIFunctionSelector`, `EthereumPersonalMessageHash`, `EIP712Hash`.
+
+### JSON-ABI contract-call decoding
+
+Parse a contract's JSON ABI and decode raw calldata into typed named parameters:
+
+```go
+abi, err := hdwallet.ParseContractABI(jsonABI)    // parse ABI array → selector-keyed map
+name, params, err := hdwallet.DecodeContractCall(abi, calldata) // decode 4-byte selector + args
+// name = "approve", params = [{Name:"spender" Value:"0x…"}, {Name:"amount" Value:"1000000"}]
+sig := hdwallet.GetFunctionSignature(abi["approve"]) // "approve(address,uint256)"
+```
+
+Implemented in `eth_contractcall.go`; no new dependencies (reuses the existing `ABIDecode` primitive).
 
 ### Bitcoin, Solana, Cosmos & Tron message signing
 
@@ -549,6 +562,7 @@ go test -race -cover ./...
 | `(*HDWallet) SignRawMessage(symbol, index, []byte) (*Signature, error)` | Chain-neutral: ECDSA 32-byte digest or ed25519 raw message. With `VerifyRawMessage`. |
 | `RecoverEthereumAddress([]byte, []byte) (string, error)` · `VerifyEthereumMessage` / `…TypedData` | Recover/verify EIP-191/712 signers. |
 | `EncodeRLP`/`DecodeRLP` · `ABIEncode`/`ABIDecode` · `ABIFunctionSelector` · `EIP712Hash` | Standalone EVM encoding utilities. |
+| `ParseContractABI(jsonABI string) (ContractABIMap, error)` · `DecodeContractCall(abi, calldata)` · `GetFunctionSignature(fn)` | JSON-ABI-driven contract-call decoding: parse a JSON ABI array into a selector-keyed map, then decode raw calldata into a function name and typed named parameters. |
 
 **Address validation / parsing (`AnyAddress`-style):**
 

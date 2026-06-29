@@ -35,10 +35,47 @@ message Transaction {
     bytes data = 2;
   }
 
+  // ERC-20 approve(spender, amount) call.
+  message ERC20Approve {
+    // Approved spender address ("0x"-prefixed hex).
+    string spender = 1;
+    // Approval amount, big-endian uint256 bytes.
+    bytes amount = 2;
+  }
+
+  // ERC-721 transferFrom(from, to, tokenId) call.
+  message ERC721Transfer {
+    // Current token owner ("0x"-prefixed hex).
+    string from = 1;
+    // Recipient address ("0x"-prefixed hex).
+    string to = 2;
+    // Token ID, big-endian uint256 bytes.
+    bytes token_id = 3;
+  }
+
+  // ERC-1155 safeTransferFrom(from, to, id, value, data) call.
+  message ERC1155Transfer {
+    // Current token owner ("0x"-prefixed hex).
+    string from = 1;
+    // Recipient address ("0x"-prefixed hex).
+    string to = 2;
+    // Token ID, big-endian uint256 bytes.
+    bytes token_id = 3;
+    // Token amount, big-endian uint256 bytes.
+    bytes value = 4;
+    // Extra data passed to safeTransferFrom.
+    bytes data = 5;
+  }
+
   oneof transaction_oneof {
     Transfer transfer = 1;
     ERC20Transfer erc20_transfer = 2;
     ContractGeneric contract_generic = 3;
+    ERC20Approve erc20_approve = 4;
+    ERC721Transfer erc721_transfer = 5;
+    ERC1155Transfer erc1155_transfer = 6;
+    SCWalletExecute sc_wallet_execute = 7;
+    SCWalletBatch sc_wallet_batch = 8;
   }
 }
 
@@ -69,6 +106,92 @@ message EthAuthorization {
   bytes r = 5;
   // s component of the authorization signature, 32 bytes big-endian.
   bytes s = 6;
+}
+
+// UserOperationV0_6 carries the ERC-4337 v0.6 meta fields that the EntryPoint
+// and bundler need but that the inner transaction does not supply.
+message UserOperationV0_6 {
+  // EntryPoint contract address ("0x"-prefixed hex, 20 bytes).
+  string entry_point = 1;
+  // Factory deployment code: factory_address (20 bytes) ++ factory_calldata.
+  // Empty for already-deployed accounts.
+  bytes init_code = 2;
+  // Smart wallet (sender) address ("0x"-prefixed hex, 20 bytes).
+  string sender = 3;
+  // preVerificationGas, big-endian bytes.
+  bytes pre_verification_gas = 4;
+  // verificationGasLimit, big-endian bytes.
+  bytes verification_gas_limit = 5;
+  // Paymaster and its data. Empty if no paymaster.
+  bytes paymaster_and_data = 6;
+}
+
+// UserOperationV0_7 carries the ERC-4337 v0.7 meta fields. The v0.7 hash uses
+// packed uint128 pairs (accountGasLimits, gasFees) and a different paymasterAndData
+// layout compared to v0.6.
+message UserOperationV0_7 {
+  // EntryPoint contract address ("0x"-prefixed hex, 20 bytes).
+  string entry_point = 1;
+  // Factory contract address ("0x"-prefixed hex). Empty if account already deployed.
+  string factory = 2;
+  // Factory calldata (init data passed to the factory). Empty if no factory.
+  bytes factory_data = 3;
+  // Smart wallet (sender) address ("0x"-prefixed hex, 20 bytes).
+  string sender = 4;
+  // preVerificationGas, big-endian bytes.
+  bytes pre_verification_gas = 5;
+  // verificationGasLimit (uint128), big-endian bytes (≤ 16 bytes).
+  bytes verification_gas_limit = 6;
+  // Paymaster contract address ("0x"-prefixed hex). Empty if no paymaster.
+  string paymaster = 7;
+  // paymasterVerificationGasLimit (uint128), big-endian bytes (≤ 16 bytes).
+  bytes paymaster_verification_gas_limit = 8;
+  // paymasterPostOpGasLimit (uint128), big-endian bytes (≤ 16 bytes).
+  bytes paymaster_post_op_gas_limit = 9;
+  // Paymaster extra data.
+  bytes paymaster_data = 10;
+}
+
+// SCWalletType selects which smart-wallet execute selector to use.
+enum SCWalletType {
+  // SimpleAccount (EIP-4337 reference) — execute(address to, uint256 value, bytes calldata data)
+  // and executeBatch(address[],uint256[],bytes[]) for batch.
+  SC_SIMPLE_ACCOUNT = 0;
+  // Biz4337 — executeBatch(address[] calldata dest, bytes[] calldata func).
+  BIZ_4337 = 1;
+  // Biz — executeBatch(address[] calldata dest, uint256[] calldata value, bytes[] calldata func).
+  BIZ = 2;
+}
+
+// BatchedCall is one call within an SCWalletBatch.
+message BatchedCall {
+  // Target contract address ("0x"-prefixed hex).
+  string address = 1;
+  // Native value, big-endian uint256 bytes (empty = 0).
+  bytes amount = 2;
+  // Calldata for the inner call.
+  bytes payload = 3;
+}
+
+// SCWalletExecute wraps a single inner Transaction for a smart-wallet execute call.
+// The transaction field is interpreted exactly as SigningInput.transaction for
+// building the inner calldata (address/value/data triple).
+message SCWalletExecute {
+  // Inner transaction (determines value and calldata; inner_to_address is the recipient).
+  Transaction transaction = 1;
+  // Wallet type controls which execute() selector is used.
+  SCWalletType wallet_type = 2;
+  // Target address for the inner call ("0x"-prefixed hex). The outer tx goes to the
+  // smart wallet (SigningInput.to_address); this is the inner call's recipient.
+  string inner_to_address = 3;
+}
+
+// SCWalletBatch groups multiple calls into a single smart-wallet executeBatch.
+message SCWalletBatch {
+  // Calls to batch.
+  repeated BatchedCall calls = 1;
+  // Wallet type controls which executeBatch() selector is used.
+  SCWalletType wallet_type = 2;
 }
 
 // SigningInput mirrors a minimal subset of TW.Ethereum.Proto.SigningInput.
@@ -122,6 +245,12 @@ message SigningInput {
   // otherwise. Each entry is a pre-signed delegation authorization from an EOA
   // that wishes to set its code to point at a contract address.
   repeated EthAuthorization authorization_list = 13;
+
+  // ERC-4337 v0.6 UserOperation meta. Required when tx_mode == 5 (UserOp v0.6).
+  UserOperationV0_6 user_operation = 14;
+
+  // ERC-4337 v0.7 UserOperation meta. Required when tx_mode == 6 (UserOp v0.7).
+  UserOperationV0_7 user_operation_v0_7 = 15;
 }
 
 // SigningOutput mirrors a minimal subset of TW.Ethereum.Proto.SigningOutput.

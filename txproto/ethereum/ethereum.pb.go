@@ -21,6 +21,60 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+// SCWalletType selects which smart-wallet execute selector to use.
+type SCWalletType int32
+
+const (
+	// SimpleAccount (EIP-4337 reference) — execute(address to, uint256 value, bytes calldata data)
+	// and executeBatch(address[],uint256[],bytes[]) for batch.
+	SCWalletType_SC_SIMPLE_ACCOUNT SCWalletType = 0
+	// Biz4337 — executeBatch(address[] calldata dest, bytes[] calldata func).
+	SCWalletType_BIZ_4337 SCWalletType = 1
+	// Biz — executeBatch(address[] calldata dest, uint256[] calldata value, bytes[] calldata func).
+	SCWalletType_BIZ SCWalletType = 2
+)
+
+// Enum value maps for SCWalletType.
+var (
+	SCWalletType_name = map[int32]string{
+		0: "SC_SIMPLE_ACCOUNT",
+		1: "BIZ_4337",
+		2: "BIZ",
+	}
+	SCWalletType_value = map[string]int32{
+		"SC_SIMPLE_ACCOUNT": 0,
+		"BIZ_4337":          1,
+		"BIZ":               2,
+	}
+)
+
+func (x SCWalletType) Enum() *SCWalletType {
+	p := new(SCWalletType)
+	*p = x
+	return p
+}
+
+func (x SCWalletType) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (SCWalletType) Descriptor() protoreflect.EnumDescriptor {
+	return file_txproto_ethereum_ethereum_proto_enumTypes[0].Descriptor()
+}
+
+func (SCWalletType) Type() protoreflect.EnumType {
+	return &file_txproto_ethereum_ethereum_proto_enumTypes[0]
+}
+
+func (x SCWalletType) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use SCWalletType.Descriptor instead.
+func (SCWalletType) EnumDescriptor() ([]byte, []int) {
+	return file_txproto_ethereum_ethereum_proto_rawDescGZIP(), []int{0}
+}
+
 // Transaction type / payload. Mirrors a minimal subset of Trust Wallet Core's
 // TW.Ethereum.Proto.Transaction.
 type Transaction struct {
@@ -30,6 +84,11 @@ type Transaction struct {
 	//	*Transaction_Transfer_
 	//	*Transaction_Erc20Transfer
 	//	*Transaction_ContractGeneric_
+	//	*Transaction_Erc20Approve
+	//	*Transaction_Erc721Transfer
+	//	*Transaction_Erc1155Transfer
+	//	*Transaction_ScWalletExecute
+	//	*Transaction_ScWalletBatch
 	TransactionOneof isTransaction_TransactionOneof `protobuf_oneof:"transaction_oneof"`
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
@@ -99,6 +158,51 @@ func (x *Transaction) GetContractGeneric() *Transaction_ContractGeneric {
 	return nil
 }
 
+func (x *Transaction) GetErc20Approve() *Transaction_ERC20Approve {
+	if x != nil {
+		if x, ok := x.TransactionOneof.(*Transaction_Erc20Approve); ok {
+			return x.Erc20Approve
+		}
+	}
+	return nil
+}
+
+func (x *Transaction) GetErc721Transfer() *Transaction_ERC721Transfer {
+	if x != nil {
+		if x, ok := x.TransactionOneof.(*Transaction_Erc721Transfer); ok {
+			return x.Erc721Transfer
+		}
+	}
+	return nil
+}
+
+func (x *Transaction) GetErc1155Transfer() *Transaction_ERC1155Transfer {
+	if x != nil {
+		if x, ok := x.TransactionOneof.(*Transaction_Erc1155Transfer); ok {
+			return x.Erc1155Transfer
+		}
+	}
+	return nil
+}
+
+func (x *Transaction) GetScWalletExecute() *SCWalletExecute {
+	if x != nil {
+		if x, ok := x.TransactionOneof.(*Transaction_ScWalletExecute); ok {
+			return x.ScWalletExecute
+		}
+	}
+	return nil
+}
+
+func (x *Transaction) GetScWalletBatch() *SCWalletBatch {
+	if x != nil {
+		if x, ok := x.TransactionOneof.(*Transaction_ScWalletBatch); ok {
+			return x.ScWalletBatch
+		}
+	}
+	return nil
+}
+
 type isTransaction_TransactionOneof interface {
 	isTransaction_TransactionOneof()
 }
@@ -115,11 +219,41 @@ type Transaction_ContractGeneric_ struct {
 	ContractGeneric *Transaction_ContractGeneric `protobuf:"bytes,3,opt,name=contract_generic,json=contractGeneric,proto3,oneof"`
 }
 
+type Transaction_Erc20Approve struct {
+	Erc20Approve *Transaction_ERC20Approve `protobuf:"bytes,4,opt,name=erc20_approve,json=erc20Approve,proto3,oneof"`
+}
+
+type Transaction_Erc721Transfer struct {
+	Erc721Transfer *Transaction_ERC721Transfer `protobuf:"bytes,5,opt,name=erc721_transfer,json=erc721Transfer,proto3,oneof"`
+}
+
+type Transaction_Erc1155Transfer struct {
+	Erc1155Transfer *Transaction_ERC1155Transfer `protobuf:"bytes,6,opt,name=erc1155_transfer,json=erc1155Transfer,proto3,oneof"`
+}
+
+type Transaction_ScWalletExecute struct {
+	ScWalletExecute *SCWalletExecute `protobuf:"bytes,7,opt,name=sc_wallet_execute,json=scWalletExecute,proto3,oneof"`
+}
+
+type Transaction_ScWalletBatch struct {
+	ScWalletBatch *SCWalletBatch `protobuf:"bytes,8,opt,name=sc_wallet_batch,json=scWalletBatch,proto3,oneof"`
+}
+
 func (*Transaction_Transfer_) isTransaction_TransactionOneof() {}
 
 func (*Transaction_Erc20Transfer) isTransaction_TransactionOneof() {}
 
 func (*Transaction_ContractGeneric_) isTransaction_TransactionOneof() {}
+
+func (*Transaction_Erc20Approve) isTransaction_TransactionOneof() {}
+
+func (*Transaction_Erc721Transfer) isTransaction_TransactionOneof() {}
+
+func (*Transaction_Erc1155Transfer) isTransaction_TransactionOneof() {}
+
+func (*Transaction_ScWalletExecute) isTransaction_TransactionOneof() {}
+
+func (*Transaction_ScWalletBatch) isTransaction_TransactionOneof() {}
 
 // Access is one EIP-2930 access-list entry: an address plus the storage slots
 // the transaction intends to access under it.
@@ -272,6 +406,414 @@ func (x *EthAuthorization) GetS() []byte {
 	return nil
 }
 
+// UserOperationV0_6 carries the ERC-4337 v0.6 meta fields that the EntryPoint
+// and bundler need but that the inner transaction does not supply.
+type UserOperationV0_6 struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// EntryPoint contract address ("0x"-prefixed hex, 20 bytes).
+	EntryPoint string `protobuf:"bytes,1,opt,name=entry_point,json=entryPoint,proto3" json:"entry_point,omitempty"`
+	// Factory deployment code: factory_address (20 bytes) ++ factory_calldata.
+	// Empty for already-deployed accounts.
+	InitCode []byte `protobuf:"bytes,2,opt,name=init_code,json=initCode,proto3" json:"init_code,omitempty"`
+	// Smart wallet (sender) address ("0x"-prefixed hex, 20 bytes).
+	Sender string `protobuf:"bytes,3,opt,name=sender,proto3" json:"sender,omitempty"`
+	// preVerificationGas, big-endian bytes.
+	PreVerificationGas []byte `protobuf:"bytes,4,opt,name=pre_verification_gas,json=preVerificationGas,proto3" json:"pre_verification_gas,omitempty"`
+	// verificationGasLimit, big-endian bytes.
+	VerificationGasLimit []byte `protobuf:"bytes,5,opt,name=verification_gas_limit,json=verificationGasLimit,proto3" json:"verification_gas_limit,omitempty"`
+	// Paymaster and its data. Empty if no paymaster.
+	PaymasterAndData []byte `protobuf:"bytes,6,opt,name=paymaster_and_data,json=paymasterAndData,proto3" json:"paymaster_and_data,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *UserOperationV0_6) Reset() {
+	*x = UserOperationV0_6{}
+	mi := &file_txproto_ethereum_ethereum_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UserOperationV0_6) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UserOperationV0_6) ProtoMessage() {}
+
+func (x *UserOperationV0_6) ProtoReflect() protoreflect.Message {
+	mi := &file_txproto_ethereum_ethereum_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UserOperationV0_6.ProtoReflect.Descriptor instead.
+func (*UserOperationV0_6) Descriptor() ([]byte, []int) {
+	return file_txproto_ethereum_ethereum_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *UserOperationV0_6) GetEntryPoint() string {
+	if x != nil {
+		return x.EntryPoint
+	}
+	return ""
+}
+
+func (x *UserOperationV0_6) GetInitCode() []byte {
+	if x != nil {
+		return x.InitCode
+	}
+	return nil
+}
+
+func (x *UserOperationV0_6) GetSender() string {
+	if x != nil {
+		return x.Sender
+	}
+	return ""
+}
+
+func (x *UserOperationV0_6) GetPreVerificationGas() []byte {
+	if x != nil {
+		return x.PreVerificationGas
+	}
+	return nil
+}
+
+func (x *UserOperationV0_6) GetVerificationGasLimit() []byte {
+	if x != nil {
+		return x.VerificationGasLimit
+	}
+	return nil
+}
+
+func (x *UserOperationV0_6) GetPaymasterAndData() []byte {
+	if x != nil {
+		return x.PaymasterAndData
+	}
+	return nil
+}
+
+// UserOperationV0_7 carries the ERC-4337 v0.7 meta fields. The v0.7 hash uses
+// packed uint128 pairs (accountGasLimits, gasFees) and a different paymasterAndData
+// layout compared to v0.6.
+type UserOperationV0_7 struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// EntryPoint contract address ("0x"-prefixed hex, 20 bytes).
+	EntryPoint string `protobuf:"bytes,1,opt,name=entry_point,json=entryPoint,proto3" json:"entry_point,omitempty"`
+	// Factory contract address ("0x"-prefixed hex). Empty if account already deployed.
+	Factory string `protobuf:"bytes,2,opt,name=factory,proto3" json:"factory,omitempty"`
+	// Factory calldata (init data passed to the factory). Empty if no factory.
+	FactoryData []byte `protobuf:"bytes,3,opt,name=factory_data,json=factoryData,proto3" json:"factory_data,omitempty"`
+	// Smart wallet (sender) address ("0x"-prefixed hex, 20 bytes).
+	Sender string `protobuf:"bytes,4,opt,name=sender,proto3" json:"sender,omitempty"`
+	// preVerificationGas, big-endian bytes.
+	PreVerificationGas []byte `protobuf:"bytes,5,opt,name=pre_verification_gas,json=preVerificationGas,proto3" json:"pre_verification_gas,omitempty"`
+	// verificationGasLimit (uint128), big-endian bytes (≤ 16 bytes).
+	VerificationGasLimit []byte `protobuf:"bytes,6,opt,name=verification_gas_limit,json=verificationGasLimit,proto3" json:"verification_gas_limit,omitempty"`
+	// Paymaster contract address ("0x"-prefixed hex). Empty if no paymaster.
+	Paymaster string `protobuf:"bytes,7,opt,name=paymaster,proto3" json:"paymaster,omitempty"`
+	// paymasterVerificationGasLimit (uint128), big-endian bytes (≤ 16 bytes).
+	PaymasterVerificationGasLimit []byte `protobuf:"bytes,8,opt,name=paymaster_verification_gas_limit,json=paymasterVerificationGasLimit,proto3" json:"paymaster_verification_gas_limit,omitempty"`
+	// paymasterPostOpGasLimit (uint128), big-endian bytes (≤ 16 bytes).
+	PaymasterPostOpGasLimit []byte `protobuf:"bytes,9,opt,name=paymaster_post_op_gas_limit,json=paymasterPostOpGasLimit,proto3" json:"paymaster_post_op_gas_limit,omitempty"`
+	// Paymaster extra data.
+	PaymasterData []byte `protobuf:"bytes,10,opt,name=paymaster_data,json=paymasterData,proto3" json:"paymaster_data,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UserOperationV0_7) Reset() {
+	*x = UserOperationV0_7{}
+	mi := &file_txproto_ethereum_ethereum_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UserOperationV0_7) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UserOperationV0_7) ProtoMessage() {}
+
+func (x *UserOperationV0_7) ProtoReflect() protoreflect.Message {
+	mi := &file_txproto_ethereum_ethereum_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UserOperationV0_7.ProtoReflect.Descriptor instead.
+func (*UserOperationV0_7) Descriptor() ([]byte, []int) {
+	return file_txproto_ethereum_ethereum_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *UserOperationV0_7) GetEntryPoint() string {
+	if x != nil {
+		return x.EntryPoint
+	}
+	return ""
+}
+
+func (x *UserOperationV0_7) GetFactory() string {
+	if x != nil {
+		return x.Factory
+	}
+	return ""
+}
+
+func (x *UserOperationV0_7) GetFactoryData() []byte {
+	if x != nil {
+		return x.FactoryData
+	}
+	return nil
+}
+
+func (x *UserOperationV0_7) GetSender() string {
+	if x != nil {
+		return x.Sender
+	}
+	return ""
+}
+
+func (x *UserOperationV0_7) GetPreVerificationGas() []byte {
+	if x != nil {
+		return x.PreVerificationGas
+	}
+	return nil
+}
+
+func (x *UserOperationV0_7) GetVerificationGasLimit() []byte {
+	if x != nil {
+		return x.VerificationGasLimit
+	}
+	return nil
+}
+
+func (x *UserOperationV0_7) GetPaymaster() string {
+	if x != nil {
+		return x.Paymaster
+	}
+	return ""
+}
+
+func (x *UserOperationV0_7) GetPaymasterVerificationGasLimit() []byte {
+	if x != nil {
+		return x.PaymasterVerificationGasLimit
+	}
+	return nil
+}
+
+func (x *UserOperationV0_7) GetPaymasterPostOpGasLimit() []byte {
+	if x != nil {
+		return x.PaymasterPostOpGasLimit
+	}
+	return nil
+}
+
+func (x *UserOperationV0_7) GetPaymasterData() []byte {
+	if x != nil {
+		return x.PaymasterData
+	}
+	return nil
+}
+
+// BatchedCall is one call within an SCWalletBatch.
+type BatchedCall struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Target contract address ("0x"-prefixed hex).
+	Address string `protobuf:"bytes,1,opt,name=address,proto3" json:"address,omitempty"`
+	// Native value, big-endian uint256 bytes (empty = 0).
+	Amount []byte `protobuf:"bytes,2,opt,name=amount,proto3" json:"amount,omitempty"`
+	// Calldata for the inner call.
+	Payload       []byte `protobuf:"bytes,3,opt,name=payload,proto3" json:"payload,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BatchedCall) Reset() {
+	*x = BatchedCall{}
+	mi := &file_txproto_ethereum_ethereum_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BatchedCall) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BatchedCall) ProtoMessage() {}
+
+func (x *BatchedCall) ProtoReflect() protoreflect.Message {
+	mi := &file_txproto_ethereum_ethereum_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BatchedCall.ProtoReflect.Descriptor instead.
+func (*BatchedCall) Descriptor() ([]byte, []int) {
+	return file_txproto_ethereum_ethereum_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *BatchedCall) GetAddress() string {
+	if x != nil {
+		return x.Address
+	}
+	return ""
+}
+
+func (x *BatchedCall) GetAmount() []byte {
+	if x != nil {
+		return x.Amount
+	}
+	return nil
+}
+
+func (x *BatchedCall) GetPayload() []byte {
+	if x != nil {
+		return x.Payload
+	}
+	return nil
+}
+
+// SCWalletExecute wraps a single inner Transaction for a smart-wallet execute call.
+// The transaction field is interpreted exactly as SigningInput.transaction for
+// building the inner calldata (address/value/data triple).
+type SCWalletExecute struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Inner transaction (determines value and calldata; inner_to_address is the recipient).
+	Transaction *Transaction `protobuf:"bytes,1,opt,name=transaction,proto3" json:"transaction,omitempty"`
+	// Wallet type controls which execute() selector is used.
+	WalletType SCWalletType `protobuf:"varint,2,opt,name=wallet_type,json=walletType,proto3,enum=hdwallet.ethereum.proto.SCWalletType" json:"wallet_type,omitempty"`
+	// Target address for the inner call ("0x"-prefixed hex). The outer tx goes to the
+	// smart wallet (SigningInput.to_address); this is the inner call's recipient.
+	InnerToAddress string `protobuf:"bytes,3,opt,name=inner_to_address,json=innerToAddress,proto3" json:"inner_to_address,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *SCWalletExecute) Reset() {
+	*x = SCWalletExecute{}
+	mi := &file_txproto_ethereum_ethereum_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SCWalletExecute) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SCWalletExecute) ProtoMessage() {}
+
+func (x *SCWalletExecute) ProtoReflect() protoreflect.Message {
+	mi := &file_txproto_ethereum_ethereum_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SCWalletExecute.ProtoReflect.Descriptor instead.
+func (*SCWalletExecute) Descriptor() ([]byte, []int) {
+	return file_txproto_ethereum_ethereum_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *SCWalletExecute) GetTransaction() *Transaction {
+	if x != nil {
+		return x.Transaction
+	}
+	return nil
+}
+
+func (x *SCWalletExecute) GetWalletType() SCWalletType {
+	if x != nil {
+		return x.WalletType
+	}
+	return SCWalletType_SC_SIMPLE_ACCOUNT
+}
+
+func (x *SCWalletExecute) GetInnerToAddress() string {
+	if x != nil {
+		return x.InnerToAddress
+	}
+	return ""
+}
+
+// SCWalletBatch groups multiple calls into a single smart-wallet executeBatch.
+type SCWalletBatch struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Calls to batch.
+	Calls []*BatchedCall `protobuf:"bytes,1,rep,name=calls,proto3" json:"calls,omitempty"`
+	// Wallet type controls which executeBatch() selector is used.
+	WalletType    SCWalletType `protobuf:"varint,2,opt,name=wallet_type,json=walletType,proto3,enum=hdwallet.ethereum.proto.SCWalletType" json:"wallet_type,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SCWalletBatch) Reset() {
+	*x = SCWalletBatch{}
+	mi := &file_txproto_ethereum_ethereum_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SCWalletBatch) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SCWalletBatch) ProtoMessage() {}
+
+func (x *SCWalletBatch) ProtoReflect() protoreflect.Message {
+	mi := &file_txproto_ethereum_ethereum_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SCWalletBatch.ProtoReflect.Descriptor instead.
+func (*SCWalletBatch) Descriptor() ([]byte, []int) {
+	return file_txproto_ethereum_ethereum_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *SCWalletBatch) GetCalls() []*BatchedCall {
+	if x != nil {
+		return x.Calls
+	}
+	return nil
+}
+
+func (x *SCWalletBatch) GetWalletType() SCWalletType {
+	if x != nil {
+		return x.WalletType
+	}
+	return SCWalletType_SC_SIMPLE_ACCOUNT
+}
+
 // SigningInput mirrors a minimal subset of TW.Ethereum.Proto.SigningInput.
 type SigningInput struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -312,13 +854,17 @@ type SigningInput struct {
 	// otherwise. Each entry is a pre-signed delegation authorization from an EOA
 	// that wishes to set its code to point at a contract address.
 	AuthorizationList []*EthAuthorization `protobuf:"bytes,13,rep,name=authorization_list,json=authorizationList,proto3" json:"authorization_list,omitempty"`
+	// ERC-4337 v0.6 UserOperation meta. Required when tx_mode == 5 (UserOp v0.6).
+	UserOperation *UserOperationV0_6 `protobuf:"bytes,14,opt,name=user_operation,json=userOperation,proto3" json:"user_operation,omitempty"`
+	// ERC-4337 v0.7 UserOperation meta. Required when tx_mode == 6 (UserOp v0.7).
+	UserOperationV0_7 *UserOperationV0_7 `protobuf:"bytes,15,opt,name=user_operation_v0_7,json=userOperationV07,proto3" json:"user_operation_v0_7,omitempty"`
 	unknownFields     protoimpl.UnknownFields
 	sizeCache         protoimpl.SizeCache
 }
 
 func (x *SigningInput) Reset() {
 	*x = SigningInput{}
-	mi := &file_txproto_ethereum_ethereum_proto_msgTypes[3]
+	mi := &file_txproto_ethereum_ethereum_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -330,7 +876,7 @@ func (x *SigningInput) String() string {
 func (*SigningInput) ProtoMessage() {}
 
 func (x *SigningInput) ProtoReflect() protoreflect.Message {
-	mi := &file_txproto_ethereum_ethereum_proto_msgTypes[3]
+	mi := &file_txproto_ethereum_ethereum_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -343,7 +889,7 @@ func (x *SigningInput) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SigningInput.ProtoReflect.Descriptor instead.
 func (*SigningInput) Descriptor() ([]byte, []int) {
-	return file_txproto_ethereum_ethereum_proto_rawDescGZIP(), []int{3}
+	return file_txproto_ethereum_ethereum_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *SigningInput) GetChainId() []byte {
@@ -437,6 +983,20 @@ func (x *SigningInput) GetAuthorizationList() []*EthAuthorization {
 	return nil
 }
 
+func (x *SigningInput) GetUserOperation() *UserOperationV0_6 {
+	if x != nil {
+		return x.UserOperation
+	}
+	return nil
+}
+
+func (x *SigningInput) GetUserOperationV0_7() *UserOperationV0_7 {
+	if x != nil {
+		return x.UserOperationV0_7
+	}
+	return nil
+}
+
 // SigningOutput mirrors a minimal subset of TW.Ethereum.Proto.SigningOutput.
 type SigningOutput struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -459,7 +1019,7 @@ type SigningOutput struct {
 
 func (x *SigningOutput) Reset() {
 	*x = SigningOutput{}
-	mi := &file_txproto_ethereum_ethereum_proto_msgTypes[4]
+	mi := &file_txproto_ethereum_ethereum_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -471,7 +1031,7 @@ func (x *SigningOutput) String() string {
 func (*SigningOutput) ProtoMessage() {}
 
 func (x *SigningOutput) ProtoReflect() protoreflect.Message {
-	mi := &file_txproto_ethereum_ethereum_proto_msgTypes[4]
+	mi := &file_txproto_ethereum_ethereum_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -484,7 +1044,7 @@ func (x *SigningOutput) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SigningOutput.ProtoReflect.Descriptor instead.
 func (*SigningOutput) Descriptor() ([]byte, []int) {
-	return file_txproto_ethereum_ethereum_proto_rawDescGZIP(), []int{4}
+	return file_txproto_ethereum_ethereum_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *SigningOutput) GetEncoded() []byte {
@@ -549,7 +1109,7 @@ type Transaction_Transfer struct {
 
 func (x *Transaction_Transfer) Reset() {
 	*x = Transaction_Transfer{}
-	mi := &file_txproto_ethereum_ethereum_proto_msgTypes[5]
+	mi := &file_txproto_ethereum_ethereum_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -561,7 +1121,7 @@ func (x *Transaction_Transfer) String() string {
 func (*Transaction_Transfer) ProtoMessage() {}
 
 func (x *Transaction_Transfer) ProtoReflect() protoreflect.Message {
-	mi := &file_txproto_ethereum_ethereum_proto_msgTypes[5]
+	mi := &file_txproto_ethereum_ethereum_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -604,7 +1164,7 @@ type Transaction_ERC20Transfer struct {
 
 func (x *Transaction_ERC20Transfer) Reset() {
 	*x = Transaction_ERC20Transfer{}
-	mi := &file_txproto_ethereum_ethereum_proto_msgTypes[6]
+	mi := &file_txproto_ethereum_ethereum_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -616,7 +1176,7 @@ func (x *Transaction_ERC20Transfer) String() string {
 func (*Transaction_ERC20Transfer) ProtoMessage() {}
 
 func (x *Transaction_ERC20Transfer) ProtoReflect() protoreflect.Message {
-	mi := &file_txproto_ethereum_ethereum_proto_msgTypes[6]
+	mi := &file_txproto_ethereum_ethereum_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -663,7 +1223,7 @@ type Transaction_ContractGeneric struct {
 
 func (x *Transaction_ContractGeneric) Reset() {
 	*x = Transaction_ContractGeneric{}
-	mi := &file_txproto_ethereum_ethereum_proto_msgTypes[7]
+	mi := &file_txproto_ethereum_ethereum_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -675,7 +1235,7 @@ func (x *Transaction_ContractGeneric) String() string {
 func (*Transaction_ContractGeneric) ProtoMessage() {}
 
 func (x *Transaction_ContractGeneric) ProtoReflect() protoreflect.Message {
-	mi := &file_txproto_ethereum_ethereum_proto_msgTypes[7]
+	mi := &file_txproto_ethereum_ethereum_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -705,15 +1265,221 @@ func (x *Transaction_ContractGeneric) GetData() []byte {
 	return nil
 }
 
+// ERC-20 approve(spender, amount) call.
+type Transaction_ERC20Approve struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Approved spender address ("0x"-prefixed hex).
+	Spender string `protobuf:"bytes,1,opt,name=spender,proto3" json:"spender,omitempty"`
+	// Approval amount, big-endian uint256 bytes.
+	Amount        []byte `protobuf:"bytes,2,opt,name=amount,proto3" json:"amount,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Transaction_ERC20Approve) Reset() {
+	*x = Transaction_ERC20Approve{}
+	mi := &file_txproto_ethereum_ethereum_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Transaction_ERC20Approve) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Transaction_ERC20Approve) ProtoMessage() {}
+
+func (x *Transaction_ERC20Approve) ProtoReflect() protoreflect.Message {
+	mi := &file_txproto_ethereum_ethereum_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Transaction_ERC20Approve.ProtoReflect.Descriptor instead.
+func (*Transaction_ERC20Approve) Descriptor() ([]byte, []int) {
+	return file_txproto_ethereum_ethereum_proto_rawDescGZIP(), []int{0, 3}
+}
+
+func (x *Transaction_ERC20Approve) GetSpender() string {
+	if x != nil {
+		return x.Spender
+	}
+	return ""
+}
+
+func (x *Transaction_ERC20Approve) GetAmount() []byte {
+	if x != nil {
+		return x.Amount
+	}
+	return nil
+}
+
+// ERC-721 transferFrom(from, to, tokenId) call.
+type Transaction_ERC721Transfer struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Current token owner ("0x"-prefixed hex).
+	From string `protobuf:"bytes,1,opt,name=from,proto3" json:"from,omitempty"`
+	// Recipient address ("0x"-prefixed hex).
+	To string `protobuf:"bytes,2,opt,name=to,proto3" json:"to,omitempty"`
+	// Token ID, big-endian uint256 bytes.
+	TokenId       []byte `protobuf:"bytes,3,opt,name=token_id,json=tokenId,proto3" json:"token_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Transaction_ERC721Transfer) Reset() {
+	*x = Transaction_ERC721Transfer{}
+	mi := &file_txproto_ethereum_ethereum_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Transaction_ERC721Transfer) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Transaction_ERC721Transfer) ProtoMessage() {}
+
+func (x *Transaction_ERC721Transfer) ProtoReflect() protoreflect.Message {
+	mi := &file_txproto_ethereum_ethereum_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Transaction_ERC721Transfer.ProtoReflect.Descriptor instead.
+func (*Transaction_ERC721Transfer) Descriptor() ([]byte, []int) {
+	return file_txproto_ethereum_ethereum_proto_rawDescGZIP(), []int{0, 4}
+}
+
+func (x *Transaction_ERC721Transfer) GetFrom() string {
+	if x != nil {
+		return x.From
+	}
+	return ""
+}
+
+func (x *Transaction_ERC721Transfer) GetTo() string {
+	if x != nil {
+		return x.To
+	}
+	return ""
+}
+
+func (x *Transaction_ERC721Transfer) GetTokenId() []byte {
+	if x != nil {
+		return x.TokenId
+	}
+	return nil
+}
+
+// ERC-1155 safeTransferFrom(from, to, id, value, data) call.
+type Transaction_ERC1155Transfer struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Current token owner ("0x"-prefixed hex).
+	From string `protobuf:"bytes,1,opt,name=from,proto3" json:"from,omitempty"`
+	// Recipient address ("0x"-prefixed hex).
+	To string `protobuf:"bytes,2,opt,name=to,proto3" json:"to,omitempty"`
+	// Token ID, big-endian uint256 bytes.
+	TokenId []byte `protobuf:"bytes,3,opt,name=token_id,json=tokenId,proto3" json:"token_id,omitempty"`
+	// Token amount, big-endian uint256 bytes.
+	Value []byte `protobuf:"bytes,4,opt,name=value,proto3" json:"value,omitempty"`
+	// Extra data passed to safeTransferFrom.
+	Data          []byte `protobuf:"bytes,5,opt,name=data,proto3" json:"data,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Transaction_ERC1155Transfer) Reset() {
+	*x = Transaction_ERC1155Transfer{}
+	mi := &file_txproto_ethereum_ethereum_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Transaction_ERC1155Transfer) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Transaction_ERC1155Transfer) ProtoMessage() {}
+
+func (x *Transaction_ERC1155Transfer) ProtoReflect() protoreflect.Message {
+	mi := &file_txproto_ethereum_ethereum_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Transaction_ERC1155Transfer.ProtoReflect.Descriptor instead.
+func (*Transaction_ERC1155Transfer) Descriptor() ([]byte, []int) {
+	return file_txproto_ethereum_ethereum_proto_rawDescGZIP(), []int{0, 5}
+}
+
+func (x *Transaction_ERC1155Transfer) GetFrom() string {
+	if x != nil {
+		return x.From
+	}
+	return ""
+}
+
+func (x *Transaction_ERC1155Transfer) GetTo() string {
+	if x != nil {
+		return x.To
+	}
+	return ""
+}
+
+func (x *Transaction_ERC1155Transfer) GetTokenId() []byte {
+	if x != nil {
+		return x.TokenId
+	}
+	return nil
+}
+
+func (x *Transaction_ERC1155Transfer) GetValue() []byte {
+	if x != nil {
+		return x.Value
+	}
+	return nil
+}
+
+func (x *Transaction_ERC1155Transfer) GetData() []byte {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
 var File_txproto_ethereum_ethereum_proto protoreflect.FileDescriptor
 
 const file_txproto_ethereum_ethereum_proto_rawDesc = "" +
 	"\n" +
-	"\x1ftxproto/ethereum/ethereum.proto\x12\x17hdwallet.ethereum.proto\"\xdf\x03\n" +
+	"\x1ftxproto/ethereum/ethereum.proto\x12\x17hdwallet.ethereum.proto\"\xb5\t\n" +
 	"\vTransaction\x12K\n" +
 	"\btransfer\x18\x01 \x01(\v2-.hdwallet.ethereum.proto.Transaction.TransferH\x00R\btransfer\x12[\n" +
 	"\x0eerc20_transfer\x18\x02 \x01(\v22.hdwallet.ethereum.proto.Transaction.ERC20TransferH\x00R\rerc20Transfer\x12a\n" +
-	"\x10contract_generic\x18\x03 \x01(\v24.hdwallet.ethereum.proto.Transaction.ContractGenericH\x00R\x0fcontractGeneric\x1a6\n" +
+	"\x10contract_generic\x18\x03 \x01(\v24.hdwallet.ethereum.proto.Transaction.ContractGenericH\x00R\x0fcontractGeneric\x12X\n" +
+	"\rerc20_approve\x18\x04 \x01(\v21.hdwallet.ethereum.proto.Transaction.ERC20ApproveH\x00R\ferc20Approve\x12^\n" +
+	"\x0ferc721_transfer\x18\x05 \x01(\v23.hdwallet.ethereum.proto.Transaction.ERC721TransferH\x00R\x0eerc721Transfer\x12a\n" +
+	"\x10erc1155_transfer\x18\x06 \x01(\v24.hdwallet.ethereum.proto.Transaction.ERC1155TransferH\x00R\x0ferc1155Transfer\x12V\n" +
+	"\x11sc_wallet_execute\x18\a \x01(\v2(.hdwallet.ethereum.proto.SCWalletExecuteH\x00R\x0fscWalletExecute\x12P\n" +
+	"\x0fsc_wallet_batch\x18\b \x01(\v2&.hdwallet.ethereum.proto.SCWalletBatchH\x00R\rscWalletBatch\x1a6\n" +
 	"\bTransfer\x12\x16\n" +
 	"\x06amount\x18\x01 \x01(\fR\x06amount\x12\x12\n" +
 	"\x04data\x18\x02 \x01(\fR\x04data\x1a7\n" +
@@ -722,7 +1488,20 @@ const file_txproto_ethereum_ethereum_proto_rawDesc = "" +
 	"\x06amount\x18\x02 \x01(\fR\x06amount\x1a=\n" +
 	"\x0fContractGeneric\x12\x16\n" +
 	"\x06amount\x18\x01 \x01(\fR\x06amount\x12\x12\n" +
-	"\x04data\x18\x02 \x01(\fR\x04dataB\x13\n" +
+	"\x04data\x18\x02 \x01(\fR\x04data\x1a@\n" +
+	"\fERC20Approve\x12\x18\n" +
+	"\aspender\x18\x01 \x01(\tR\aspender\x12\x16\n" +
+	"\x06amount\x18\x02 \x01(\fR\x06amount\x1aO\n" +
+	"\x0eERC721Transfer\x12\x12\n" +
+	"\x04from\x18\x01 \x01(\tR\x04from\x12\x0e\n" +
+	"\x02to\x18\x02 \x01(\tR\x02to\x12\x19\n" +
+	"\btoken_id\x18\x03 \x01(\fR\atokenId\x1az\n" +
+	"\x0fERC1155Transfer\x12\x12\n" +
+	"\x04from\x18\x01 \x01(\tR\x04from\x12\x0e\n" +
+	"\x02to\x18\x02 \x01(\tR\x02to\x12\x19\n" +
+	"\btoken_id\x18\x03 \x01(\fR\atokenId\x12\x14\n" +
+	"\x05value\x18\x04 \x01(\fR\x05value\x12\x12\n" +
+	"\x04data\x18\x05 \x01(\fR\x04dataB\x13\n" +
 	"\x11transaction_oneof\"C\n" +
 	"\x06Access\x12\x18\n" +
 	"\aaddress\x18\x01 \x01(\tR\aaddress\x12\x1f\n" +
@@ -734,7 +1513,41 @@ const file_txproto_ethereum_ethereum_proto_rawDesc = "" +
 	"\x05nonce\x18\x03 \x01(\x04R\x05nonce\x12\x19\n" +
 	"\by_parity\x18\x04 \x01(\rR\ayParity\x12\f\n" +
 	"\x01r\x18\x05 \x01(\fR\x01r\x12\f\n" +
-	"\x01s\x18\x06 \x01(\fR\x01s\"\xda\x04\n" +
+	"\x01s\x18\x06 \x01(\fR\x01s\"\xff\x01\n" +
+	"\x11UserOperationV0_6\x12\x1f\n" +
+	"\ventry_point\x18\x01 \x01(\tR\n" +
+	"entryPoint\x12\x1b\n" +
+	"\tinit_code\x18\x02 \x01(\fR\binitCode\x12\x16\n" +
+	"\x06sender\x18\x03 \x01(\tR\x06sender\x120\n" +
+	"\x14pre_verification_gas\x18\x04 \x01(\fR\x12preVerificationGas\x124\n" +
+	"\x16verification_gas_limit\x18\x05 \x01(\fR\x14verificationGasLimit\x12,\n" +
+	"\x12paymaster_and_data\x18\x06 \x01(\fR\x10paymasterAndData\"\xbd\x03\n" +
+	"\x11UserOperationV0_7\x12\x1f\n" +
+	"\ventry_point\x18\x01 \x01(\tR\n" +
+	"entryPoint\x12\x18\n" +
+	"\afactory\x18\x02 \x01(\tR\afactory\x12!\n" +
+	"\ffactory_data\x18\x03 \x01(\fR\vfactoryData\x12\x16\n" +
+	"\x06sender\x18\x04 \x01(\tR\x06sender\x120\n" +
+	"\x14pre_verification_gas\x18\x05 \x01(\fR\x12preVerificationGas\x124\n" +
+	"\x16verification_gas_limit\x18\x06 \x01(\fR\x14verificationGasLimit\x12\x1c\n" +
+	"\tpaymaster\x18\a \x01(\tR\tpaymaster\x12G\n" +
+	" paymaster_verification_gas_limit\x18\b \x01(\fR\x1dpaymasterVerificationGasLimit\x12<\n" +
+	"\x1bpaymaster_post_op_gas_limit\x18\t \x01(\fR\x17paymasterPostOpGasLimit\x12%\n" +
+	"\x0epaymaster_data\x18\n" +
+	" \x01(\fR\rpaymasterData\"Y\n" +
+	"\vBatchedCall\x12\x18\n" +
+	"\aaddress\x18\x01 \x01(\tR\aaddress\x12\x16\n" +
+	"\x06amount\x18\x02 \x01(\fR\x06amount\x12\x18\n" +
+	"\apayload\x18\x03 \x01(\fR\apayload\"\xcb\x01\n" +
+	"\x0fSCWalletExecute\x12F\n" +
+	"\vtransaction\x18\x01 \x01(\v2$.hdwallet.ethereum.proto.TransactionR\vtransaction\x12F\n" +
+	"\vwallet_type\x18\x02 \x01(\x0e2%.hdwallet.ethereum.proto.SCWalletTypeR\n" +
+	"walletType\x12(\n" +
+	"\x10inner_to_address\x18\x03 \x01(\tR\x0einnerToAddress\"\x93\x01\n" +
+	"\rSCWalletBatch\x12:\n" +
+	"\x05calls\x18\x01 \x03(\v2$.hdwallet.ethereum.proto.BatchedCallR\x05calls\x12F\n" +
+	"\vwallet_type\x18\x02 \x01(\x0e2%.hdwallet.ethereum.proto.SCWalletTypeR\n" +
+	"walletType\"\x88\x06\n" +
 	"\fSigningInput\x12\x19\n" +
 	"\bchain_id\x18\x01 \x01(\fR\achainId\x12\x14\n" +
 	"\x05nonce\x18\x02 \x01(\fR\x05nonce\x12\x17\n" +
@@ -751,7 +1564,9 @@ const file_txproto_ethereum_ethereum_proto_rawDesc = "" +
 	"accessList\x12.\n" +
 	"\x14max_fee_per_blob_gas\x18\v \x01(\fR\x10maxFeePerBlobGas\x122\n" +
 	"\x15blob_versioned_hashes\x18\f \x03(\fR\x13blobVersionedHashes\x12X\n" +
-	"\x12authorization_list\x18\r \x03(\v2).hdwallet.ethereum.proto.EthAuthorizationR\x11authorizationList\"\x9f\x01\n" +
+	"\x12authorization_list\x18\r \x03(\v2).hdwallet.ethereum.proto.EthAuthorizationR\x11authorizationList\x12Q\n" +
+	"\x0euser_operation\x18\x0e \x01(\v2*.hdwallet.ethereum.proto.UserOperationV0_6R\ruserOperation\x12Y\n" +
+	"\x13user_operation_v0_7\x18\x0f \x01(\v2*.hdwallet.ethereum.proto.UserOperationV0_7R\x10userOperationV07\"\x9f\x01\n" +
 	"\rSigningOutput\x12\x18\n" +
 	"\aencoded\x18\x01 \x01(\fR\aencoded\x12\f\n" +
 	"\x01r\x18\x02 \x01(\fR\x01r\x12\f\n" +
@@ -760,7 +1575,11 @@ const file_txproto_ethereum_ethereum_proto_rawDesc = "" +
 	"\vencoded_hex\x18\x05 \x01(\tR\n" +
 	"encodedHex\x12\x14\n" +
 	"\x05error\x18\x06 \x01(\tR\x05error\x12\x13\n" +
-	"\x05tx_id\x18\a \x01(\tR\x04txIdB3Z1github.com/ranjbar-dev/hd-wallet/txproto/ethereumb\x06proto3"
+	"\x05tx_id\x18\a \x01(\tR\x04txId*<\n" +
+	"\fSCWalletType\x12\x15\n" +
+	"\x11SC_SIMPLE_ACCOUNT\x10\x00\x12\f\n" +
+	"\bBIZ_4337\x10\x01\x12\a\n" +
+	"\x03BIZ\x10\x02B3Z1github.com/ranjbar-dev/hd-wallet/txproto/ethereumb\x06proto3"
 
 var (
 	file_txproto_ethereum_ethereum_proto_rawDescOnce sync.Once
@@ -774,29 +1593,50 @@ func file_txproto_ethereum_ethereum_proto_rawDescGZIP() []byte {
 	return file_txproto_ethereum_ethereum_proto_rawDescData
 }
 
-var file_txproto_ethereum_ethereum_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
+var file_txproto_ethereum_ethereum_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_txproto_ethereum_ethereum_proto_msgTypes = make([]protoimpl.MessageInfo, 16)
 var file_txproto_ethereum_ethereum_proto_goTypes = []any{
-	(*Transaction)(nil),                 // 0: hdwallet.ethereum.proto.Transaction
-	(*Access)(nil),                      // 1: hdwallet.ethereum.proto.Access
-	(*EthAuthorization)(nil),            // 2: hdwallet.ethereum.proto.EthAuthorization
-	(*SigningInput)(nil),                // 3: hdwallet.ethereum.proto.SigningInput
-	(*SigningOutput)(nil),               // 4: hdwallet.ethereum.proto.SigningOutput
-	(*Transaction_Transfer)(nil),        // 5: hdwallet.ethereum.proto.Transaction.Transfer
-	(*Transaction_ERC20Transfer)(nil),   // 6: hdwallet.ethereum.proto.Transaction.ERC20Transfer
-	(*Transaction_ContractGeneric)(nil), // 7: hdwallet.ethereum.proto.Transaction.ContractGeneric
+	(SCWalletType)(0),                   // 0: hdwallet.ethereum.proto.SCWalletType
+	(*Transaction)(nil),                 // 1: hdwallet.ethereum.proto.Transaction
+	(*Access)(nil),                      // 2: hdwallet.ethereum.proto.Access
+	(*EthAuthorization)(nil),            // 3: hdwallet.ethereum.proto.EthAuthorization
+	(*UserOperationV0_6)(nil),           // 4: hdwallet.ethereum.proto.UserOperationV0_6
+	(*UserOperationV0_7)(nil),           // 5: hdwallet.ethereum.proto.UserOperationV0_7
+	(*BatchedCall)(nil),                 // 6: hdwallet.ethereum.proto.BatchedCall
+	(*SCWalletExecute)(nil),             // 7: hdwallet.ethereum.proto.SCWalletExecute
+	(*SCWalletBatch)(nil),               // 8: hdwallet.ethereum.proto.SCWalletBatch
+	(*SigningInput)(nil),                // 9: hdwallet.ethereum.proto.SigningInput
+	(*SigningOutput)(nil),               // 10: hdwallet.ethereum.proto.SigningOutput
+	(*Transaction_Transfer)(nil),        // 11: hdwallet.ethereum.proto.Transaction.Transfer
+	(*Transaction_ERC20Transfer)(nil),   // 12: hdwallet.ethereum.proto.Transaction.ERC20Transfer
+	(*Transaction_ContractGeneric)(nil), // 13: hdwallet.ethereum.proto.Transaction.ContractGeneric
+	(*Transaction_ERC20Approve)(nil),    // 14: hdwallet.ethereum.proto.Transaction.ERC20Approve
+	(*Transaction_ERC721Transfer)(nil),  // 15: hdwallet.ethereum.proto.Transaction.ERC721Transfer
+	(*Transaction_ERC1155Transfer)(nil), // 16: hdwallet.ethereum.proto.Transaction.ERC1155Transfer
 }
 var file_txproto_ethereum_ethereum_proto_depIdxs = []int32{
-	5, // 0: hdwallet.ethereum.proto.Transaction.transfer:type_name -> hdwallet.ethereum.proto.Transaction.Transfer
-	6, // 1: hdwallet.ethereum.proto.Transaction.erc20_transfer:type_name -> hdwallet.ethereum.proto.Transaction.ERC20Transfer
-	7, // 2: hdwallet.ethereum.proto.Transaction.contract_generic:type_name -> hdwallet.ethereum.proto.Transaction.ContractGeneric
-	0, // 3: hdwallet.ethereum.proto.SigningInput.transaction:type_name -> hdwallet.ethereum.proto.Transaction
-	1, // 4: hdwallet.ethereum.proto.SigningInput.access_list:type_name -> hdwallet.ethereum.proto.Access
-	2, // 5: hdwallet.ethereum.proto.SigningInput.authorization_list:type_name -> hdwallet.ethereum.proto.EthAuthorization
-	6, // [6:6] is the sub-list for method output_type
-	6, // [6:6] is the sub-list for method input_type
-	6, // [6:6] is the sub-list for extension type_name
-	6, // [6:6] is the sub-list for extension extendee
-	0, // [0:6] is the sub-list for field type_name
+	11, // 0: hdwallet.ethereum.proto.Transaction.transfer:type_name -> hdwallet.ethereum.proto.Transaction.Transfer
+	12, // 1: hdwallet.ethereum.proto.Transaction.erc20_transfer:type_name -> hdwallet.ethereum.proto.Transaction.ERC20Transfer
+	13, // 2: hdwallet.ethereum.proto.Transaction.contract_generic:type_name -> hdwallet.ethereum.proto.Transaction.ContractGeneric
+	14, // 3: hdwallet.ethereum.proto.Transaction.erc20_approve:type_name -> hdwallet.ethereum.proto.Transaction.ERC20Approve
+	15, // 4: hdwallet.ethereum.proto.Transaction.erc721_transfer:type_name -> hdwallet.ethereum.proto.Transaction.ERC721Transfer
+	16, // 5: hdwallet.ethereum.proto.Transaction.erc1155_transfer:type_name -> hdwallet.ethereum.proto.Transaction.ERC1155Transfer
+	7,  // 6: hdwallet.ethereum.proto.Transaction.sc_wallet_execute:type_name -> hdwallet.ethereum.proto.SCWalletExecute
+	8,  // 7: hdwallet.ethereum.proto.Transaction.sc_wallet_batch:type_name -> hdwallet.ethereum.proto.SCWalletBatch
+	1,  // 8: hdwallet.ethereum.proto.SCWalletExecute.transaction:type_name -> hdwallet.ethereum.proto.Transaction
+	0,  // 9: hdwallet.ethereum.proto.SCWalletExecute.wallet_type:type_name -> hdwallet.ethereum.proto.SCWalletType
+	6,  // 10: hdwallet.ethereum.proto.SCWalletBatch.calls:type_name -> hdwallet.ethereum.proto.BatchedCall
+	0,  // 11: hdwallet.ethereum.proto.SCWalletBatch.wallet_type:type_name -> hdwallet.ethereum.proto.SCWalletType
+	1,  // 12: hdwallet.ethereum.proto.SigningInput.transaction:type_name -> hdwallet.ethereum.proto.Transaction
+	2,  // 13: hdwallet.ethereum.proto.SigningInput.access_list:type_name -> hdwallet.ethereum.proto.Access
+	3,  // 14: hdwallet.ethereum.proto.SigningInput.authorization_list:type_name -> hdwallet.ethereum.proto.EthAuthorization
+	4,  // 15: hdwallet.ethereum.proto.SigningInput.user_operation:type_name -> hdwallet.ethereum.proto.UserOperationV0_6
+	5,  // 16: hdwallet.ethereum.proto.SigningInput.user_operation_v0_7:type_name -> hdwallet.ethereum.proto.UserOperationV0_7
+	17, // [17:17] is the sub-list for method output_type
+	17, // [17:17] is the sub-list for method input_type
+	17, // [17:17] is the sub-list for extension type_name
+	17, // [17:17] is the sub-list for extension extendee
+	0,  // [0:17] is the sub-list for field type_name
 }
 
 func init() { file_txproto_ethereum_ethereum_proto_init() }
@@ -808,19 +1648,25 @@ func file_txproto_ethereum_ethereum_proto_init() {
 		(*Transaction_Transfer_)(nil),
 		(*Transaction_Erc20Transfer)(nil),
 		(*Transaction_ContractGeneric_)(nil),
+		(*Transaction_Erc20Approve)(nil),
+		(*Transaction_Erc721Transfer)(nil),
+		(*Transaction_Erc1155Transfer)(nil),
+		(*Transaction_ScWalletExecute)(nil),
+		(*Transaction_ScWalletBatch)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_txproto_ethereum_ethereum_proto_rawDesc), len(file_txproto_ethereum_ethereum_proto_rawDesc)),
-			NumEnums:      0,
-			NumMessages:   8,
+			NumEnums:      1,
+			NumMessages:   16,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
 		GoTypes:           file_txproto_ethereum_ethereum_proto_goTypes,
 		DependencyIndexes: file_txproto_ethereum_ethereum_proto_depIdxs,
+		EnumInfos:         file_txproto_ethereum_ethereum_proto_enumTypes,
 		MessageInfos:      file_txproto_ethereum_ethereum_proto_msgTypes,
 	}.Build()
 	File_txproto_ethereum_ethereum_proto = out.File
