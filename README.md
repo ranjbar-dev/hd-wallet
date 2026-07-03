@@ -11,6 +11,8 @@ Generate a BIP-39 mnemonic (or import one) and derive receive addresses for **98
 
 > **36 chains are explicitly not supported** by this library (no address derivation, no validation, nothing). See [Unsupported chains](#unsupported-chains).
 
+> 🤖 **Using an LLM / AI coding assistant?** Point it at [`llms.txt`](llms.txt) — a self-contained context file summarizing the project scope, full API surface, workflows, and troubleshooting notes.
+
 Sensitive material (the mnemonic and derived seed) is **never** held as a plain Go string or a long-lived byte slice. It lives in encrypted, page-locked [memguard](https://github.com/awnumar/memguard) enclaves and is decrypted only for the microseconds of a single derivation.
 
 ---

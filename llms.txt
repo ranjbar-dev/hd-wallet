@@ -1,0 +1,82 @@
+# hd-wallet
+
+> `github.com/ranjbar-dev/hd-wallet` — a Trust Wallet–compatible, security-focused HD wallet library for Go (single package `hdwallet`, MIT). It derives addresses for 98 networks (secp256k1 + ed25519), signs digests/messages/transactions, and seals all secrets in memguard enclaves. Correctness is fund-critical: every address encoder, derivation path, and transaction signer is pinned to an authoritative test vector (Trust Wallet Core, BIP/SLIP specs, or a btcd/go-ethereum oracle). Requires Go 1.24+.
+
+## Scope
+
+- **Does:** BIP-39 mnemonic generation/import (12–24 words, optional passphrase), BIP-32/SLIP-0010 derivation, addresses for 98 networks (same paths/formats as Trust Wallet — seeds are interchangeable), raw signing, EVM message signing (EIP-191/EIP-712), non-EVM message signing (Bitcoin/Solana/Cosmos ADR-36/Tron TIP-191), protobuf transaction signing for 10 families, signed-tx decoding, address validation/parsing, PSBT (v0+v2), Bitcoin multisig, Ordinals/BRC-20, amount formatting, WIF/xpub/BIP-38/BIP-85 key tooling.
+- **Does NOT:** network I/O of any kind (no RPC, no broadcast, no fee fetching — the caller supplies all chain state), token lists/decimals lookup, and **no raw private-key `[]byte` getter** (by design; secrets leave only via wiped callbacks or memguard buffers).
+- **36 chains are deliberately unsupported** (no derivation, no validation, nothing): ADA, AE, BCD, BTG, CANTO, CKB, DOT, EGLD, EOS, FIL, FIO, FLUX, GRS, HBAR, ICX, IOST, KIN, KMD, KSM, NEAR, NEBL, NEO, ONE, ONT, ROSE, STRK, SUI, WAVES, WAX, XEC, XNO, XTZ, XVG, ZEN, ZETA (Cosmos side), ZIL. ZETAEVM, ZEC, and BCH ARE supported. Re-adding any requires an authoritative test vector.
+- Networks: 94 secp256k1 (BTC-family/UTXO, ~47 EVM, TRX, XRP, ~30 Cosmos) + 4 ed25519 (SOL, XLM, ALGO, APTOS). `SupportedCoins()` returns the live list; `CoinInfo(symbol)` gives curve/path/decimals. `Symbol` is a typed string enum with an exported constant per network (`hdwallet.BTC`, `hdwallet.ETH`, …).
+
+## Security model (the non-negotiable invariants)
+
+- Mnemonic and seed live only in **memguard enclaves** (encrypted in RAM, page-locked against swap, auto-wiped). Never a Go `string` or exported field. `w.Destroy()` wipes a wallet; `defer memguard.Purge()` at exit.
+- Private keys are derived, used, and **wiped inside the package** per operation (`withPrivateKey` in `derive.go` is the single materialization point). Export paths (`WithPrivateKey`, `PrivateKey`, `WithMnemonic`, `Mnemonic`, `WIF`, `WithAccountXPrv`) hand out only wiped-on-return callbacks or memguard `LockedBuffer`s.
+- ECDSA signing is RFC 6979 deterministic with canonical low-S; recoverable (65-byte R‖S‖V) available on secp256k1.
+- Mnemonic entry security ladder: `FromMnemonicBuffer(*memguard.LockedBuffer)` (strongest, zero-copy) > `FromMnemonicBytes([]byte)` (wiped inside) > `FromMnemonic(string)` (weakest — strings can't be wiped; avoid for real funds).
+
+## Core API (package `hdwallet`)
+
+Construction: `NewHDWallet()` (fresh 12-word), `NewHDWalletWithWordCount(12|15|18|21|24)`, `NewHDWalletWithEntropy(bits)`, `GenerateMnemonic()`, `FromMnemonic` / `FromMnemonicBytes` / `FromMnemonicBuffer`, `FromMnemonicWithPassphrase` / `FromMnemonicBufferWithPassphrase`, `FromPrivateKeyBytes(key, curve)` / `FromPrivateKeyBuffer` (key-only wallet, index 0 only), `FromWIF`, `WatchOnlyFromXPub(xpub, symbol) → *WatchWallet` (address derivation, no seed).
+
+Addresses: `Address(symbol)`, `AddressIndex(symbol, i)`, `AddressAt(symbol, account, change, index)`, `AddressPath(symbol, "m/44'/…")`, `AllAddresses()` / `AllAddressesAt(i)` (every network, one seed-open), `AddressRange(symbol, start, count)` (gap-limit scans), `BitcoinAddress(symbol, P2PKH|P2SHP2WPKH|P2WPKH|P2TR, account, change, index)` (BIP-44/49/84/86 for BTC/LTC; registry default is native SegWit).
+
+Raw signing: `Sign(symbol, data)`, `SignIndex`, `SignAt`, `SignPath`; `PublicKey` / `PublicKeyIndex` / `PublicKeyAt` / `PublicKeyPath`. Returns `*Signature` with `.Bytes()` (64-byte R‖S or ed25519), `.Recoverable()` (65-byte R‖S‖V, secp256k1 only), `.DER()`. Verify without secrets: `Verify(curve, pub, data, sig)`, `VerifySignature(symbol, pub, data, sig)`.
+**Critical rule (hashing asymmetry):** secp256k1 chains sign a **32-byte digest** — the caller pre-hashes with the chain's hash (keccak256 for ETH/TRX, double-SHA256 for BTC, SHA-256 for Cosmos). Non-32-byte input → `ErrInvalidDigest`. ed25519 chains (SOL/XLM/ALGO/APTOS) sign the **raw message** (EdDSA hashes internally). This is cryptography, not style.
+
+Message signing: `SignMessage(symbol, i, msg)` (EIP-191 personal_sign → 65-byte r‖s‖v), `SignTypedData(symbol, i, typedDataJSON)` (EIP-712), `SignBitcoinMessage` (→ base64), `SignSolanaMessage` (→ base58), `SignCosmosADR36(symbol, i, signerAddr, msg)` (→ base64), `SignTronMessage` (TIP-191 → 0x-hex), `SignRawMessage` (chain-neutral). Each has a `Verify…` counterpart; plus `RecoverEthereumAddress`, `VerifyEthereumMessage`, `VerifyEthereumTypedData`.
+
+Transaction signing: `SignTransaction(symbol, index, *SigningInput) (proto.Message, error)` — builds, signs, serializes a broadcast-ready raw tx; **never broadcasts**. Protos live under `github.com/ranjbar-dev/hd-wallet/txproto/{ethereum,tron,ripple,cosmos,solana,bitcoin,stellar,algorand,aptos}`. Families and coverage:
+- **EVM** (all registered EVM chains): legacy/EIP-2930/1559/4844 (blob)/7702 (set-code) via `tx_mode` (`EthTxModeLegacy`=0, `EthTxModeEIP2930`=1, `EthTxModeEIP1559`=2, `EthTxModeEIP4844`=3, `EthTxModeEIP7702`=4, `EthTxModeUserOp`=5, `EthTxModeUserOpV07`=6); native/ERC-20/arbitrary call/deploy; structured intents `ERC20Approve`, `ERC721Transfer`, `ERC1155Transfer`; ERC-4337 UserOperation v0.6 + v0.7; smart-wallet `SCWalletExecute`/`SCWalletBatch` (SC_SIMPLE_ACCOUNT, BIZ_4337, BIZ).
+- **Tron:** TRX/TRC-10/TRC-20 transfers, `TriggerSmartContract`, freeze/unfreeze/withdraw/vote, and `raw_json` mode (signs a node-built tx; verifies sha256(raw_data)==txID).
+- **Cosmos:** MsgSend/Delegate/Undelegate/WithdrawReward + multi-message, all standard chains; **EVMOS** and **INJ** via ethermint eth_secp256k1 (keccak256 SignDoc, chain-specific pubkey type URL, INJ uncompressed key).
+- **XRP:** Payment. **Solana:** system transfer + SPL TransferChecked. **Stellar:** Payment. **Algorand:** Payment. **Aptos:** entry-function transfer.
+- **Bitcoin/UTXO:** BTC/LTC across P2PKH, P2SH-P2WPKH, P2WPKH, Taproot key-path; SIGHASH ALL/NONE/SINGLE/ANYONECANPAY; coin selection (`input_selector`, `byte_fee`, dust policy, send-all, RBF, lock_time, multi-recipient, OP_RETURN, multi-index inputs); altcoins DOGE/DASH/BCH (FORKID)/ZEC (ZIP-243) and DGB/SYS/VIA/STRAX/QTUM/RVN/FIRO/MONA/PIVX. `PlanBitcoinTx` previews selection/fee/change without a seed; `EstimateBitcoinFee`/`EstimateTxVsize`/`CPFPFee` estimate.
+- **Bitcoin extras:** PSBT v0 `BuildPSBT`/`SignPSBT`/`FinalizePSBT`/`ExtractPSBTTx` + v2 `…PSBTV2` variants (v2 segwit-only); multisig m-of-n P2SH/P2WSH `BuildMultisigRedeemScript`, `MultisigP2SHAddress`/`MultisigP2WSHAddress`, `BuildMultisigPSBT`→`SignMultisigPSBT`→`FinalizeMultisigPSBT`→`ExtractMultisigTx` (BIP-67 sorted); Ordinals/BRC-20 `BuildInscriptionScript`, `BuildBRC20TransferBody`, `BuildBRC20Commit`→`SignBRC20Reveal`; Babylon staking output builders.
+
+Post-signing: `BroadcastPayload(symbol, out)` → the exact string each RPC expects (EVM 0x-hex, BTC raw hex, Solana/Cosmos base64, Tron JSON, XRP uppercase hex); `TransactionID(out)` → canonical txid. Decoders (reverse direction, "what am I signing"): `DecodeEthereumTx`, `DecodeBitcoinTx`, `DecodeCosmosTx`, `DecodeSolanaTx`, `DecodeTronTx`, `DecodeRippleTx` → typed `*…TxFields`; malformed input → `ErrTxDecode`, never panics. EVM log helpers: `DecodeEthLog`, `ERC20TransferLog`, `ERC721TransferLog`.
+
+EVM utilities (standalone, no wallet needed): `EncodeRLP`/`DecodeRLP`, `ABIEncode`/`ABIDecode`/`ABIFunctionSelector`, `EthereumPersonalMessageHash`, `EIP712Hash`, `ParseContractABI(jsonABI)` → selector-keyed map, `DecodeContractCall(abi, calldata)` → function name + typed params, `GetFunctionSignature(fn)`, `CREATE2Address(deployer, salt, initCode)`, `Keccak256`, ERC-20/721/1155 calldata builders, `UserOperationHash`.
+
+Key tooling: `WithPrivateKey(symbol, i, fn)` / `PrivateKey(symbol, i)` (memguard buffer, caller Destroys), `WithMnemonic(fn)` / `Mnemonic()`, `WIF`/`WithWIF`, `AccountXPub(symbol, account)` / `WithAccountXPrv` (secp256k1 only), BIP-38 `EncryptWIF(symbol, i, passphrase)` / `DecryptWIF(encrypted, passphrase, fn)`, BIP-85 `BIP85Mnemonic(wordCount, i, fn)` / `BIP85Entropy(appPath, i, length, fn)`.
+
+Helpers: amounts `FormatAmount`/`ParseAmount` (native decimals from registry), `FormatUnits`/`ParseUnits` (caller-supplied token decimals), `NativeDecimals` — big.Int/decimal-string only, no float. Validation `IsValidAddress`, `ValidateAddress`, `ParseAddress`, `AddressFromPublicKey`. Mnemonic UX `WordlistPrefix`, `IsValidWord`, `SuggestFinalWords`, `MnemonicStrength`, `ValidateMnemonic`/`ValidateMnemonicBytes`. Fee/gas heuristics `EthGasLimit`, `CosmosGasLimit`, `CosmosMinFee`, `SolanaComputeUnits`, `SolanaComputeBudgetInstructions`, `TronBandwidth`, `TronEnergy`.
+
+Providers (`providers.go`): `NonceProvider`, `UTXOProvider`, `FeeOracle`, `RecentBlockhashProvider`, `Broadcaster` — interfaces the **caller** implements around their node/indexer; the library never calls them. `doc.go` has the authoritative per-family matrix of which `SigningInput` field comes from which RPC call.
+
+## Documentation
+
+- [README.md](README.md): install, quick start, full API tables, supported-network tables, security guidance, release process.
+- [doc.go](doc.go): godoc package overview + the per-family `SigningInput` field → data-source → provider matrix (what to fetch from the chain before signing).
+- [CLAUDE.md](CLAUDE.md): architecture deep-dive (secret isolation, registry, derivation/signing layers, every feature file), how correctness is proven, unsupported-chains rationale, conventions.
+- [SECURITY.md](SECURITY.md): vulnerability reporting (private advisory, not a public issue).
+- [example_test.go](example_test.go) and [example_providers_test.go](example_providers_test.go): runnable examples, including provider wiring.
+- [cmd/hdwallet/main.go](cmd/hdwallet/main.go): demo CLI (`go run ./cmd/hdwallet -mnemonic "…"` prints every chain's address).
+- pkg.go.dev: https://pkg.go.dev/github.com/ranjbar-dev/hd-wallet
+
+## Workflows
+
+- Install: `go get github.com/ranjbar-dev/hd-wallet`; import as `hdwallet "github.com/ranjbar-dev/hd-wallet"`.
+- Typical flow: construct wallet → `defer w.Destroy()` (+ `defer memguard.Purge()` at exit) → derive/validate addresses → fetch chain state yourself (nonce/UTXOs/fees/blockhash) → fill the family's protobuf `SigningInput` → `SignTransaction` → `BroadcastPayload` → submit via your own RPC client.
+- Build/test: `go build ./...`; `go test -race -cover ./...` (target ≥80%); single test `go test -race -run TestSignSecp256k1 .`; examples `go test -run 'Example' -count=1 .`; fuzz `go test -run '^$' -fuzz '^FuzzParsePath$' -fuzztime 10s .`; lint `gofmt -l .` (must be empty), `go vet ./...`, `golangci-lint run ./...` (v2 config), `gosec -quiet ./...`, `govulncheck ./...`. No Makefile — run the Go toolchain directly.
+- Canonical test mnemonic everywhere: the BIP-39 vector `abandon abandon … about` (holds no funds).
+- Adding a network: one row in `registry.go` (`{Name, Symbol, Curve, Path, Encode}`) + an encoder (`encodeETH` reusable for EVM, `cosmosEncoder("<hrp>")` for Cosmos) + a Trust Wallet Core address vector in `encoders_test.go`. **No fund-critical address or signature ships without an authoritative vector.**
+- After editing any `txproto/*.proto`: regenerate with `protoc --go_out=. --go_opt=paths=source_relative txproto/<family>/<family>.proto`, then `go build ./...`.
+- Releases are automated: every push to `main` that passes CI auto-tags and publishes. Commit-message markers control the bump: `[major]`, `[minor]`, default patch, `[skip release]` for none. The module path in go.mod must stay `github.com/ranjbar-dev/hd-wallet`.
+
+## Troubleshooting
+
+Sentinel errors (use `errors.Is`): `ErrInvalidMnemonic`, `ErrInvalidWordCount`, `ErrUnsupportedCoin`, `ErrDestroyed` (wallet used after `Destroy()`), `ErrInvalidDigest` (ECDSA input not 32 bytes — pre-hash first), `ErrInvalidPrivateKey`, `ErrCurveMismatch` (coin's curve ≠ imported key's curve), `ErrKeyOnlyWallet` / `ErrKeyOnlyIndex` (mnemonic-only ops / index>0 on a key-only wallet), `ErrPathArity` (coin path isn't 5-element BIP-44 — use `AddressPath`/`SignPath`), `ErrExtKeyUnsupportedCurve` (xpub/xprv/watch-only are secp256k1-only), `ErrTxUnsupported` (no tx family for that coin — derive/validate only; sign manually via `Sign` on the chain's sighash), `ErrTxInput`, `ErrTxDecode`, `ErrInvalidAddress`, `ErrInvalidWIF`, `ErrNoTxID`, `ErrNotRecoverable`, `ErrNegativeAmount`, `ErrInvalidAmount`, `ErrRLPCanonical`/`ErrRLPTruncated`/`ErrRLPTrailing`, `ErrABIType`/`ErrABIValue`/`ErrABIDecode`, `ErrEIP712`, `ErrEthSignature`.
+
+Common pitfalls:
+- "Signature invalid on-chain" for a secp256k1 chain usually means you passed a raw message instead of the chain's 32-byte digest (or used the wrong hash). ed25519 is the opposite: pass the raw message, never a pre-hash.
+- `SignTransaction` output that a node rejects: you likely omitted caller-supplied chain state (nonce/sequence, chain_id, recent_blockhash, UTXO scripts, block header for Tron). The library fills nothing from the network.
+- There is deliberately no way to get a private key as a plain `[]byte`/`string`; requests to add one are rejected by design. Use `WithPrivateKey`/`PrivateKey` (memguard).
+- Token amounts: the registry only knows native-coin decimals; ERC-20/SPL/TRC-20 decimals are yours to supply via `FormatUnits`/`ParseUnits`.
+- `govulncheck` false positive on stdlib: run with Go ≥1.24.4.
+- gosec: `#nosec G115` must be the first token after `//` or it is silently ignored and CI fails.
+- ZETA (Cosmos side) is unsupported; ZETAEVM is the supported ZetaChain symbol.
+- Watch-only (`WatchOnlyFromXPub`) derives addresses only — it cannot sign.
+- The `_oracle/` directory is a separate Go module (test-vector generation via go-ethereum); it is intentionally excluded from the library build and dependency graph.
+- Always verify before sending funds: import the mnemonic into Trust Wallet and confirm the address for any chain you intend to use with real value.
