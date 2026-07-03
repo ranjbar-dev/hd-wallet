@@ -92,13 +92,7 @@ func TestCoinFamily(t *testing.T) {
 		{SOL, "solana"},
 		{TRX, "tron"},
 		{XRP, "ripple"},
-		{ADA, "cardano"},
 		{XLM, "stellar"},
-		{NEAR, "near"},
-		{DOT, "polkadot"},
-		{XTZ, "tezos"},
-		{XNO, "nano"},
-		{WAVES, "waves"},
 	}
 	for _, c := range cases {
 		if got := CoinFamily(c.sym); got != c.want {
@@ -168,27 +162,6 @@ func TestAllAddressResultsMnemonic(t *testing.T) {
 	}
 }
 
-func TestAllAddressResultsKeyOnlyADA(t *testing.T) {
-	key := make([]byte, 32)
-	for i := range key {
-		key[i] = 0x01
-	}
-	w, err := FromPrivateKeyBytes(key, Secp256k1)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer w.Destroy()
-
-	results := w.AllAddressResults(0)
-	adaResult, ok := results[ADA]
-	if !ok {
-		t.Fatal("ADA not in AllAddressResults")
-	}
-	if !errors.Is(adaResult.Err, ErrNoEntropy) {
-		t.Fatalf("AllAddressResults[ADA].Err = %v, want ErrNoEntropy", adaResult.Err)
-	}
-}
-
 // --- Feature 4: ValidateSigningInput ---
 
 func TestValidateSigningInputEVM(t *testing.T) {
@@ -217,9 +190,9 @@ func TestValidateSigningInputEVM(t *testing.T) {
 }
 
 func TestValidateSigningInputUnsupported(t *testing.T) {
-	err := ValidateSigningInput(ADA, &txeth.SigningInput{})
+	err := ValidateSigningInput(Symbol("NOPE"), &txeth.SigningInput{})
 	if !errors.Is(err, ErrTxUnsupported) {
-		t.Fatalf("ValidateSigningInput(ADA): want ErrTxUnsupported, got %v", err)
+		t.Fatalf("ValidateSigningInput(NOPE): want ErrTxUnsupported, got %v", err)
 	}
 }
 
@@ -231,9 +204,9 @@ func TestErrTxUnsupportedWrapped(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer w.Destroy()
-	_, txErr := w.SignTransaction(ADA, 0, &txeth.SigningInput{})
+	_, txErr := w.SignTransaction(Symbol("NOPE"), 0, &txeth.SigningInput{})
 	if !errors.Is(txErr, ErrTxUnsupported) {
-		t.Fatalf("SignTransaction(ADA): want errors.Is ErrTxUnsupported, got %v", txErr)
+		t.Fatalf("SignTransaction(NOPE): want errors.Is ErrTxUnsupported, got %v", txErr)
 	}
 }
 
@@ -267,12 +240,6 @@ func TestSupportedTxCoins(t *testing.T) {
 		if !inSet(want) {
 			t.Errorf("SupportedTxCoins missing %s", want)
 		}
-	}
-	if inSet(XNO) {
-		t.Error("SupportedTxCoins should not contain XNO (Nano, no tx signing)")
-	}
-	if inSet(ADA) {
-		t.Error("SupportedTxCoins should not contain ADA (no tx signing yet)")
 	}
 }
 

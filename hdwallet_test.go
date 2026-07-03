@@ -40,28 +40,11 @@ func TestEndToEndKnownAddresses(t *testing.T) {
 
 // TestEndToEndTrustWalletMnemonicVectors verifies the full mnemonic->seed->
 // derive->encode pipeline against Trust Wallet Core's own HDWalletTests (which
-// use a real mnemonic, empty passphrase). NEAR exercises the ed25519/SLIP-0010
-// path; the Cosmos case exercises secp256k1 bech32. Together with the BTC/ETH
-// anchors and the SLIP-0010 nist256p1 spec test, every curve family has an
-// end-to-end Trust Wallet vector.
+// use a real mnemonic, empty passphrase). The Cosmos case exercises secp256k1
+// bech32. Together with the BTC/ETH anchors and the SLIP-0010 ed25519 spec
+// test, the secp256k1 and ed25519 curve families each have an end-to-end
+// Trust Wallet vector.
 func TestEndToEndTrustWalletMnemonicVectors(t *testing.T) {
-	t.Run("NEAR-ed25519", func(t *testing.T) {
-		// NEAR address is hex(public key); empty passphrase.
-		w, err := FromMnemonic("owner erupt swamp room swift final allow unaware hint identify figure cotton")
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer w.Destroy()
-		got, err := w.Address("NEAR")
-		if err != nil {
-			t.Fatal(err)
-		}
-		const want = "b8d5df25047841365008f30fb6b30dd820e9a84d869f05623d114e96831f2fbf"
-		if got != want {
-			t.Errorf("NEAR = %s, want %s", got, want)
-		}
-	})
-
 	t.Run("Cosmos-secp256k1", func(t *testing.T) {
 		// Stargaze (Cosmos SDK, hrp "stars"), m/44'/118'/0'/0/0, empty passphrase.
 		w, err := FromMnemonic("rude segment two fury you output manual volcano sugar draft elite fame")

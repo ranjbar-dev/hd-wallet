@@ -5,7 +5,7 @@ package hdwallet
 // The registry holds ONE encoder per coin (BTC/LTC default to native SegWit,
 // BIP-84). Real wallets need the other standard Bitcoin script formats too, so
 // this file adds them without touching the registry (which would change the
-// AllAddresses set / the 129-network count): legacy P2PKH (BIP-44), nested
+// AllAddresses set / the registered-network count): legacy P2PKH (BIP-44), nested
 // SegWit P2SH-P2WPKH (BIP-49), native SegWit P2WPKH (BIP-84, the registry
 // default), and Taproot P2TR (BIP-86, bech32m). They are reached through the
 // BitcoinAddress method, which derives at the type's standard BIP purpose path
@@ -91,13 +91,6 @@ type btcParams struct {
 // proven by the btcd oracle (tx_utxo_altcoins_test.go). Per-coin version bytes are
 // taken from Trust Wallet Core's registry.json (and the chains' own
 // chainparams for STRAX).
-//
-// Deliberately NOT here (would emit a wrong, fund-losing signature with this
-// engine):
-//   - GRS (Groestlcoin): base58Hasher is groestl512d and its sighash is not the
-//     standard double-SHA256, so btcd cannot model it and it needs a Groestl dep.
-//   - BTG (Bitcoin Gold): signs with a BIP-143 SIGHASH_FORKID (ForkID 79) that the
-//     standard Bitcoin P2WPKH sighash does not match.
 var btcAddrParams = map[Symbol]btcParams{
 	BTC: {hrp: "bc", p2pkhVer: 0x00, p2shVer: 0x05},
 	LTC: {hrp: "ltc", p2pkhVer: 0x30, p2shVer: 0x32},

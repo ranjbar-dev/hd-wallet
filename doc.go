@@ -1,7 +1,9 @@
 // Package hdwallet is a Trust Wallet–compatible hierarchical-deterministic (HD)
-// wallet library for Go. It derives addresses and signs transactions for 130+
-// networks across six elliptic curves, with secrets sealed in memguard enclaves
-// so private keys are never exposed to the caller.
+// wallet library for Go. It derives addresses and signs transactions for 98
+// networks across two elliptic curves (secp256k1 and ed25519), with secrets
+// sealed in memguard enclaves so private keys are never exposed to the caller.
+// See the package README's "Unsupported chains" section for networks this
+// library deliberately does not support.
 //
 // # What you must supply (the network seam)
 //

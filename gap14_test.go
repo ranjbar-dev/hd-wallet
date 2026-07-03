@@ -8,31 +8,6 @@ import (
 
 const gap14Mnemonic = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about"
 
-// TestCardanoLen verifies that a grotesquely long input is rejected immediately
-// without hanging in bech32.DecodeNoLimit.
-func TestCardanoLen(t *testing.T) {
-	long := strings.Repeat("a", 10000)
-	if IsValidAddress(ADA, long) {
-		t.Fatal("IsValidAddress(ADA, 10000-char string) should be false")
-	}
-	err := ValidateAddress(ADA, long)
-	if !errors.Is(err, ErrInvalidAddress) {
-		t.Fatalf("ValidateAddress(ADA, long): want ErrInvalidAddress, got %v", err)
-	}
-}
-
-// TestCKBLen verifies the same for CKB (the other DecodeNoLimit caller).
-func TestCKBLen(t *testing.T) {
-	long := strings.Repeat("c", 10000)
-	if IsValidAddress(CKB, long) {
-		t.Fatal("IsValidAddress(CKB, 10000-char string) should be false")
-	}
-	err := ValidateAddress(CKB, long)
-	if !errors.Is(err, ErrInvalidAddress) {
-		t.Fatalf("ValidateAddress(CKB, long): want ErrInvalidAddress, got %v", err)
-	}
-}
-
 // TestSignNil verifies that Sign and SignIndex return ErrInvalidDigest (not panic)
 // when called with nil data.
 func TestSignNil(t *testing.T) {
@@ -68,7 +43,6 @@ func TestParseBounds(t *testing.T) {
 		{ETH, "0x000000000000000000000000000000000000000"}, // 41 chars, 1 short
 		{SOL, "1"},           // way too short for base58->32 bytes
 		{ATOM, "cosmos1abc"}, // too short payload
-		{ADA, "addr1abc"},    // too short payload
 	}
 	for _, c := range cases {
 		_, err := ParseAddress(c.sym, c.addr)

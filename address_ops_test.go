@@ -1,7 +1,6 @@
 package hdwallet
 
 import (
-	"strings"
 	"testing"
 )
 
@@ -165,14 +164,5 @@ func TestAddressFromPayload(t *testing.T) {
 	// Wrong payload length.
 	if _, err := AddressFromPayload(ETH, make([]byte, 5)); err == nil {
 		t.Error("AddressFromPayload(ETH, 5 bytes) expected ErrInvalidAddress")
-	}
-}
-
-// TestCardanoAddressLengthGuard verifies that a pathologically long input is
-// rejected without running the unbounded bech32 decoder.
-func TestCardanoAddressLengthGuard(t *testing.T) {
-	long := strings.Repeat("a", 1000)
-	if IsValidAddress(ADA, long) {
-		t.Error("IsValidAddress(ADA, 1000-char string) = true, want false")
 	}
 }

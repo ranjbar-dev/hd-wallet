@@ -10,12 +10,6 @@ package hdwallet
 // Coins proven here:
 //   - native-SegWit (standard BIP-143 P2WPKH): DGB, SYS, VIA, STRAX
 //   - legacy-P2PKH  (standard double-SHA256):  QTUM, RVN, FIRO, MONA, PIVX
-//
-// Deliberately deferred (would emit a wrong, fund-losing signature with this
-// engine; see the notes in address_types.go / tx_utxo.go / tx_families.go):
-//   - GRS (Groestl-512 sighash), BTG (BIP-143 SIGHASH_FORKID 79),
-//     BCD ("sbtc"-tagged sighash), XEC (BCH-style FORKID path not wired here),
-//     KMD/ZEN/FLUX (Zcash ZIP-143/243 sighash), NEBL/XVG (PoS nTime field).
 
 import (
 	"bytes"
@@ -313,23 +307,6 @@ func TestUtxoAltcoinTxVersion(t *testing.T) {
 	for _, symbol := range legacyAltcoins {
 		if v := btcTxVersion(symbol); v != 1 {
 			t.Errorf("btcTxVersion(%s) = %d, want 1", symbol, v)
-		}
-	}
-}
-
-// TestUtxoAltcoinsDeferred is the safety guard: the coins we could NOT prove must
-// NOT be routed to the Bitcoin signer (they would produce wrong, fund-losing
-// signatures).
-func TestUtxoAltcoinsDeferred(t *testing.T) {
-	for _, symbol := range []Symbol{GRS, BTG, BCD, XEC, KMD, ZEN, FLUX, NEBL, XVG} {
-		if _, ok := utxoTxChains[symbol]; ok {
-			t.Errorf("%s is in utxoTxChains but its sighash is not proven — must stay deferred", symbol)
-		}
-		if got := txFamilyOf(symbol); got != familyNone {
-			t.Errorf("txFamilyOf(%s) = %v, want familyNone (deferred)", symbol, got)
-		}
-		if bitcoinTxSupported(symbol) {
-			t.Errorf("bitcoinTxSupported(%s) = true, want false (deferred)", symbol)
 		}
 	}
 }

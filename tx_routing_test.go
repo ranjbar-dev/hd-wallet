@@ -2,7 +2,6 @@ package hdwallet
 
 import (
 	"bytes"
-	"errors"
 	"regexp"
 	"testing"
 
@@ -38,13 +37,6 @@ func TestTxFamilyRouting(t *testing.T) {
 	for _, s := range []Symbol{EVMOS, INJ} {
 		if got := txFamilyOf(s); got != familyCosmosEthermint {
 			t.Errorf("txFamilyOf(%s) = %v, want familyCosmosEthermint", s, got)
-		}
-	}
-	// The remaining ethermint-keyed chains stay unrouted pending their own vectors
-	// (each uses a chain-specific pubkey type URL; see tx_families.go).
-	for _, s := range []Symbol{CANTO, ZETA, ONE} {
-		if got := txFamilyOf(s); got != familyNone {
-			t.Errorf("txFamilyOf(%s) = %v, want familyNone (ethermint, no vector yet)", s, got)
 		}
 	}
 	// Single-chain families.
@@ -125,23 +117,6 @@ func TestCosmosRoutingProducesIdenticalBytes(t *testing.T) {
 	}
 }
 
-// TestEthermintCosmosUnsupported confirms the deliberate exclusion: signing for an
-// ethermint-keyed Cosmos chain that is NOT yet vector-verified returns
-// ErrTxUnsupported rather than emitting an on-chain-invalid (wrong pubkey type)
-// transaction. EVMOS and INJ are wired (each pinned to its TWC vector); CANTO
-// remains roadmap, so it stands in for the still-excluded set here.
-func TestEthermintCosmosUnsupported(t *testing.T) {
-	w := canonicalSeedWallet(t)
-	defer w.Destroy()
-	_, err := w.SignTransaction(CANTO, 0, &txcosmos.SigningInput{
-		Fee:  &txcosmos.Fee{Amount: "1", Denom: "acanto", Gas: 1},
-		Send: &txcosmos.SendCoinsMessage{FromAddress: "a", ToAddress: "b", Amount: "1", Denom: "acanto"},
-	})
-	if !errors.Is(err, ErrTxUnsupported) {
-		t.Fatalf("CANTO SignTransaction error = %v, want ErrTxUnsupported", err)
-	}
-}
-
 // TestEVMRoutingDriftGuard catches a future registry EVM chain (0x-address) that
 // is not added to evmTxChains: every coin whose index-0 address is a 0x + 40-hex
 // Ethereum address must route to the EVM family.
@@ -162,7 +137,7 @@ func TestEVMRoutingDriftGuard(t *testing.T) {
 			// Ethermint-keyed Cosmos chains also produce 0x... addresses but are
 			// intentionally not EVM-tx chains; skip those.
 			switch s {
-			case EVMOS, INJ, CANTO, ZETA, ONE:
+			case EVMOS, INJ:
 				continue
 			}
 			t.Errorf("%s has an Ethereum-format address (%s) but is not in evmTxChains", s, addr)

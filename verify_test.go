@@ -22,7 +22,6 @@ func TestVerifySignaturePerCurve(t *testing.T) {
 	}{
 		{BTC, digest[:]}, // secp256k1
 		{ETH, digest[:]}, // secp256k1 (keccak chain)
-		{NEO, digest[:]}, // nist256p1
 		{SOL, msg},       // ed25519
 	}
 	for _, tc := range cases {
@@ -99,7 +98,7 @@ func TestVerifySignatureInvalidDigest(t *testing.T) {
 	w := signTestWallet(t)
 	defer w.Destroy()
 
-	for _, sym := range []Symbol{BTC, ETH, NEO} {
+	for _, sym := range []Symbol{BTC, ETH} {
 		pub, _ := w.PublicKeyIndex(sym, 0)
 		ok, err := VerifySignature(sym, pub, []byte("too short"), &Signature{})
 		if ok {

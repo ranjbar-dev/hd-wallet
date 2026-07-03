@@ -12,36 +12,8 @@ type Curve int
 const (
 	// Secp256k1 covers Bitcoin-style, Ethereum/EVM, Cosmos, XRP and Tron.
 	Secp256k1 Curve = iota
-	// Ed25519 covers Solana, Stellar, Polkadot, NEAR, Algorand, Sui, Aptos, Tezos.
+	// Ed25519 covers Solana, Stellar, Algorand, Aptos.
 	Ed25519
-	// Nist256p1 (NIST P-256) covers NEO.
-	Nist256p1
-	// Ed25519Blake2bNano is the ed25519 EdDSA variant Nano uses: identical to
-	// ed25519 except the internal 512-bit hash is BLAKE2b-512 instead of SHA-512
-	// (both for key expansion and the R/challenge hashes). SLIP-0010 ed25519
-	// derivation is used for the leaf private key. Matches Trust Wallet Core's
-	// TWCurveED25519Blake2bNano.
-	Ed25519Blake2bNano
-	// Curve25519 is the public-key/signing scheme Waves uses: the leaf private
-	// key is derived via SLIP-0010 ed25519, the public key is the X25519
-	// (Montgomery) point, and signing is ed25519 with the public-key sign bit
-	// folded into S[63] (the "curve25519_sign" construction). Matches Trust
-	// Wallet Core's TWCurveCurve25519.
-	Curve25519
-	// Ed25519ExtendedCardano is BIP32-Ed25519 (CIP-1852) with 64-byte extended
-	// private keys, as used by Cardano. The master secret comes from the Icarus
-	// (PBKDF2-HMAC-SHA512 over the BIP-39 entropy) scheme. Matches Trust Wallet
-	// Core's TWCurveED25519ExtendedCardano.
-	Ed25519ExtendedCardano
-	// Starkex is the STARK curve (StarkNet/StarkEx), EIP-2645 key derivation with
-	// grinding, RFC-6979 deterministic ECDSA. Matches Trust Wallet Core's
-	// TWCurveStarkex.
-	Starkex
-	// Sr25519 is schnorrkel/ristretto255, the native key scheme for
-	// Polkadot/Kusama. NOTE: this is NOT part of Trust Wallet Core's curve set
-	// (TWC uses plain ed25519 for Polkadot); it is provided here as an additional
-	// curve for native substrate signing.
-	Sr25519
 )
 
 // String returns the SLIP-0010/BIP-32 name of the curve for diagnostics. The
@@ -52,18 +24,6 @@ func (c Curve) String() string {
 		return "secp256k1"
 	case Ed25519:
 		return "ed25519"
-	case Nist256p1:
-		return "nist256p1"
-	case Ed25519Blake2bNano:
-		return "ed25519-blake2b-nano"
-	case Curve25519:
-		return "curve25519"
-	case Ed25519ExtendedCardano:
-		return "ed25519-cardano-seed"
-	case Starkex:
-		return "starkex"
-	case Sr25519:
-		return "sr25519"
 	default:
 		return "unknown(" + strconv.Itoa(int(c)) + ")"
 	}
@@ -93,37 +53,20 @@ const (
 	ZEC  Symbol = "ZEC"
 
 	// secp256k1 — additional UTXO chains.
-	GRS   Symbol = "GRS"   // Groestlcoin (segwit)
 	DGB   Symbol = "DGB"   // DigiByte (segwit)
-	BTG   Symbol = "BTG"   // Bitcoin Gold (segwit)
 	SYS   Symbol = "SYS"   // Syscoin (segwit)
 	VIA   Symbol = "VIA"   // Viacoin (segwit)
 	QTUM  Symbol = "QTUM"  // Qtum (base58check P2PKH)
 	RVN   Symbol = "RVN"   // Ravencoin (base58check P2PKH)
-	KMD   Symbol = "KMD"   // Komodo (base58check P2PKH)
 	FIRO  Symbol = "FIRO"  // Firo (base58check P2PKH)
 	MONA  Symbol = "MONA"  // MonaCoin (base58check P2PKH)
-	XVG   Symbol = "XVG"   // Verge (base58check P2PKH)
 	PIVX  Symbol = "PIVX"  // PIVX (base58check P2PKH)
-	NEBL  Symbol = "NEBL"  // Neblio (base58check P2PKH)
 	STRAX Symbol = "STRAX" // Stratis (segwit)
-	ZEN   Symbol = "ZEN"   // Horizen (base58check 2-byte)
-	BCD   Symbol = "BCD"   // Bitcoin Diamond (base58check P2PKH)
-	XEC   Symbol = "XEC"   // eCash (CashAddr)
-	FLUX  Symbol = "FLUX"  // Flux/Zelcash (base58check 2-byte)
 
 	// secp256k1 — account-based / keccak.
 	ETH Symbol = "ETH"
 	TRX Symbol = "TRX"
 	XRP Symbol = "XRP"
-
-	// secp256k1 — EOS-family public-key strings.
-	EOS Symbol = "EOS"
-	WAX Symbol = "WAX"
-	FIO Symbol = "FIO"
-
-	// secp256k1 — Filecoin (f1 base32 address).
-	FIL Symbol = "FIL"
 
 	// secp256k1 — EVM chains (same key & address format as Ethereum).
 	BNB   Symbol = "BNB"
@@ -210,47 +153,12 @@ const (
 	// secp256k1 — Cosmos chains with EVM-style keys (keccak address, bech32).
 	EVMOS Symbol = "EVMOS"
 	INJ   Symbol = "INJ"
-	CANTO Symbol = "CANTO"
-	ZETA  Symbol = "ZETA"
-	ONE   Symbol = "ONE"
 
 	// ed25519 (SLIP-0010).
 	SOL   Symbol = "SOL"
 	XLM   Symbol = "XLM"
-	DOT   Symbol = "DOT"
-	KSM   Symbol = "KSM"
-	NEAR  Symbol = "NEAR"
 	ALGO  Symbol = "ALGO"
-	SUI   Symbol = "SUI"
 	APTOS Symbol = "APTOS"
-	XTZ   Symbol = "XTZ"
-
-	// ed25519 (SLIP-0010) — additional chains.
-	EGLD Symbol = "EGLD" // MultiversX (bech32 of pubkey)
-	IOST Symbol = "IOST" // IOST (base58 of pubkey)
-	HBAR Symbol = "HBAR" // Hedera (0.0.<DER-encoded pubkey hex>)
-	ROSE Symbol = "ROSE" // Oasis (bech32 of context-hashed pubkey)
-	KIN  Symbol = "KIN"  // Kin (Stellar strkey)
-	AE   Symbol = "AE"   // Aeternity (ak_ base58check)
-
-	// nist256p1 (SLIP-0010).
-	NEO Symbol = "NEO"
-	ONT Symbol = "ONT" // Ontology (same NEO-style address)
-
-	// new-curve chains (SLIP-0010 ed25519 leaf key, chain-specific signing).
-	XNO   Symbol = "XNO"   // Nano (ed25519-blake2b)
-	WAVES Symbol = "WAVES" // Waves (curve25519)
-
-	// ed25519-extended (BIP32-Ed25519 / CIP-1852).
-	ADA Symbol = "ADA" // Cardano (Icarus master from BIP-39 entropy; addr1 base address)
-
-	// secp256k1 — additional account-based chains.
-	ICX Symbol = "ICX" // ICON (hx-prefixed keccak20)
-	CKB Symbol = "CKB" // Nervos CKB (bech32m full address, RFC 0021)
-	ZIL Symbol = "ZIL" // Zilliqa (bech32 of sha256(pubkey)[12:])
-
-	// Starkex curve — StarkNet.
-	STRK Symbol = "STRK" // StarkNet (EIP-2645, STARK curve; address = "0x"+hex(pub_x))
 
 	// Roadmap — Trust Wallet Core networks intentionally NOT registered yet (each
 	// needs more than a vector-verified encoder over the standard seed path, so
@@ -260,8 +168,13 @@ const (
 	//   - NULS, Nebulas, Nimiq, Polymesh, Pactus, Internet Computer,
 	//     Everscale, Aion: address scheme not yet reproduced against the TWC
 	//     expected vector; omitted until vector-verified.
-	//   - Zilliqa tx: Schnorr-on-secp256k1 signing variant (RFC 6979 nonce,
-	//     Pedersen hash) differs from BIP-340; not yet implemented.
+	//
+	// Unsupported — see the "Unsupported chains" section in README.md/CLAUDE.md
+	// for the 36 chains removed from this library entirely (ADA, AE, BCD, BTG,
+	// CANTO, CKB, DOT, EGLD, EOS, FIL, FIO, FLUX, GRS, HBAR, ICX, IOST, KIN, KMD,
+	// KSM, NEAR, NEBL, NEO, ONE, ONT, ROSE, STRK, SUI, WAVES, WAX, XEC, XNO, XTZ,
+	// XVG, ZEN, ZETA, ZIL). A PR re-adding any of them must follow the
+	// test-vector rule below.
 )
 
 // Coin describes a supported network: its curve, BIP-32 derivation path, and the
@@ -322,44 +235,21 @@ var coins = map[Symbol]Coin{
 
 	// ---- secp256k1 : additional UTXO chains ----
 	// Native SegWit (P2WPKH, bech32) chains — witness program is hash160(pub).
-	"GRS": {"Groestlcoin", "GRS", Secp256k1, "m/84'/17'/0'/0/0", encodeGRS, 8, 0},
 	"DGB": {"DigiByte", "DGB", Secp256k1, "m/84'/20'/0'/0/0", encodeDGB, 8, 0},
-	"BTG": {"Bitcoin Gold", "BTG", Secp256k1, "m/84'/156'/0'/0/0", encodeBTG, 8, 0},
 	"SYS": {"Syscoin", "SYS", Secp256k1, "m/84'/57'/0'/0/0", encodeSYS, 8, 0},
 	"VIA": {"Viacoin", "VIA", Secp256k1, "m/84'/14'/0'/0/0", encodeVIA, 8, 0},
 	// Legacy P2PKH (base58check, single version byte).
 	"QTUM":  {"Qtum", "QTUM", Secp256k1, "m/44'/2301'/0'/0/0", encodeQTUM, 8, 0},
 	"RVN":   {"Ravencoin", "RVN", Secp256k1, "m/44'/175'/0'/0/0", encodeRVN, 8, 0},
-	"KMD":   {"Komodo", "KMD", Secp256k1, "m/44'/141'/0'/0/0", encodeKMD, 8, 0},
 	"FIRO":  {"Firo", "FIRO", Secp256k1, "m/44'/136'/0'/0/0", encodeFIRO, 8, 0},
 	"MONA":  {"MonaCoin", "MONA", Secp256k1, "m/44'/22'/0'/0/0", encodeMONA, 8, 0},
-	"XVG":   {"Verge", "XVG", Secp256k1, "m/44'/77'/0'/0/0", encodeXVG, 6, 0}, // TWC: 6 decimals
 	"PIVX":  {"PIVX", "PIVX", Secp256k1, "m/44'/119'/0'/0/0", encodePIVX, 8, 0},
-	"NEBL":  {"Neblio", "NEBL", Secp256k1, "m/44'/146'/0'/0/0", encodeNEBL, 8, 0},
 	"STRAX": {"Stratis", "STRAX", Secp256k1, "m/84'/105105'/0'/0/0", encodeStratis, 8, 0},
-	"ZEN":   {"Horizen", "ZEN", Secp256k1, "m/44'/121'/0'/0/0", encodeZEN, 8, 0},
-	"BCD":   {"Bitcoin Diamond", "BCD", Secp256k1, "m/44'/999'/0'/0/0", encodeBCD, 7, 0}, // TWC: 7 decimals
-	"XEC":   {"eCash", "XEC", Secp256k1, "m/44'/899'/0'/0/0", encodeECash, 2, 0},         // TWC: 2 decimals
-	"FLUX":  {"Flux", "FLUX", Secp256k1, "m/44'/19167'/0'/0/0", encodeFLUX, 8, 0},
 
 	// ---- secp256k1 : account-based / keccak ----
 	"ETH": {"Ethereum", "ETH", Secp256k1, "m/44'/60'/0'/0/0", encodeETH, 18, 1},
 	"TRX": {"Tron", "TRX", Secp256k1, "m/44'/195'/0'/0/0", encodeTRX, 6, 0},
 	"XRP": {"XRP Ledger", "XRP", Secp256k1, "m/44'/144'/0'/0/0", encodeXRP, 6, 0},
-	// ICON uses the same keccak20 as Ethereum but lowercased with an "hx" prefix.
-	"ICX": {"ICON", "ICX", Secp256k1, "m/44'/60'/0'/0/0", encodeICX, 18, 0},
-	// Nervos CKB: bech32m full-address (RFC 0021), blake2b-160 args.
-	"CKB": {"Nervos CKB", "CKB", Secp256k1, "m/44'/309'/0'/0/0", encodeCKB, 8, 0},
-	// Zilliqa: bech32("zil", sha256(compressed_pub)[12:]).
-	"ZIL": {"Zilliqa", "ZIL", Secp256k1, "m/44'/313'/0'/0/0", encodeZIL, 12, 0},
-
-	// ---- secp256k1 : EOS-family public-key strings ----
-	"EOS": {"EOS", "EOS", Secp256k1, "m/44'/194'/0'/0/0", eosEncoder("EOS"), 4, 0},
-	"WAX": {"WAX", "WAX", Secp256k1, "m/44'/194'/0'/0/0", eosEncoder("EOS"), 4, 0},
-	"FIO": {"FIO", "FIO", Secp256k1, "m/44'/235'/0'/0/0", eosEncoder("FIO"), 9, 0},
-
-	// ---- secp256k1 : Filecoin ----
-	"FIL": {"Filecoin", "FIL", Secp256k1, "m/44'/461'/0'/0/0", encodeFIL, 18, 0},
 
 	// ---- secp256k1 : EVM chains (same key & address format as Ethereum) ----
 	"BNB":   {"BNB Smart Chain", "BNB", Secp256k1, "m/44'/60'/0'/0/0", encodeETH, 18, 56},
@@ -450,52 +340,12 @@ var coins = map[Symbol]Coin{
 	// evmTxChains), so ChainID stays 0.
 	"EVMOS": {"Evmos", "EVMOS", Secp256k1, "m/44'/60'/0'/0/0", cosmosEvmEncoder("evmos"), 18, 0},
 	"INJ":   {"Injective", "INJ", Secp256k1, "m/44'/60'/0'/0/0", cosmosEvmEncoder("inj"), 18, 0},
-	"CANTO": {"Canto", "CANTO", Secp256k1, "m/44'/60'/0'/0/0", cosmosEvmEncoder("canto"), 18, 0},
-	"ZETA":  {"ZetaChain", "ZETA", Secp256k1, "m/44'/60'/0'/0/0", cosmosEvmEncoder("zeta"), 18, 0},
-	"ONE":   {"Harmony", "ONE", Secp256k1, "m/44'/1023'/0'/0/0", cosmosEvmEncoder("one"), 18, 0},
 
 	// ---- ed25519 (SLIP-0010) ----
 	"SOL":   {"Solana", "SOL", Ed25519, "m/44'/501'/0'", encodeSOL, 9, 0},
 	"XLM":   {"Stellar", "XLM", Ed25519, "m/44'/148'/0'", encodeXLM, 7, 0},
-	"DOT":   {"Polkadot", "DOT", Ed25519, "m/44'/354'/0'/0'/0'", ss58Encoder(0), 10, 0},
-	"KSM":   {"Kusama", "KSM", Ed25519, "m/44'/434'/0'/0'/0'", ss58Encoder(2), 12, 0},
-	"NEAR":  {"NEAR", "NEAR", Ed25519, "m/44'/397'/0'", encodeNEAR, 24, 0},
 	"ALGO":  {"Algorand", "ALGO", Ed25519, "m/44'/283'/0'/0'/0'", encodeALGO, 6, 0},
-	"SUI":   {"Sui", "SUI", Ed25519, "m/44'/784'/0'/0'/0'", encodeSUI, 9, 0},
 	"APTOS": {"Aptos", "APTOS", Ed25519, "m/44'/637'/0'/0'/0'", encodeAPTOS, 8, 0},
-	"XTZ":   {"Tezos", "XTZ", Ed25519, "m/44'/1729'/0'/0'", encodeXTZ, 6, 0},
-
-	// ---- ed25519 (SLIP-0010) : additional chains ----
-	"EGLD": {"MultiversX", "EGLD", Ed25519, "m/44'/508'/0'/0'/0'", encodeEGLD, 18, 0},
-	"IOST": {"IOST", "IOST", Ed25519, "m/44'/899'/0'/0'/0'", encodeSOL, 2, 0}, // TWC: 2 decimals
-	"HBAR": {"Hedera", "HBAR", Ed25519, "m/44'/3030'/0'/0'/0'", encodeHBAR, 8, 0},
-	"ROSE": {"Oasis", "ROSE", Ed25519, "m/44'/474'/0'", encodeOasis, 9, 0},
-	"KIN":  {"Kin", "KIN", Ed25519, "m/44'/2017'/0'", encodeXLM, 5, 0}, // TWC: 5 decimals
-	"AE":   {"Aeternity", "AE", Ed25519, "m/44'/457'/0'/0'/0'", encodeAE, 18, 0},
-
-	// ---- nist256p1 (SLIP-0010) ----
-	"NEO": {"NEO", "NEO", Nist256p1, "m/44'/888'/0'/0/0", encodeNEO, 8, 0},
-	// Ontology's native ONT token is indivisible (0 decimals) per TWC's registry.
-	"ONT": {"Ontology", "ONT", Nist256p1, "m/44'/1024'/0'/0/0", encodeNEO, 0, 0},
-
-	// ---- new-curve chains ----
-	"XNO":   {"Nano", "XNO", Ed25519Blake2bNano, "m/44'/165'/0'", encodeNano, 30, 0}, // TWC: 30 decimals
-	"WAVES": {"Waves", "WAVES", Curve25519, "m/44'/5741564'/0'/0'/0'", encodeWaves, 8, 0},
-
-	// ---- Starkex (EIP-2645) ----
-	// StarkNet: secp256k1 leaf key derived from m/2645'/…, then EIP-2645 grind to
-	// a valid STARK scalar. Address is the x-coordinate of d*G on the STARK curve,
-	// 0x-prefixed 64-char hex. EIP-2645 path per Trust Wallet Core StarkNet config.
-	// Vector anchor: TWC sign key 0139fe4d… → pub 02c5dbad… verified in curves_twc_test.go.
-	"STRK": {"StarkNet", "STRK", Starkex, "m/2645'/1195502025'/1148870696'/0'/0'/0", encodeStarknet, 18, 0},
-
-	// ---- ed25519-extended (BIP32-Ed25519 / CIP-1852) ----
-	// Cardano derives its Icarus master key from the BIP-39 ENTROPY (not the seed),
-	// so Address/Sign route through the entropy enclave (see hdwallet.go); a wallet
-	// with no mnemonic returns ErrNoEntropy. The encoder receives the 128-byte
-	// ED25519Cardano public key (payment + staking) and builds the addr1 base
-	// address.
-	"ADA": {"Cardano", "ADA", Ed25519ExtendedCardano, "m/1852'/1815'/0'/0/0", encodeCardano, 6, 0},
 }
 
 // init registers address validators for the networks added beyond the original
@@ -516,34 +366,17 @@ func init() {
 	// Ronin is an Ethereum address with a "ronin:" prefix instead of "0x".
 	validators[RONIN] = roninValidator(RONIN)
 
-	// EOS-family public-key strings.
-	validators[EOS] = eosValidator("EOS", EOS)
-	validators[WAX] = eosValidator("EOS", WAX)
-	validators[FIO] = eosValidator("FIO", FIO)
-
-	// Filecoin f1 address.
-	validators[FIL] = filValidator(FIL)
-
 	// Additional native-SegWit UTXO chains (witness program is hash160).
-	validators[GRS] = segwitValidator("grs", GRS)
 	validators[DGB] = segwitValidator("dgb", DGB)
-	validators[BTG] = segwitValidator("btg", BTG)
 	validators[SYS] = segwitValidator("sys", SYS)
 	validators[VIA] = segwitValidator("via", VIA)
 	// Additional legacy P2PKH (base58check, single version byte) chains.
 	validators[QTUM] = base58CheckValidator1(0x3a, QTUM)
 	validators[RVN] = base58CheckValidator1(0x3c, RVN)
-	validators[KMD] = base58CheckValidator1(0x3c, KMD)
 	validators[FIRO] = base58CheckValidator1(0x52, FIRO)
 	validators[MONA] = base58CheckValidator1(0x32, MONA)
-	validators[XVG] = base58CheckValidator1(0x1e, XVG)
 	validators[PIVX] = base58CheckValidator1(0x1e, PIVX)
-	validators[NEBL] = base58CheckValidator1(0x35, NEBL)
 	validators[STRAX] = segwitValidator("strax", STRAX)
-	validators[ZEN] = base58CheckValidatorN(base58BTC, []byte{0x20, 0x89}, ZEN)
-	validators[BCD] = base58CheckValidator1(0x00, BCD)
-	validators[FLUX] = base58CheckValidatorN(base58BTC, []byte{0x1c, 0xb8}, FLUX)
-	validators[XEC] = cashAddrValidator("ecash", XEC)
 
 	// Additional Cosmos SDK chains (bech32, 20-byte payload, per-HRP). The same
 	// validator handles both hash160-key and EVM-key chains since both encode a
@@ -555,35 +388,16 @@ func init() {
 		MARS: "mars", UMEE: "umee", COREUM: "core", QSR: "quasar", XPRT: "persistence",
 		AKT: "akash", NOBLE: "noble", SEI: "sei", DYDX: "dydx", BLZ: "bluzelle",
 		CRYPTOORG: "cro",
-		EVMOS:     "evmos", INJ: "inj", CANTO: "canto", ZETA: "zeta", ONE: "one",
+		EVMOS:     "evmos", INJ: "inj",
 	}
 	for sym, hrp := range cosmos {
 		validators[sym] = cosmosValidator(hrp, sym)
 	}
-
-	// Additional ed25519 / nist256p1 chains.
-	validators[EGLD] = egldValidator(EGLD)             // bech32("erd", 32-byte pubkey)
-	validators[IOST] = solValidator(IOST)              // base58 32-byte pubkey
-	validators[HBAR] = hbarValidator(HBAR)             // 0.0.<DER hex>
-	validators[ROSE] = oasisValidator(ROSE)            // bech32("oasis", ...)
-	validators[KIN] = strkeyValidator(6<<3, KIN)       // Stellar strkey (version 'G')
-	validators[AE] = aeValidator(AE)                   // ak_ base58check
-	validators[ONT] = base58CheckValidator1(0x17, ONT) // same NEO-style address
-
-	// New-curve chains.
-	validators[XNO] = nanoValidator(XNO)      // nano_ base32 + blake2b-40 checksum
-	validators[WAVES] = wavesValidator(WAVES) // base58 secure-hash address
-
-	// Cardano base address (bech32 "addr", 57-byte payload, mainnet header 0x01).
-	validators[ADA] = cardanoValidator(ADA)
-
-	// StarkNet: "0x" + hex of 32-byte STARK public-key x-coordinate.
-	validators[STRK] = starknetValidator(STRK)
 }
 
 // CoinFamily returns a string identifying the chain family for routing purposes.
-// Values: "evm", "cosmos", "bitcoin-utxo", "solana", "tron", "ripple", "cardano",
-// "stellar", "near", "polkadot", "tezos", "nano", "waves", or "unknown".
+// Values: "evm", "cosmos", "bitcoin-utxo", "solana", "tron", "ripple", "stellar",
+// or "unknown".
 func CoinFamily(symbol Symbol) string {
 	if _, ok := evmTxChains[symbol]; ok {
 		return "evm"
@@ -604,22 +418,8 @@ func CoinFamily(symbol Symbol) string {
 		return "ripple"
 	case SOL:
 		return "solana"
-	case XLM, KIN:
+	case XLM:
 		return "stellar"
-	case NEAR:
-		return "near"
-	case DOT, KSM:
-		return "polkadot"
-	case XTZ:
-		return "tezos"
-	case XNO:
-		return "nano"
-	case WAVES:
-		return "waves"
-	case ADA:
-		return "cardano"
-	case CANTO, ZETA, ONE:
-		return "cosmos"
 	default:
 		return "unknown"
 	}

@@ -46,17 +46,6 @@ type utxoOutParam struct {
 // version bytes differ — they never enter the signed bytes), so the btcd oracle
 // proves each one byte-for-byte (tx_utxo_altcoins_test.go). Version bytes are
 // from Trust Wallet Core's registry.json.
-//
-// Deliberately NOT here (the engine would emit a wrong, fund-losing signature):
-//   - BCD (Bitcoin Diamond): appends a length-prefixed "sbtc" string to the
-//     sighash preimage for replay protection — not the standard legacy sighash.
-//   - XEC (eCash): a Bitcoin Cash ABC continuation that signs with the BIP-143 +
-//     SIGHASH_FORKID path; that branch lives in tx_bitcoin.go (owned elsewhere)
-//     and currently keys only off BCH, so XEC would fall through to the legacy
-//     sighash and produce an invalid FORKID signature.
-//   - KMD/ZEN/FLUX: Zcash-derived (ZIP-143/ZIP-243 BLAKE2b sighash, Overwinter/
-//     Sapling wire format; ZEN also has a CHECKBLOCKATHEIGHT scriptPubKey suffix).
-//   - NEBL/XVG: Peercoin-style PoS forks with an extra nTime field in the tx.
 var utxoOutParams = map[Symbol]utxoOutParam{
 	DOGE: {p2pkhVer: []byte{0x1e}, p2shVer: []byte{0x16}},
 	DASH: {p2pkhVer: []byte{0x4c}, p2shVer: []byte{0x10}},
@@ -180,9 +169,9 @@ func decodeCashAddrScript(prefix, addr string) ([]byte, error) {
 //
 // A symbol is supported when it is a native-SegWit chain (btcAddrParams: BTC,
 // LTC, DGB, SYS, VIA, STRAX) or one of the legacy/CashAddr chains that decode via
-// utxoOutParams (DOGE, DASH, BCH, QTUM, RVN, KMD, FIRO, MONA, XVG, PIVX, NEBL,
-// ZEN, FLUX). ZEC is also a utxoOutParams entry but is intercepted by signZcashTx
-// before this check, so its membership here is never reached.
+// utxoOutParams (DOGE, DASH, BCH, QTUM, RVN, FIRO, MONA, PIVX). ZEC is also a
+// utxoOutParams entry but is intercepted by signZcashTx before this check, so
+// its membership here is never reached.
 func bitcoinTxSupported(symbol Symbol) bool {
 	if _, ok := btcAddrParams[symbol]; ok { // BTC, LTC, DGB, SYS, VIA, STRAX
 		return true

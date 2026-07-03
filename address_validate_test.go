@@ -19,36 +19,19 @@ var validAddrVectors = map[Symbol]string{
 	DASH: "XsyCV5yojxF4y3bYeEiVYqarvRgsWFELZL",
 	ZEC:  "t1b9xfAk3kZp5Qk3rinDPq7zzLkJGHTChDS",
 	// secp256k1 — additional UTXO chains (segwit and base58check P2PKH)
-	GRS:   "grs1qhkfq3zahaqkkzx5mjnamwjsfpq2jk7z0jsaf3d",
 	DGB:   "dgb1qhkfq3zahaqkkzx5mjnamwjsfpq2jk7z0c69ssz",
-	BTG:   "btg1qhkfq3zahaqkkzx5mjnamwjsfpq2jk7z0eg8day",
 	SYS:   "sys1qhkfq3zahaqkkzx5mjnamwjsfpq2jk7z083sjh7",
 	VIA:   "via1qhkfq3zahaqkkzx5mjnamwjsfpq2jk7z09y9mn2",
 	QTUM:  "QdtLm8ccxhuJFF5zCgikpaghbM3thdaGsW",
 	RVN:   "RSZYjMDCP4q3t7NAFXPPnqEGrMZn971pdB",
-	KMD:   "RSZYjMDCP4q3t7NAFXPPnqEGrMZn971pdB",
 	FIRO:  "aHzpPjmY132KseS4nkiQTbDahTEXqesY89",
 	MONA:  "MRBWtGEKHGCHhmyJ1L4CwaWQZJzM5DnVcs",
-	XVG:   "DNRTC6GZ5evmM7BZWwPqF54fyDqUqULMyu",
 	PIVX:  "DNRTC6GZ5evmM7BZWwPqF54fyDqUqULMyu",
-	NEBL:  "NdCKqb8BQoavA5PZ5b4APxKmSpmBA6yMSi",
 	STRAX: "strax1qhkfq3zahaqkkzx5mjnamwjsfpq2jk7z0rvt20n",
-	ZEN:   "zniNGeFxXRpY6RDGVdfdmbcvcFb1rrLdnFz",
-	BCD:   "1JHMeqKunF2Up6zxnMQGhJu5667BXz98YQ",
-	XEC:   "ecash:qz7eyzytkl5z6cg6nw20hd62pyyp22mcfuywezks2y",
-	FLUX:  "t1b9xfAk3kZp5Qk3rinDPq7zzLkJGHTChDS",
 	// secp256k1 — account / keccak
 	ETH: "0x9d8A62f656a8d1615C1294fd71e9CFb3E4855A4F",
 	TRX: "TQLCsShbQNXMTVCjprY64qZmEA4rBarpQp",
 	XRP: "rJHMeqKu8Ep7Fazx8MQG6JunaafBXz93YQ",
-	ICX: "hx9d8a62f656a8d1615c1294fd71e9cfb3e4855a4f",
-	CKB: "ckb1qzda0cr08m85hc8jlnfp3zer7xulejywt49kt2rr0vthywaa50xwsqfzayeck2k4hlcqu40lwpzv0nqqkqs5lncej05rm",
-	ZIL: "zil1j2cvtd7j9n7fnxfv2r3neucjw8tp4xz9sp07v4",
-	// secp256k1 — EOS-family public-key strings
-	EOS: "EOS5TrYnZP1RkDSUMzBY4GanCy6AP68kCMdkAb5EACkAwkdgRLShz",
-	WAX: "EOS5TrYnZP1RkDSUMzBY4GanCy6AP68kCMdkAb5EACkAwkdgRLShz",
-	FIO: "FIO5TrYnZP1RkDSUMzBY4GanCy6AP68kCMdkAb5EACkAwkdgRLShz",
-	FIL: "f1qsx7qwiojh5duxbxhbqgnlyx5hmpcf7mcz5oxsy",
 	// secp256k1 — EVM (share the Ethereum vector)
 	BNB:   "0x9d8A62f656a8d1615C1294fd71e9CFb3E4855A4F",
 	MATIC: "0x9d8A62f656a8d1615C1294fd71e9CFb3E4855A4F",
@@ -130,40 +113,11 @@ var validAddrVectors = map[Symbol]string{
 	// secp256k1 — Cosmos chains with EVM-style keys (keccak address, bech32)
 	EVMOS: "evmos1nk9x9ajk4rgkzhqjjn7hr6w0k0jg2kj07me7uu",
 	INJ:   "inj1nk9x9ajk4rgkzhqjjn7hr6w0k0jg2kj0knl55v",
-	CANTO: "canto1nk9x9ajk4rgkzhqjjn7hr6w0k0jg2kj0wvfqju",
-	ZETA:  "zeta1nk9x9ajk4rgkzhqjjn7hr6w0k0jg2kj027x9uy",
-	ONE:   "one1nk9x9ajk4rgkzhqjjn7hr6w0k0jg2kj0nmx3dt",
 	// ed25519
 	SOL:   "H4JcMPicKkHcxxDjkyyrLoQj7Kcibd9t815ak4UvTr9M",
 	XLM:   "GDXJHJHWN6GRNOAZXON6XH74ZX6NYFAS5B7642RSJQVJTIPA4ZYUQLEB",
-	DOT:   "16PpFrXrC6Ko3pYcyMAx6gPMp3mFFaxgyYMt4G5brkgNcSz8",
-	KSM:   "Hy8mqcexg5FMwMYnQvzrUvD723qMxDjMRU9HdNCnTsMAypY",
-	NEAR:  "ee93a4f66f8d16b819bb9beb9ffccdfcdc1412e87fee6a324c2a99a1e0e67148",
 	ALGO:  "52J2J5TPRULLQGN3TPVZ77GN7TOBIEXIP7XGUMSMFKM2DYHGOFEOGBP2T4",
-	SUI:   "0x870deb25d5c0a4d7250d52d5cd58dacca2d51eb2a120a979b13384cd52e21e1b",
 	APTOS: "0xce2fd04ac9efa74f17595e5785e847a2399d7e637f5e8179244f76191f653276",
-	XTZ:   "tz1gcEWswVU6dxfNQWbhTgaZrUrNUFwrsT4z",
-	// ed25519 — additional chains
-	EGLD: "erd1a6f6fan035ttsxdmn04ellxdlnwpgyhg0lhx5vjv92v6rc8xw9yq83344f",
-	IOST: "H4JcMPicKkHcxxDjkyyrLoQj7Kcibd9t815ak4UvTr9M",
-	HBAR: "0.0.302a300506032b6570032100ee93a4f66f8d16b819bb9beb9ffccdfcdc1412e87fee6a324c2a99a1e0e67148",
-	ROSE: "oasis1qzw4h3wmyjtrttduqqrs8udggyy2emwdzqmuzwg4",
-	KIN:  "GDXJHJHWN6GRNOAZXON6XH74ZX6NYFAS5B7642RSJQVJTIPA4ZYUQLEB",
-	AE:   "ak_2p5878zbFhxnrm7meL7TmqwtvBaqcBddyp5eGzZbovZ5FeVfcw",
-	// nist256p1
-	NEO: "AeicEjZyiXKgUeSBbYQHxsU1X3V5Buori5",
-	ONT: "AeicEjZyiXKgUeSBbYQHxsU1X3V5Buori5",
-	// new-curve chains
-	XNO:   "nano_1qepdf4k95dhb5gsmhmq3iddqsxiafwkihunm7irn48jdiwdtnn6pe93k3f6",
-	WAVES: "3P2C786D6mBuvyf4WYr6K6Vch5uhi97nBHG",
-	// ed25519-extended (Cardano) — TWC CoinAddressDerivationTests dummy-key base
-	// address; a well-formed mainnet addr1 the validator must accept.
-	ADA: "addr1qxzk4wqhh5qmzas4e26aghcvkz8feju6sa43nghfj5xxsly9d2up00gpk9mptj44630sevywnn9e4pmtrx3wn9gvdp7qjhvjl4",
-	// Starkex — the TWC signing test key (0139fe4d…) public key x-coordinate.
-	// The dummy key 0x4646…46 is above the STARK group order so it cannot be used
-	// directly; this is the address derived from the canonical TWC starkex test key
-	// and is verified byte-for-byte in TestStarknetAddressVector.
-	STRK: "0x02c5dbad71c92a45cc4b40573ae661f8147869a91d57b8d9b8f48c8af7f83159",
 }
 
 // TestValidVectorsCoverRegistry guards that the valid-vector table stays in sync
@@ -247,16 +201,14 @@ func corruptChecksum(addr string) string {
 
 // TestValidateAddressRejectsCorruptedChecksum asserts every validator REJECTS an
 // address whose final character (checksum region) has been altered. Chains
-// without an internal checksum (Sui/Aptos/NEAR raw hex) still fail because the
-// flip lands in the payload and is detected by length/hex validation only when
+// without an internal checksum (Aptos raw hex) still fail because the flip
+// lands in the payload and is detected by length/hex validation only when
 // applicable; for those we additionally rely on the length/prefix tests below.
 func TestValidateAddressRejectsCorruptedChecksum(t *testing.T) {
 	// Chains with no internal checksum: a single-char flip yields a different but
 	// still well-formed payload, so corruption is undetectable by design. They
 	// are exercised by the length/prefix negative tests instead.
-	// ICX (ICON) is also checksum-free: "hx" + 40 raw hex chars, no embedded CRC.
-	// STRK: "0x" + 64 raw hex chars, no embedded CRC.
-	noChecksum := map[Symbol]bool{SOL: true, SUI: true, APTOS: true, NEAR: true, IOST: true, HBAR: true, ICX: true, STRK: true}
+	noChecksum := map[Symbol]bool{SOL: true, APTOS: true}
 	for sym, addr := range validAddrVectors {
 		if noChecksum[sym] {
 			continue
@@ -317,12 +269,9 @@ func TestPerChainNegativeCases(t *testing.T) {
 		// base58check single-version: wrong version byte.
 		{"DOGE wrong version (dash addr)", DOGE, "XsyCV5yojxF4y3bYeEiVYqarvRgsWFELZL"},
 		{"DASH wrong version (doge addr)", DASH, "DNRTC6GZ5evmM7BZWwPqF54fyDqUqULMyu"},
-		{"NEO wrong version (doge addr)", NEO, "DNRTC6GZ5evmM7BZWwPqF54fyDqUqULMyu"},
 		{"TRX wrong version (doge addr)", TRX, "DNRTC6GZ5evmM7BZWwPqF54fyDqUqULMyu"},
 		// base58check multi-version: wrong prefix.
-		{"ZEC wrong prefix (xtz addr)", ZEC, "tz1gcEWswVU6dxfNQWbhTgaZrUrNUFwrsT4z"},
 		{"XRP wrong alphabet (btc base58)", XRP, "DNRTC6GZ5evmM7BZWwPqF54fyDqUqULMyu"},
-		{"XTZ wrong prefix (zec addr)", XTZ, "t1b9xfAk3kZp5Qk3rinDPq7zzLkJGHTChDS"},
 		// CashAddr: wrong prefix.
 		{"BCH wrong prefix", BCH, "bitcoin:qz7eyzytkl5z6cg6nw20hd62pyyp22mcfuardfd2vn"},
 		// Cosmos: wrong HRP.
@@ -338,12 +287,7 @@ func TestPerChainNegativeCases(t *testing.T) {
 		{"SOL wrong length", SOL, "H4JcMPicKkHcxxDjkyyrLoQj7Kcibd9t815ak4UvTr9M1"},
 		{"SOL invalid char", SOL, "H4JcMPicKkHcxxDjkyyrLoQj7Kcibd9t815ak4UvTr90"},
 		{"XLM wrong version (long)", XLM, "MDXJHJHWN6GRNOAZXON6XH74ZX6NYFAS5B7642RSJQVJTIPA4ZYUQLEB"},
-		{"DOT wrong network prefix (ksm)", DOT, "Hy8mqcexg5FMwMYnQvzrUvD723qMxDjMRU9HdNCnTsMAypY"},
-		{"KSM wrong network prefix (dot)", KSM, "16PpFrXrC6Ko3pYcyMAx6gPMp3mFFaxgyYMt4G5brkgNcSz8"},
 		{"ALGO wrong length", ALGO, "52J2J5TPRULLQGN3TPVZ77GN7TOBIEXIP7XGUMSMFKM2DYHGOFEOGBP2T"},
-		{"NEAR uppercase", NEAR, "EE93A4F66F8D16B819BB9BEB9FFCCDFCDC1412E87FEE6A324C2A99A1E0E67148"},
-		{"NEAR short", NEAR, "ee93a4f66f8d16b819bb9beb9ffccdfcdc1412e87fee6a324c2a99a1e0e671"},
-		{"SUI short", SUI, "0x870deb25d5c0a4d7250d52d5cd58dacca2d51eb2a120a979b13384cd52e21e"},
 		{"APTOS no 0x", APTOS, "ce2fd04ac9efa74f17595e5785e847a2399d7e637f5e8179244f76191f653276"},
 	}
 	for _, tc := range cases {
@@ -411,22 +355,6 @@ func TestBCHWithoutPrefix(t *testing.T) {
 func TestAddressFromPublicKeyMatchesEncoder(t *testing.T) {
 	priv := dummyKey()
 	for sym, coin := range coins {
-		if coin.Curve == Ed25519ExtendedCardano {
-			// Cardano's public key is the 128-byte ED25519Cardano payment+staking
-			// form derived from a 96-byte extended key (built from BIP-39 entropy),
-			// not from a raw 32-byte dummy private key, so it cannot take part in
-			// this 32-byte-key sweep. Its address derivation is pinned byte-for-byte
-			// to TWC in cardano_vector_test.go and its validator round-trip is
-			// covered by TestCardanoAddressValidates.
-			continue
-		}
-		if coin.Curve == Starkex {
-			// The STARK curve's group order is ~2^251; the dummy key 0x4646...46
-			// (~2^252) is above it, so publicKeyFromPriv would fail. STRK address
-			// derivation is pinned to TWC in TestStarknetAddressVector and
-			// TestStarkexDerivationVector (curves_twc_test.go).
-			continue
-		}
 		t.Run(sym.String(), func(t *testing.T) {
 			pub, err := publicKeyFromPriv(coin.Curve, priv)
 			if err != nil {
@@ -466,31 +394,16 @@ func TestAddressFromPublicKeyBadKey(t *testing.T) {
 // assert payload lengths per family as a structural guard.
 func TestParsePayloadLengths(t *testing.T) {
 	want32 := map[Symbol]bool{
-		SOL: true, XLM: true, DOT: true, KSM: true, NEAR: true,
-		ALGO: true, SUI: true, APTOS: true,
-		// additional 32-byte-payload chains
-		IOST: true, KIN: true, EGLD: true, HBAR: true, AE: true, XNO: true,
-		// StarkNet: 32-byte STARK field element (x-coordinate of public key).
-		STRK: true,
+		SOL: true, XLM: true, ALGO: true, APTOS: true,
 	}
-	// EOS-family validators return the 33-byte compressed public key.
-	want33 := map[Symbol]bool{EOS: true, WAX: true, FIO: true}
-	// Cardano's validator returns the full 57-byte base-address payload
-	// (header(1) || payment key hash(28) || staking key hash(28)).
-	want57 := map[Symbol]bool{ADA: true}
 	for sym, addr := range validAddrVectors {
 		payload, err := ParseAddress(sym, addr)
 		if err != nil {
 			t.Fatalf("ParseAddress(%s): %v", sym, err)
 		}
 		exp := 20
-		switch {
-		case want32[sym]:
+		if want32[sym] {
 			exp = 32
-		case want33[sym]:
-			exp = 33
-		case want57[sym]:
-			exp = 57
 		}
 		if len(payload) != exp {
 			t.Errorf("%s payload length %d, want %d", sym, len(payload), exp)

@@ -5,13 +5,12 @@ import "fmt"
 // SignRawMessage is the chain-neutral signing primitive. It routes to the
 // correct curve for the given symbol and returns the raw Signature.
 //
-// For ECDSA chains (secp256k1, nist256p1, starkex — e.g. ETH, BTC, NEO,
-// ATOM) message must be the 32-byte digest the caller has pre-hashed with
-// the chain's own hash function (keccak256 for Ethereum/Tron, double-SHA256
-// for Bitcoin, SHA-256 for Cosmos, …). A non-32-byte input returns a wrapped
-// ErrInvalidDigest.
+// For the ECDSA chain (secp256k1 — e.g. ETH, BTC, ATOM) message must be the
+// 32-byte digest the caller has pre-hashed with the chain's own hash function
+// (keccak256 for Ethereum/Tron, double-SHA256 for Bitcoin, SHA-256 for
+// Cosmos, …). A non-32-byte input returns a wrapped ErrInvalidDigest.
 //
-// For ed25519 chains (SOL, XLM, DOT, …) message is the raw payload; the
+// For ed25519 chains (SOL, XLM, ALGO, …) message is the raw payload; the
 // EdDSA scheme hashes internally, so any length is accepted.
 //
 // This is the low-level primitive. For chain-specific standards with magic

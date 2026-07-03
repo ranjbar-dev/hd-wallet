@@ -140,7 +140,6 @@ func TestSeedWalletPrivateKeyRoundTrip(t *testing.T) {
 		{ETH, Secp256k1},
 		{BTC, Secp256k1},
 		{SOL, Ed25519},
-		{NEO, Nist256p1},
 	}
 	for _, tc := range cases {
 		t.Run(tc.symbol.String(), func(t *testing.T) {
@@ -374,7 +373,7 @@ func TestImportInvalidKeyLengths(t *testing.T) {
 
 func TestImportAllZeroKeyRejected(t *testing.T) {
 	zero := make([]byte, privateKeyLen)
-	for _, c := range []Curve{Secp256k1, Ed25519, Nist256p1} {
+	for _, c := range []Curve{Secp256k1, Ed25519} {
 		if _, err := FromPrivateKeyBytes(append([]byte(nil), zero...), c); !errors.Is(err, ErrInvalidPrivateKey) {
 			t.Errorf("FromPrivateKeyBytes(all-zero, %s) err = %v, want ErrInvalidPrivateKey", c, err)
 		}

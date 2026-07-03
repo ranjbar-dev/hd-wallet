@@ -9,12 +9,11 @@ package hdwallet
 // passes, not in the signed bytes). These sets are the single source of truth
 // for that routing; they mirror the registry in registry.go / address_validate.go.
 //
-// IMPORTANT — ethermint-keyed Cosmos chains (EVMOS, INJ, CANTO, ZETA, ONE; the
-// cosmosEvmEncoder rows) are deliberately NOT in cosmosTxChains: they sign with an
-// eth_secp256k1 public-key type (not the standard "/cosmos.crypto.secp256k1.PubKey"),
-// so the standard Cosmos builder would emit an on-chain-invalid transaction for
-// them. The vector-verified ones are routed via ethermintTxChains instead; the rest
-// remain unsupported until handled explicitly.
+// IMPORTANT — ethermint-keyed Cosmos chains (EVMOS, INJ; the cosmosEvmEncoder
+// rows) are deliberately NOT in cosmosTxChains: they sign with an eth_secp256k1
+// public-key type (not the standard "/cosmos.crypto.secp256k1.PubKey"), so the
+// standard Cosmos builder would emit an on-chain-invalid transaction for them.
+// They are routed via ethermintTxChains instead.
 
 // evmTxChains is every chain whose transaction is a standard Ethereum RLP tx
 // (the encodeETH / encodeRonin registry rows).
@@ -57,19 +56,6 @@ var cosmosTxChains = symbolSet(
 // all straight Bitcoin-codebase forks with the unmodified legacy sighash and tx
 // wire format.
 //
-// Deliberately excluded (the engine would emit a wrong, fund-losing signature):
-//   - GRS  — Groestl-512 base58/sighash, not double-SHA256.
-//   - BTG  — BIP-143 SIGHASH_FORKID (ForkID 79).
-//   - BCD  — appends a length-prefixed "sbtc" string to the sighash preimage.
-//   - XEC  — Bitcoin Cash ABC continuation; signs with the BIP-143 + FORKID path
-//     that lives in tx_bitcoin.go (owned elsewhere) and keys only off BCH.
-//   - KMD, ZEN, FLUX — Zcash-derived: transparent inputs use the ZIP-143/ZIP-243
-//     BLAKE2b sighash and an Overwinter/Sapling wire format (ZEN also adds a
-//     CHECKBLOCKATHEIGHT replay suffix to its scriptPubKey), none of which the
-//     standard Bitcoin legacy sighash matches.
-//   - NEBL, XVG — Peercoin-style proof-of-stake forks whose transactions carry an
-//     extra nTime field, changing the serialization and sighash.
-//
 // See the per-coin notes in address_types.go / tx_utxo.go.
 var utxoTxChains = symbolSet(
 	DOGE, DASH, BCH, ZEC,
@@ -86,12 +72,6 @@ var utxoTxChains = symbolSet(
 // (tx_cosmos_ethermint_test.go); INJ uses
 // "/injective.crypto.v1beta1.ethsecp256k1.PubKey" with an UNCOMPRESSED key
 // (tx_cosmos_injective_test.go).
-//
-// Roadmap — the other Ethermint-keyed rows (CANTO, ZETA, ONE) are NOT listed: an
-// Ethermint chain's pubkey type URL (and, for some, its compressed/uncompressed
-// encoding) DOES enter the signed bytes and is chain-specific, so each needs its
-// own TWC vector before routing. Until then they fall through to ErrTxUnsupported
-// rather than risk an on-chain-invalid signature.
 var ethermintTxChains = symbolSet(EVMOS, INJ)
 
 // symbolSet builds a set from a list of symbols.

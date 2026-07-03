@@ -192,32 +192,3 @@ func TestSymbolIsValid(t *testing.T) {
 		t.Error("NOPE should be invalid")
 	}
 }
-
-// --- starkex provisional derivation: exercise the EIP-2645 grind path ---
-// The seed->key grind is unverified against an external vector (see starkex.go),
-// so this only asserts the derivation produces a valid in-field, non-zero stark
-// key (covering withStarkexPrivateKey / starkGrindKey / stripLeadingZeros).
-// Sign/verify correctness is covered by TestStarkexSignVector with a known key.
-func TestStarkexGrindDerivation(t *testing.T) {
-	seed := bytes.Repeat([]byte{0x42}, 64)
-	path, err := parsePath("m/2645'/579218131'/0'/0'")
-	if err != nil {
-		t.Fatalf("parsePath: %v", err)
-	}
-	err = withStarkexPrivateKey(seed, path, func(priv []byte) error {
-		if len(priv) == 0 || len(priv) > 32 {
-			t.Fatalf("unexpected stark key length %d", len(priv))
-		}
-		if new(big.Int).SetBytes(priv).Sign() == 0 {
-			t.Fatal("grind produced a zero stark key")
-		}
-		// The derived key must yield a usable public key.
-		if _, err := publicKeyFromPriv(Starkex, priv); err != nil {
-			t.Fatalf("publicKeyFromPriv(Starkex): %v", err)
-		}
-		return nil
-	})
-	if err != nil {
-		t.Fatalf("withStarkexPrivateKey: %v", err)
-	}
-}

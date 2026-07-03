@@ -24,10 +24,10 @@ func TestSignTransactionUnsupportedCoin(t *testing.T) {
 	}
 	defer w.Destroy()
 
-	// NEO has no transaction builder family.
-	_, err = w.SignTransaction(NEO, 0, &txeth.SigningInput{})
+	// An unregistered symbol has no transaction builder family.
+	_, err = w.SignTransaction(Symbol("NOPE"), 0, &txeth.SigningInput{})
 	if !errors.Is(err, ErrTxUnsupported) {
-		t.Fatalf("NEO SignTransaction error = %v, want ErrTxUnsupported", err)
+		t.Fatalf("SignTransaction(NOPE) error = %v, want ErrTxUnsupported", err)
 	}
 }
 

@@ -1,12 +1,10 @@
 package hdwallet
 
 import (
-	"crypto/elliptic"
 	"crypto/hmac"
 	"crypto/sha512"
 	"encoding/binary"
 	"errors"
-	"math/big"
 )
 
 // hardenedOffset is the BIP-32 hardened key boundary (2^31). It matches
@@ -47,78 +45,6 @@ func deriveEd25519(seed []byte, path []uint32) (*slipNode, error) {
 		node = &slipNode{key: i[:32], chain: i[32:]}
 	}
 	return node, nil
-}
-
-// deriveNist256p1 implements SLIP-0010 derivation over the NIST P-256 curve.
-// It supports both hardened and non-hardened elements (NEO uses m/44'/888'/0'/0/0).
-func deriveNist256p1(seed []byte, path []uint32) (*slipNode, error) {
-	n := elliptic.P256().Params().N
-
-	i := hmacSHA512([]byte("Nist256p1 seed"), seed)
-	for {
-		il := new(big.Int).SetBytes(i[:32])
-		if il.Sign() != 0 && il.Cmp(n) < 0 {
-			break
-		}
-		prev := i
-		i = hmacSHA512([]byte("Nist256p1 seed"), i) // invalid master key: retry with I as data
-		wipe(prev)                                  // discarded master candidate
-	}
-	node := &slipNode{key: i[:32], chain: i[32:]}
-
-	for _, idx := range path {
-		var data []byte
-		if idx >= hardenedOffset {
-			data = make([]byte, 1+32+4)
-			data[0] = 0x00
-			copy(data[1:33], node.key)
-			binary.BigEndian.PutUint32(data[33:], idx)
-		} else {
-			pub := compressP256(node.key)
-			data = make([]byte, len(pub)+4)
-			copy(data, pub)
-			binary.BigEndian.PutUint32(data[len(pub):], idx)
-		}
-
-		parent := node // keep the parent node so we can wipe it once superseded
-		for {
-			i = hmacSHA512(parent.chain, data)
-			il := new(big.Int).SetBytes(i[:32])
-			ki := new(big.Int).Add(il, new(big.Int).SetBytes(parent.key))
-			ki.Mod(ki, n)
-			if il.Cmp(n) < 0 && ki.Sign() != 0 {
-				node = &slipNode{key: leftPad(ki.Bytes(), 32), chain: i[32:]}
-				wipe(i[:32]) // IL is spent; node.chain aliases i[32:], so leave it
-				break
-			}
-			// Invalid child: retry with Data = 0x01 || IR || ser32(i), key unchanged.
-			retry := make([]byte, 1+32+4)
-			retry[0] = 0x01
-			copy(retry[1:33], i[32:])
-			copy(retry[33:], data[len(data)-4:])
-			wipe(i)    // whole HMAC output copied into retry; safe to wipe
-			wipe(data) // superseded by retry
-			data = retry
-		}
-		wipe(data)       // child-link data: holds parent key (hardened) or its pubkey
-		wipe(parent.key) // parent private key is no longer referenced by node
-	}
-	return node, nil
-}
-
-// compressP256 returns the SEC1 compressed public key for a P-256 private key.
-func compressP256(priv []byte) []byte {
-	//nolint:staticcheck // ScalarBaseMult is the simplest correct API for SLIP-0010
-	x, y := elliptic.P256().ScalarBaseMult(priv)
-	out := make([]byte, 33)
-	if y.Bit(0) == 0 {
-		out[0] = 0x02
-	} else {
-		out[0] = 0x03
-	}
-	xb := x.Bytes()
-	copy(out[33-len(xb):], xb)
-	return out
 }
 
 func leftPad(b []byte, size int) []byte {

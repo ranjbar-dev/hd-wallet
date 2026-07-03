@@ -78,29 +78,8 @@ func withPrivateKey(seed []byte, c Coin, fn func(priv []byte) error) error {
 	switch c.Curve {
 	case Secp256k1:
 		return withSecp256k1PrivateKey(seed, path, fn)
-	case Ed25519, Ed25519Blake2bNano, Curve25519, Sr25519:
-		// All three use SLIP-0010 ed25519 derivation for the leaf 32-byte key;
-		// they differ only in how that key is expanded into a signing key.
+	case Ed25519:
 		node, err := deriveEd25519(seed, path)
-		if err != nil {
-			return err
-		}
-		defer wipe(node.key)
-		return fn(node.key)
-	case Ed25519ExtendedCardano:
-		// Cardano's Icarus master secret is derived from the BIP-39 ENTROPY, not
-		// the BIP-39 seed that this function receives. The seed is the wrong input
-		// here, so the seed-based path is deliberately closed: the public Address/
-		// Sign APIs route Cardano through the entropy enclave instead
-		// (HDWallet.withLeafPrivateKey / withCardanoCombinedPublicKey, which call
-		// withCardanoPrivateKey(entropy, ...) in cardano.go). Reaching this branch
-		// means a Cardano coin was fed the seed directly, which would silently
-		// produce a wrong key, so it errors.
-		return errCardanoNeedsEntropy
-	case Starkex:
-		return withStarkexPrivateKey(seed, path, fn)
-	case Nist256p1:
-		node, err := deriveNist256p1(seed, path)
 		if err != nil {
 			return err
 		}
@@ -179,18 +158,6 @@ func publicKeyFromPriv(curve Curve, priv []byte) ([]byte, error) {
 		seed := make([]byte, ed25519.SeedSize)
 		copy(seed, priv)
 		return ed25519PubFromSeed(seed), nil
-	case Ed25519Blake2bNano:
-		return blake2bPublicKey(priv)
-	case Curve25519:
-		return curve25519PublicKey(priv)
-	case Sr25519:
-		return sr25519PublicKey(priv)
-	case Ed25519ExtendedCardano:
-		return cardanoPublicKey(priv)
-	case Starkex:
-		return starkexPublicKey(priv)
-	case Nist256p1:
-		return compressP256(priv), nil
 	default:
 		return nil, fmt.Errorf("unsupported curve: %d", curve)
 	}

@@ -7,8 +7,8 @@ import (
 
 // Test vectors are taken verbatim from the SLIP-0010 specification
 // (https://github.com/satoshilabs/slips/blob/master/slip-0010.md), Test Vector
-// 1 for ed25519 and nist256p1. Proving derivation against the spec means the
-// per-curve key derivation is correct independently of any coin's encoder.
+// 1 for ed25519. Proving derivation against the spec means the per-curve key
+// derivation is correct independently of any coin's encoder.
 
 const slip10Seed1 = "000102030405060708090a0b0c0d0e0f"
 
@@ -56,44 +56,6 @@ func TestSLIP10Ed25519Vector1(t *testing.T) {
 			wantPub := tc.pub[2:]
 			if got := hex.EncodeToString(ed25519PubFromSeed(node.key)); got != wantPub {
 				t.Errorf("public key = %s, want %s", got, wantPub)
-			}
-		})
-	}
-}
-
-func TestSLIP10Nist256p1Vector1(t *testing.T) {
-	seed := mustHex(t, slip10Seed1)
-	cases := []struct {
-		path  string
-		chain string
-		priv  string
-		pub   string
-	}{
-		{"m", "beeb672fe4621673f722f38529c07392fecaa61015c80c34f29ce8b41b3cb6ea", "612091aaa12e22dd2abef664f8a01a82cae99ad7441b7ef8110424915c268bc2", "0266874dc6ade47b3ecd096745ca09bcd29638dd52c2c12117b11ed3e458cfa9e8"},
-		{"m/0'", "3460cea53e6a6bb5fb391eeef3237ffd8724bf0a40e94943c98b83825342ee11", "6939694369114c67917a182c59ddb8cafc3004e63ca5d3b84403ba8613debc0c", "0384610f5ecffe8fda089363a41f56a5c7ffc1d81b59a612d0d649b2d22355590c"},
-		{"m/0'/1", "4187afff1aafa8445010097fb99d23aee9f599450c7bd140b6826ac22ba21d0c", "284e9d38d07d21e4e281b645089a94f4cf5a5a81369acf151a1c3a57f18b2129", "03526c63f8d0b4bbbf9c80df553fe66742df4676b241dabefdef67733e070f6844"},
-		{"m/0'/1/2'", "98c7514f562e64e74170cc3cf304ee1ce54d6b6da4f880f313e8204c2a185318", "694596e8a54f252c960eb771a3c41e7e32496d03b954aeb90f61635b8e092aa7", "0359cf160040778a4b14c5f4d7b76e327ccc8c4a6086dd9451b7482b5a4972dda0"},
-		{"m/0'/1/2'/2", "ba96f776a5c3907d7fd48bde5620ee374d4acfd540378476019eab70790c63a0", "5996c37fd3dd2679039b23ed6f70b506c6b56b3cb5e424681fb0fa64caf82aaa", "029f871f4cb9e1c97f9f4de9ccd0d4a2f2a171110c61178f84430062230833ff20"},
-		{"m/0'/1/2'/2/1000000000", "b9b7b82d326bb9cb5b5b121066feea4eb93d5241103c9e7a18aad40f1dde8059", "21c4f269ef0a5fd1badf47eeacebeeaa3de22eb8e5b0adcd0f27dd99d34d0119", "02216cd26d31147f72427a453c443ed2cde8a1e53c9cc44e5ddf739725413fe3f4"},
-	}
-	for _, tc := range cases {
-		t.Run(tc.path, func(t *testing.T) {
-			path, err := parsePath(tc.path)
-			if err != nil {
-				t.Fatal(err)
-			}
-			node, err := deriveNist256p1(seed, path)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if got := hex.EncodeToString(node.chain); got != tc.chain {
-				t.Errorf("chain code = %s, want %s", got, tc.chain)
-			}
-			if got := hex.EncodeToString(node.key); got != tc.priv {
-				t.Errorf("private key = %s, want %s", got, tc.priv)
-			}
-			if got := hex.EncodeToString(compressP256(node.key)); got != tc.pub {
-				t.Errorf("public key = %s, want %s", got, tc.pub)
 			}
 		})
 	}

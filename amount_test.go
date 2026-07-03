@@ -31,7 +31,7 @@ func TestFormatUnits(t *testing.T) {
 		{name: "zero/0dec", raw: big.NewInt(0), decimals: 0, want: "0"},
 		{name: "nil/18dec", raw: nil, decimals: 18, want: "0"},
 
-		// decimals=0 (integer coins like ONT)
+		// decimals=0 (integer coins)
 		{name: "dec0/1", raw: big.NewInt(1), decimals: 0, want: "1"},
 		{name: "dec0/large", raw: big.NewInt(9999), decimals: 0, want: "9999"},
 
@@ -71,10 +71,10 @@ func TestFormatUnits(t *testing.T) {
 		{name: "negative 1.5 BTC", raw: big.NewInt(-150_000_000), decimals: 8, want: "-1.5"},
 		{name: "negative sub-unit", raw: big.NewInt(-1), decimals: 6, want: "-0.000001"},
 
-		// XEC: 2 decimals
-		{name: "XEC 1.23", raw: big.NewInt(123), decimals: 2, want: "1.23"},
-		{name: "XEC 1.20 strips", raw: big.NewInt(120), decimals: 2, want: "1.2"},
-		{name: "XEC 0.01", raw: big.NewInt(1), decimals: 2, want: "0.01"},
+		// 2 decimals
+		{name: "2dec 1.23", raw: big.NewInt(123), decimals: 2, want: "1.23"},
+		{name: "2dec 1.20 strips", raw: big.NewInt(120), decimals: 2, want: "1.2"},
+		{name: "2dec 0.01", raw: big.NewInt(1), decimals: 2, want: "0.01"},
 	}
 
 	for _, tc := range tests {
@@ -317,8 +317,6 @@ func TestNativeDecimals(t *testing.T) {
 		{BTC, 8, true},
 		{ETH, 18, true},
 		{ATOM, 6, true},
-		{XEC, 2, true},
-		{ONT, 0, true},             // indivisible
 		{Symbol("NOPE"), 0, false}, // unknown
 	}
 	for _, tc := range tests {

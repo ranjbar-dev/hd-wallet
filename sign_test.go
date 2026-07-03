@@ -122,34 +122,13 @@ func TestSignEd25519(t *testing.T) {
 	}
 }
 
-// TestSignNist256p1 covers sign/verify for the NIST P-256 chain (NEO).
-func TestSignNist256p1(t *testing.T) {
-	w := signTestWallet(t)
-	defer w.Destroy()
-
-	digest := sha256.Sum256([]byte("neo transaction digest"))
-	sig, err := w.Sign(NEO, digest[:])
-	if err != nil {
-		t.Fatal(err)
-	}
-	pub, _ := w.PublicKey(NEO)
-	if !Verify(Nist256p1, pub, digest[:], sig) {
-		t.Fatal("nist256p1 signature did not verify")
-	}
-	bad := digest
-	bad[1] ^= 0xff
-	if Verify(Nist256p1, pub, bad[:], sig) {
-		t.Error("nist256p1 signature verified against a tampered digest")
-	}
-}
-
 // TestSignDigestValidation ensures ECDSA chains require a 32-byte digest while
 // ed25519 accepts any-length messages.
 func TestSignDigestValidation(t *testing.T) {
 	w := signTestWallet(t)
 	defer w.Destroy()
 
-	for _, sym := range []Symbol{BTC, ETH, NEO} {
+	for _, sym := range []Symbol{BTC, ETH} {
 		if _, err := w.Sign(sym, []byte("too short")); !errors.Is(err, ErrInvalidDigest) {
 			t.Errorf("%s: Sign(non-32-byte) error = %v, want ErrInvalidDigest", sym, err)
 		}
@@ -185,7 +164,7 @@ func TestPublicKeyMatchesAddress(t *testing.T) {
 	w := signTestWallet(t)
 	defer w.Destroy()
 
-	for _, sym := range []Symbol{BTC, ETH, SOL, ATOM, NEO} {
+	for _, sym := range []Symbol{BTC, ETH, SOL, ATOM} {
 		pub, err := w.PublicKey(sym)
 		if err != nil {
 			t.Fatalf("%s: %v", sym, err)

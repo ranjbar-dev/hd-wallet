@@ -65,26 +65,6 @@ func TestU32Trunc(t *testing.T) {
 	}
 }
 
-func TestErrInvalidKeyLen(t *testing.T) {
-	err := errInvalidKeyLen("ed25519", 31, 32)
-	if err == nil || !bytes.Contains([]byte(err.Error()), []byte("31")) ||
-		!bytes.Contains([]byte(err.Error()), []byte("32")) {
-		t.Errorf("errInvalidKeyLen message missing detail: %v", err)
-	}
-}
-
-func TestStripLeadingZeros(t *testing.T) {
-	if got := stripLeadingZeros([]byte{0, 0, 1, 2}); !bytes.Equal(got, []byte{1, 2}) {
-		t.Errorf("stripLeadingZeros = %x", got)
-	}
-	if got := stripLeadingZeros([]byte{0, 0, 0}); len(got) != 0 {
-		t.Errorf("all-zero strip = %x, want empty", got)
-	}
-	if got := stripLeadingZeros(nil); len(got) != 0 {
-		t.Errorf("nil strip = %x", got)
-	}
-}
-
 // --- ABI type helpers and error branches ---
 
 func TestCanonicalTypeShorthands(t *testing.T) {

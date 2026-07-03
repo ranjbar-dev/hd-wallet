@@ -1,10 +1,7 @@
 package hdwallet
 
 import (
-	"crypto/ecdsa"
 	"crypto/ed25519"
-	"crypto/elliptic"
-	"crypto/rand"
 	"encoding/asn1"
 	"fmt"
 	"math/big"
@@ -15,10 +12,10 @@ import (
 
 // Signature is the result of signing with a derived key.
 //
-// For ECDSA curves (secp256k1, nist256p1), R and S are the signature scalars and
-// the value is available as a 64-byte R||S string, an ASN.1 DER encoding, and —
-// for secp256k1 — a 65-byte recoverable form. For ed25519, R and S are nil and
-// the 64-byte signature is available via Bytes.
+// For the ECDSA curve (secp256k1), R and S are the signature scalars and the
+// value is available as a 64-byte R||S string, an ASN.1 DER encoding, and a
+// 65-byte recoverable form. For ed25519, R and S are nil and the 64-byte
+// signature is available via Bytes.
 type Signature struct {
 	Curve      Curve
 	R, S       []byte // ECDSA signature scalars (nil for ed25519)
@@ -74,18 +71,6 @@ func signDigest(curve Curve, priv, data []byte) (*Signature, error) {
 		return signDigestSecp256k1(priv, data)
 	case Ed25519:
 		return signMessageEd25519(priv, data)
-	case Ed25519Blake2bNano:
-		return signMessageEd25519Blake2b(priv, data)
-	case Curve25519:
-		return signMessageCurve25519(priv, data)
-	case Sr25519:
-		return signMessageSr25519(priv, data)
-	case Ed25519ExtendedCardano:
-		return signMessageCardano(priv, data)
-	case Starkex:
-		return signDigestStarkex(priv, data)
-	case Nist256p1:
-		return signDigestNist256p1(priv, data)
 	default:
 		return nil, fmt.Errorf("unsupported curve: %d", curve)
 	}
@@ -130,37 +115,6 @@ func signMessageEd25519(priv, message []byte) (*Signature, error) {
 	return &Signature{Curve: Ed25519, raw: ed25519.Sign(key, message)}, nil
 }
 
-// signDigestNist256p1 produces a canonical low-S ECDSA signature over a 32-byte
-// digest on NIST P-256, using a secure random nonce.
-func signDigestNist256p1(priv, digest []byte) (*Signature, error) {
-	if len(digest) != 32 {
-		return nil, ErrInvalidDigest
-	}
-	curve := elliptic.P256()
-	d := new(big.Int).SetBytes(priv)
-	pk := &ecdsa.PrivateKey{D: d}
-	pk.Curve = curve
-	//nolint:staticcheck // ScalarBaseMult is the simplest correct way to set the P-256 public point
-	pk.X, pk.Y = curve.ScalarBaseMult(priv)
-
-	r, s, err := ecdsa.Sign(rand.Reader, pk, digest)
-	if err != nil {
-		return nil, err
-	}
-	// Normalise to low-S to avoid malleability.
-	n := curve.Params().N
-	if halfN := new(big.Int).Rsh(n, 1); s.Cmp(halfN) > 0 {
-		s.Sub(n, s)
-	}
-
-	rb := leftPad(r.Bytes(), 32)
-	sb := leftPad(s.Bytes(), 32)
-	raw := make([]byte, 64)
-	copy(raw[:32], rb)
-	copy(raw[32:], sb)
-	return &Signature{Curve: Nist256p1, R: rb, S: sb, raw: raw}, nil
-}
-
 // verifySignature checks a signature against a public key and data. Used by
 // tests; exported behaviour is provided by Verify.
 func verifySignature(curve Curve, pub, data []byte, sig *Signature) bool {
@@ -180,23 +134,6 @@ func verifySignature(curve Curve, pub, data []byte, sig *Signature) bool {
 			return false
 		}
 		return ed25519.Verify(ed25519.PublicKey(pub), data, sig.raw)
-	case Ed25519Blake2bNano:
-		return verifyEd25519Blake2b(pub, data, sig.raw)
-	case Curve25519:
-		return verifyCurve25519(pub, data, sig.raw)
-	case Sr25519:
-		return verifySr25519(pub, data, sig.raw)
-	case Ed25519ExtendedCardano:
-		return verifyCardano(pub, data, sig.raw)
-	case Starkex:
-		return verifyStarkex(pub, data, sig)
-	case Nist256p1:
-		x, y := elliptic.UnmarshalCompressed(elliptic.P256(), pub)
-		if x == nil {
-			return false
-		}
-		pk := &ecdsa.PublicKey{Curve: elliptic.P256(), X: x, Y: y}
-		return ecdsa.Verify(pk, data, new(big.Int).SetBytes(sig.R), new(big.Int).SetBytes(sig.S))
 	default:
 		return false
 	}
@@ -214,9 +151,9 @@ func Verify(curve Curve, pub, data []byte, sig *Signature) bool {
 // curve is resolved from the registry rather than supplied directly.
 //
 // As with Sign/SignIndex, data is the 32-byte digest for ECDSA chains
-// (secp256k1, nist256p1, starkex) and the raw message for ed25519 chains. A
-// non-32-byte input for an ECDSA chain returns a wrapped ErrInvalidDigest,
-// mirroring SignIndex; an unknown symbol returns a wrapped ErrUnsupportedCoin.
+// (secp256k1) and the raw message for ed25519 chains. A non-32-byte input for
+// an ECDSA chain returns a wrapped ErrInvalidDigest, mirroring SignIndex; an
+// unknown symbol returns a wrapped ErrUnsupportedCoin.
 //
 // It needs no secret and so is a free function, not a wallet method.
 func VerifySignature(symbol Symbol, pub, data []byte, sig *Signature) (bool, error) {
@@ -225,7 +162,7 @@ func VerifySignature(symbol Symbol, pub, data []byte, sig *Signature) (bool, err
 		return false, fmt.Errorf("%w: %s", ErrUnsupportedCoin, symbol)
 	}
 	switch coin.Curve {
-	case Secp256k1, Nist256p1, Starkex:
+	case Secp256k1:
 		if len(data) != 32 {
 			return false, fmt.Errorf("hdwallet: %s: %w", symbol, ErrInvalidDigest)
 		}

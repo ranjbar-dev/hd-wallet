@@ -13,9 +13,6 @@ func TestCoinDecimalsRepresentative(t *testing.T) {
 		ATOM: 6,
 		XRP:  6,
 		XLM:  7,
-		DOT:  10,
-		KSM:  12,
-		NEAR: 24,
 		TRX:  6,
 		BNB:  18,
 	}
@@ -36,9 +33,7 @@ func TestCoinDecimalsRepresentative(t *testing.T) {
 // zero-valued (forgotten) Decimals field.
 func TestCoinDecimalsDocumented(t *testing.T) {
 	// Coins whose native unit legitimately has 0 fractional digits.
-	zeroDecimals := map[Symbol]bool{
-		ONT: true, // Ontology ONT is indivisible (TWC registry: 0 decimals)
-	}
+	zeroDecimals := map[Symbol]bool{}
 	for _, sym := range SupportedCoins() {
 		coin, _ := CoinInfo(sym)
 		if coin.Decimals == 0 && !zeroDecimals[sym] {

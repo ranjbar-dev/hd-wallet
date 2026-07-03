@@ -42,8 +42,8 @@ func TestAddressIndexZeroMatchesAddress(t *testing.T) {
 	defer w.Destroy()
 
 	// BTC/ETH: secp256k1; SOL: ed25519 (final hardened); ATOM: cosmos
-	// secp256k1; NEO: nist256p1.
-	for _, symbol := range []Symbol{BTC, ETH, SOL, ATOM, NEO} {
+	// secp256k1.
+	for _, symbol := range []Symbol{BTC, ETH, SOL, ATOM} {
 		want, err := w.Address(symbol)
 		if err != nil {
 			t.Fatalf("Address(%s): %v", symbol, err)

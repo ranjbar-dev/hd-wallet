@@ -3,7 +3,6 @@ package hdwallet
 import (
 	"bytes"
 	"fmt"
-	"math/big"
 
 	"github.com/awnumar/memguard"
 	bip39 "github.com/tyler-smith/go-bip39"
@@ -25,13 +24,6 @@ import (
 type secret struct {
 	seed     *memguard.Enclave
 	mnemonic *memguard.Enclave
-
-	// entropy is the BIP-39 entropy the mnemonic decodes to, sealed in its own
-	// enclave. It is set only in seed mode (alongside seed/mnemonic) and is nil in
-	// key-only mode. Cardano's Icarus master key is derived from this entropy (not
-	// the BIP-39 seed), so it must be sealed and wiped with the same discipline as
-	// the seed; see withEntropy and cardano.go.
-	entropy *memguard.Enclave
 
 	// Key-only mode: a single imported leaf private key and its curve. When
 	// privKey is non-nil the secret is key-only and seed/mnemonic are nil.
@@ -56,7 +48,7 @@ func newSecret(mnemonic, passphrase []byte) (*secret, error) {
 
 	trimmed := bytes.TrimSpace(mnemonic) // sub-slice; sealed via a copy below
 
-	seedEnclave, entropyEnclave, err := deriveSeedAndEntropyEnclaves(trimmed, passphrase)
+	seedEnclave, err := deriveSeedEnclave(trimmed, passphrase)
 	if err != nil {
 		return nil, err
 	}
@@ -67,7 +59,6 @@ func newSecret(mnemonic, passphrase []byte) (*secret, error) {
 	return &secret{
 		seed:     seedEnclave,
 		mnemonic: mnBuf.Seal(),
-		entropy:  entropyEnclave,
 	}, nil
 }
 
@@ -85,7 +76,7 @@ func newSecretFromBuffer(buf *memguard.LockedBuffer, passphrase []byte) (*secret
 	raw := buf.Bytes()
 	trimmed := bytes.TrimSpace(raw) // sub-slice of protected memory; no copy
 
-	seedEnclave, entropyEnclave, err := deriveSeedAndEntropyEnclaves(trimmed, passphrase)
+	seedEnclave, err := deriveSeedEnclave(trimmed, passphrase)
 	if err != nil {
 		buf.Destroy()
 		return nil, err
@@ -103,7 +94,7 @@ func newSecretFromBuffer(buf *memguard.LockedBuffer, passphrase []byte) (*secret
 		buf.Destroy()
 	}
 
-	return &secret{seed: seedEnclave, mnemonic: mnemonic, entropy: entropyEnclave}, nil
+	return &secret{seed: seedEnclave, mnemonic: mnemonic}, nil
 }
 
 // privateKeyLen is the raw private-key length for every supported curve: 32
@@ -146,16 +137,10 @@ func newSecretFromPrivateKeyBuffer(buf *memguard.LockedBuffer, curve Curve) (*se
 
 // validatePrivateKey checks that priv is a plausible private key for curve: the
 // correct length (32 bytes for every supported curve) and not the all-zero
-// scalar (invalid on every curve — it would derive the point at infinity). For
-// the STARK curve the scalar must additionally be below the group order.
-//
-// Ed25519ExtendedCardano is intentionally rejected: Cardano uses a 96-byte
-// extended key derived from BIP-39 entropy, not a raw 32-byte scalar, so it
-// cannot be imported as a plain private key.
+// scalar (invalid on every curve — it would derive the point at infinity).
 func validatePrivateKey(priv []byte, curve Curve) error {
 	switch curve {
-	case Secp256k1, Ed25519, Nist256p1,
-		Ed25519Blake2bNano, Curve25519, Sr25519, Starkex:
+	case Secp256k1, Ed25519:
 	default:
 		return fmt.Errorf("%w: %s", ErrUnsupportedCurve, curve)
 	}
@@ -171,11 +156,6 @@ func validatePrivateKey(priv []byte, curve Curve) error {
 	}
 	if allZero {
 		return fmt.Errorf("%w: key is all zero", ErrInvalidPrivateKey)
-	}
-	if curve == Starkex {
-		if new(big.Int).SetBytes(priv).Cmp(starkOrder) >= 0 {
-			return fmt.Errorf("%w: starkex scalar not below the curve order", ErrInvalidPrivateKey)
-		}
 	}
 	return nil
 }
@@ -211,45 +191,6 @@ func deriveSeedEnclave(mnemonic, passphrase []byte) (*memguard.Enclave, error) {
 	return memguard.NewBufferFromBytes(seed).Seal(), nil // wipes seed
 }
 
-// deriveSeedAndEntropyEnclaves validates a mnemonic, then returns BOTH its BIP-39
-// seed (with the optional passphrase) and the BIP-39 entropy it decodes from,
-// each sealed in its own enclave. The entropy is needed for Cardano's Icarus
-// master key (cardano.go); recovering it from the mnemonic via
-// bip39.EntropyFromMnemonic re-validates the checksum, so a phrase that passes
-// here is a genuine BIP-39 mnemonic. It does not take ownership of the mnemonic
-// or passphrase slices (the caller wipes/seals them). The transient entropy slice
-// is wiped after sealing.
-func deriveSeedAndEntropyEnclaves(mnemonic, passphrase []byte) (seed, entropy *memguard.Enclave, err error) {
-	seedEnclave, err := deriveSeedEnclave(mnemonic, passphrase)
-	if err != nil {
-		return nil, nil, err
-	}
-	// EntropyFromMnemonic re-checks the phrase (incl. checksum); deriveSeedEnclave
-	// already validated it, so an error here would indicate an internal mismatch.
-	ent, err := bip39.EntropyFromMnemonic(string(mnemonic))
-	if err != nil {
-		return nil, nil, ErrInvalidMnemonic
-	}
-	// NewBufferFromBytes copies ent into protected memory and wipes the source.
-	return seedEnclave, memguard.NewBufferFromBytes(ent).Seal(), nil
-}
-
-// withEntropy opens the BIP-39 entropy enclave, runs fn with the plaintext
-// entropy, and destroys the decrypted buffer before returning. It returns
-// ErrNoEntropy when the wallet has no entropy (a key-only/WIF/xpub wallet has no
-// mnemonic, so Cardano derivation is unavailable).
-func (s *secret) withEntropy(fn func(entropy []byte) error) error {
-	if s.entropy == nil {
-		return ErrNoEntropy
-	}
-	buf, err := s.entropy.Open()
-	if err != nil {
-		return err
-	}
-	defer buf.Destroy()
-	return fn(buf.Bytes())
-}
-
 // withSeed opens the seed enclave, runs fn with the plaintext seed, and destroys
 // the decrypted buffer before returning.
 func (s *secret) withSeed(fn func(seed []byte) error) error {
@@ -273,6 +214,5 @@ func (s *secret) openMnemonic() (*memguard.LockedBuffer, error) {
 func (s *secret) destroy() {
 	s.seed = nil
 	s.mnemonic = nil
-	s.entropy = nil
 	s.privKey = nil
 }

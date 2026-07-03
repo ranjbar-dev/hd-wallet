@@ -7,7 +7,9 @@
 
 A **Trust Wallet–compatible**, security-focused **hierarchical-deterministic (HD) wallet** library for Go.
 
-Generate a BIP-39 mnemonic (or import one) and derive receive addresses for **134 networks** using the same derivation paths and address formats Trust Wallet uses by default — so seeds are interchangeable between the two. Beyond derivation it adds **EVM tooling** (RLP, ABI, EIP-191, EIP-712), **protobuf transaction signing** for many families (EVM, Tron, XRP, Cosmos, Solana, Bitcoin/UTXO, Stellar, Algorand, Aptos — no broadcast), **secure private-key import/export**, and **address validation/parsing**.
+Generate a BIP-39 mnemonic (or import one) and derive receive addresses for **98 networks** using the same derivation paths and address formats Trust Wallet uses by default — so seeds are interchangeable between the two. Beyond derivation it adds **EVM tooling** (RLP, ABI, EIP-191, EIP-712), **protobuf transaction signing** for many families (EVM, Tron, XRP, Cosmos, Solana, Bitcoin/UTXO, Stellar, Algorand, Aptos — no broadcast), **secure private-key import/export**, and **address validation/parsing**.
+
+> **36 chains are explicitly not supported** by this library (no address derivation, no validation, nothing). See [Unsupported chains](#unsupported-chains).
 
 Sensitive material (the mnemonic and derived seed) is **never** held as a plain Go string or a long-lived byte slice. It lives in encrypted, page-locked [memguard](https://github.com/awnumar/memguard) enclaves and is decrypted only for the microseconds of a single derivation.
 
@@ -17,10 +19,10 @@ Sensitive material (the mnemonic and derived seed) is **never** held as a plain 
 
 - 🔐 **Secrets isolated in RAM.** Encrypted enclaves, memory locked against swap (`mlock`/`VirtualLock`), guard pages, and automatic wiping. No mnemonic-as-`string`, no exported secret fields. Private-key import/export goes through the same memguard pattern — there is still no raw key getter.
 - ✅ **Provably Trust Wallet–compatible.** Every address encoder is tested against Trust Wallet Core's own vectors; key derivation is tested against the SLIP-0010 specification; transaction signers reproduce Trust Wallet Core's `AnySigner` vectors byte-for-byte. See [Verification](#verification).
-- 🌐 **134 networks across 7 curves in use.** secp256k1 (Bitcoin-style, 50+ EVM chains, ~30 Cosmos chains, XRP, Tron), ed25519 (Solana, Stellar, …), NIST P-256 (NEO, Ontology), ed25519-blake2b (Nano), curve25519 (Waves), starkex (StarkNet), and ed25519-extended/CIP-1852 (Cardano). 8 curve schemes are implemented in total (sr25519 is implemented but not yet wired to a registered chain).
+- 🌐 **98 networks across 2 curves.** secp256k1 (Bitcoin-style, 50+ EVM chains, ~30 Cosmos chains, XRP, Tron) and ed25519 (Solana, Stellar, Algorand, Aptos).
 - ✍️ **Signing at every level.** Raw ECDSA/EdDSA signing for every network, EVM message signing (EIP-191/EIP-712), and full **protobuf transaction signing** (EVM, Tron, XRP, Cosmos, Solana, Bitcoin/UTXO, Stellar, Algorand, Aptos) that returns broadcast-ready raw transactions. Derived keys are wiped after each use.
 - 🧩 **Extensible.** Add a network with a single registry row.
-- 📦 **Focused dependency surface.** btcd (secp256k1/bech32/base58), go-bip39, x/crypto, memguard, protobuf, and curve libraries (edwards25519, schnorrkel, gnark-crypto) for the additional schemes.
+- 📦 **Focused dependency surface.** btcd (secp256k1/bech32/base58), go-bip39, x/crypto, memguard, protobuf.
 
 ---
 
@@ -134,12 +136,12 @@ the package** — there is no way to extract a private key.
 
 There is one inherent rule, driven by the cryptography:
 
-- **ECDSA chains** (secp256k1, nist256p1 — BTC, ETH, ATOM, NEO, …): pass the
-  **32-byte digest** your chain signs. Pre-hash the message yourself with the
-  chain's hash (keccak256 for Ethereum/Tron, double-SHA256 for Bitcoin, SHA-256
-  for Cosmos, …).
-- **ed25519 chains** (SOL, XLM, DOT, …): pass the **message**; the EdDSA scheme
-  hashes internally.
+- **The ECDSA chain** (secp256k1 — BTC, ETH, ATOM, …): pass the **32-byte
+  digest** your chain signs. Pre-hash the message yourself with the chain's
+  hash (keccak256 for Ethereum/Tron, double-SHA256 for Bitcoin, SHA-256 for
+  Cosmos, …).
+- **ed25519 chains** (SOL, XLM, ALGO, APTOS): pass the **message**; the EdDSA
+  scheme hashes internally.
 
 ```go
 digest := sha256.Sum256(txBytes)         // chain-specific pre-hash for ECDSA
@@ -166,7 +168,7 @@ non-zero address indices. ECDSA inputs that are not 32 bytes return
 transaction** from a protobuf `SigningInput`, mirroring Trust Wallet Core's
 `AnySigner`. It returns the signed bytes/hex — it does **not** broadcast.
 
-> **Coverage note:** address derivation/validation spans **all 134 networks**,
+> **Coverage note:** address derivation/validation spans **all 98 networks**,
 > but transaction building covers only the families in the table below. For any
 > other chain you can derive and validate addresses but must assemble and sign
 > the transaction yourself (use the raw `Sign`/`SignIndex` primitive on the
@@ -181,7 +183,7 @@ Verified against authoritative signing vectors for:
 | **EVM** | legacy (EIP-155) + EIP-2930 (access list) + EIP-1559 + **EIP-4844** (type-3 blob tx: `max_fee_per_blob_gas` + `blob_versioned_hashes`) + **EIP-7702** (type-4 set-code tx: `authorization_list`), native + ERC-20 + arbitrary contract call + contract creation (deploy). Select the format with `tx_mode` (exported `hdwallet.EthTxModeLegacy`/`EthTxModeEIP2930`/`EthTxModeEIP1559`/`EthTxModeEIP4844`/`EthTxModeEIP7702`). Structured token intents via proto oneofs: **ERC-20 approve** (`ERC20Approve`), **ERC-721 transfer** (`ERC721Transfer`), **ERC-1155 transfer** (`ERC1155Transfer`) — each tested with Legacy + EIP-1559 TWC-vector-pinned tests. **ERC-4337 account abstraction**: UserOperation v0.6 (`EthTxModeUserOp` = 5, `SigningInput.user_operation` field 14) and v0.7 (`EthTxModeUserOpV07` = 6, `SigningInput.user_operation_v0_7` field 15, packed `uint128` `accountGasLimits`/`gasFees`). **Smart-wallet batch intents**: `SCWalletExecute` (single call, field 7) and `SCWalletBatch` (batched calls, field 8) for three wallet types — `SC_SIMPLE_ACCOUNT` (`execute`/`executeBatch(address[],uint256[],bytes[])`), `BIZ_4337` (`executeBatch(address[],bytes[])`), and `BIZ` (`executeBatch(address[],uint256[],bytes[])`). All registered EVM chains. |
 | **Tron** | TRX transfer (`TransferContract`) + TRC-10 transfer (`TransferAssetContract`) + TRC-20 transfer + generic `TriggerSmartContract` (arbitrary call with `call_value`/`data`/`call_token_value`/`token_id`) + legacy Stake 1.0 `FreezeBalanceContract`/`UnfreezeBalanceContract` + `UnfreezeAssetContract` + `WithdrawBalanceContract` + `VoteAssetContract`; **raw_json mode** signs a node/DApp-provided pre-built transaction (`raw_data_hex` + txID guard) for wallet-connect flows |
 | **XRP** | Payment |
-| **Cosmos** | bank `MsgSend`, staking `MsgDelegate`/`MsgUndelegate`, `MsgWithdrawDelegatorReward`, multi-message (protobuf direct mode). All standard secp256k1 Cosmos chains, plus **EVMOS** and **INJ** (ethermint eth_secp256k1: keccak256 SignDoc + chain-specific pubkey type URL — INJ uses an uncompressed key). Other ethermint chains (CANTO/ZETA/ONE) stay roadmap — each needs its own vector. |
+| **Cosmos** | bank `MsgSend`, staking `MsgDelegate`/`MsgUndelegate`, `MsgWithdrawDelegatorReward`, multi-message (protobuf direct mode). All standard secp256k1 Cosmos chains, plus **EVMOS** and **INJ** (ethermint eth_secp256k1: keccak256 SignDoc + chain-specific pubkey type URL — INJ uses an uncompressed key). |
 | **Solana** | system transfer + SPL token transfer (TransferChecked) |
 | **Bitcoin / UTXO** | BTC/LTC spends across **all four** single-key input types — legacy **P2PKH**, nested **P2SH-P2WPKH** (BIP-49), native **P2WPKH** (BIP-143), and **Taproot key-path** (BIP-341 / BIP-340 Schnorr); outputs to any address type; SIGHASH ALL/NONE/SINGLE/ANYONECANPAY (legacy + BIP-143); multiple recipients, OP_RETURN data output, opt-in **RBF** (BIP-125) + `nLockTime`/`nSequence`; deterministic coin-selection with configurable input selectors, fee-per-vByte, dust handling, send-all/use-all, and change. `PlanBitcoinTx`/`EstimateBitcoinFee` preview the plan without signing. The same engine signs the UTXO altcoins (DOGE/DASH/BCH/ZEC and DGB/SYS/VIA/STRAX/QTUM/RVN/FIRO/MONA/PIVX). Verified against `btcd` and the BIP-143 spec vector. |
 | **Bitcoin PSBT** | BIP-174 (v0) **and** BIP-370 (v2) build / sign / finalize / extract over the same inputs (`BuildPSBT`/`SignPSBT`/`FinalizePSBT`/`ExtractPSBTTx` and the `…PSBTV2` variants). The v0 path is byte-identical to the direct signer. |
@@ -405,78 +407,53 @@ for i := range raw {                     // wipe any trimmed remainder
 
 ## Supported networks
 
-**134 networks** across 7 curves in use. `SupportedCoins()` returns the live,
+**98 networks** across 2 curves. `SupportedCoins()` returns the live,
 authoritative list; `CoinInfo(symbol)` gives each coin's curve and path. Every
 chain below is verified against a Trust Wallet Core address vector.
 
-#### secp256k1 (113)
+#### secp256k1 (94)
 
 | Group | Symbols | Path |
 |---|---|---|
-| Bitcoin-family / UTXO | BTC, LTC, DOGE, BCH, DASH, ZEC, BTG, DGB, GRS, SYS, VIA, QTUM, RVN, KMD, FIRO, MONA, XVG, PIVX, NEBL, STRAX, ZEN, BCD, XEC, FLUX | per-chain (e.g. `m/84'/0'/0'/0/0`) |
-| Ethereum / EVM (same key & address) | ETH, BNB, MATIC, AVAX, ARB, OP, FTM, BASE, CRO, GNO, CELO, ETC, RBTC, KAIA, AURORA, GLMR, MOVR, BOBA, METIS, OPBNB, POLZKEVM, MANTA, ZKSYNC, LINEA, SCROLL, MANTLE, BLAST, RONIN, HECO, OKT, KCS, WAN, POA, CLO, GO, TT, VET, IOTX, THETA, NEON, MERLIN, LIGHT, SONIC, ZENEON, ONE, EVMOS, INJ, CANTO, ZETAEVM | `m/44'/60'/0'/0/0` |
+| Bitcoin-family / UTXO | BTC, LTC, DOGE, BCH, DASH, ZEC, DGB, SYS, VIA, QTUM, RVN, FIRO, MONA, PIVX, STRAX | per-chain (e.g. `m/84'/0'/0'/0/0`) |
+| Ethereum / EVM (same key & address) | ETH, BNB, MATIC, AVAX, ARB, OP, FTM, BASE, CRO, GNO, CELO, ETC, RBTC, KAIA, AURORA, GLMR, MOVR, BOBA, METIS, OPBNB, POLZKEVM, MANTA, ZKSYNC, LINEA, SCROLL, MANTLE, BLAST, RONIN, HECO, OKT, KCS, WAN, POA, CLO, GO, TT, VET, IOTX, THETA, NEON, MERLIN, LIGHT, SONIC, ZENEON, EVMOS, INJ, ZETAEVM | `m/44'/60'/0'/0/0` |
 | Tron | TRX | `m/44'/195'/0'/0/0` |
 | XRP Ledger | XRP | `m/44'/144'/0'/0/0` |
-| Cosmos SDK (bech32, per-chain HRP) | ATOM, OSMO, JUNO, TIA, LUNA, KAVA, SCRT, BAND, RUNE, STARS, AXL, STRD, BLD, CRE, KUJI, CMDX, NTRN, SOMM, FET, MARS, UMEE, COREUM, QSR, XPRT, AKT, NOBLE, SEI, DYDX, BLZ, CRYPTOORG, ZETA | `m/44'/118'/0'/0/0` (some differ) |
-| EOS-family / Filecoin | EOS, WAX, FIO, FIL | per-chain |
-| Other secp256k1 | ICX (ICON), CKB (Nervos), ZIL (Zilliqa) | per-chain |
+| Cosmos SDK (bech32, per-chain HRP) | ATOM, OSMO, JUNO, TIA, LUNA, KAVA, SCRT, BAND, RUNE, STARS, AXL, STRD, BLD, CRE, KUJI, CMDX, NTRN, SOMM, FET, MARS, UMEE, COREUM, QSR, XPRT, AKT, NOBLE, SEI, DYDX, BLZ, CRYPTOORG | `m/44'/118'/0'/0/0` (some differ) |
 
-#### ed25519 (15)
+#### ed25519 (4)
 
 | Symbol | Network | Path |
 |---|---|---|
 | SOL | Solana | `m/44'/501'/0'` |
 | XLM | Stellar | `m/44'/148'/0'` |
-| DOT · KSM | Polkadot · Kusama (SS58) | `m/44'/354'/0'/0'/0'` · `m/44'/434'/0'/0'/0'` |
-| NEAR · XTZ · SUI · APTOS · ALGO | NEAR · Tezos · Sui · Aptos · Algorand | per-chain |
-| EGLD · HBAR · IOST · ROSE · KIN · AE | MultiversX · Hedera · IOST · Oasis · Kin · Aeternity | per-chain |
-
-#### nist256p1 (2) · ed25519-blake2b (1) · curve25519 (1) · starkex (1) · ed25519-extended (1)
-
-| Symbol | Network | Curve | Path |
-|---|---|---|---|
-| NEO | NEO (legacy) | nist256p1 | `m/44'/888'/0'/0/0` |
-| ONT | Ontology | nist256p1 | `m/44'/1024'/0'/0/0` |
-| XNO | Nano | ed25519-blake2b | `m/44'/165'/0'` |
-| WAVES | Waves | curve25519 | `m/44'/5741564'/0'/0'/0'` |
-| STRK | StarkNet | starkex (EIP-2645) | `m/2645'/1195502025'/1148870696'/0'/0'/0` |
-| ADA | Cardano | ed25519-extended (CIP-1852) | `m/1852'/1815'/0'/0/0` |
+| ALGO | Algorand | `m/44'/283'/0'/0'/0'` |
+| APTOS | Aptos | `m/44'/637'/0'/0'/0'` |
 
 All paths derive receive address index 0 and an empty BIP-39 passphrase
 (Trust Wallet's default).
 
-> **Note on Polkadot/Kusama:** Trust Wallet derives these on **ed25519** via
-> SLIP-0010. The native Polkadot ecosystem (e.g. Polkadot.js) defaults to
-> **sr25519** with a different scheme, so addresses there will differ. This
-> library matches **Trust Wallet**, which is the stated compatibility target.
+### Unsupported chains
 
-### Roadmap (deferred)
+This library does **not** support the following 36 chains at all — no address
+derivation, no validation, no registry rows, nothing:
 
-Cardano (ADA), StarkNet (STRK), ICON (ICX), and Zilliqa (ZIL) are now **registered
-and vector-matched** — their addresses derive against authoritative vectors. What
-remains deferred:
+`ADA` (Cardano), `AE` (Aeternity), `BCD` (Bitcoin Diamond), `BTG` (Bitcoin Gold),
+`CANTO` (Canto), `CKB` (Nervos), `DOT` (Polkadot), `EGLD` (MultiversX),
+`EOS` (EOS), `FIL` (Filecoin), `FIO` (FIO), `FLUX` (Flux), `GRS` (Groestlcoin),
+`HBAR` (Hedera), `ICX` (ICON), `IOST` (IOST), `KIN` (Kin), `KMD` (Komodo),
+`KSM` (Kusama), `NEAR` (NEAR), `NEBL` (Neblio), `NEO` (NEO), `ONE` (Harmony),
+`ONT` (Ontology), `ROSE` (Oasis), `STRK` (StarkNet), `SUI` (Sui), `WAVES` (Waves),
+`WAX` (WAX), `XEC` (eCash), `XNO` (Nano), `XTZ` (Tezos), `XVG` (Verge),
+`ZEN` (Horizen), `ZETA` (ZetaChain, Cosmos-side), `ZIL` (Zilliqa).
 
-Curve schemes implemented but **not yet wired to a registered chain** (a
-fund-critical address must match an authoritative vector first):
+Note: **ZETAEVM** (ZetaChain's EVM side) and **ZEC**/**BCH** remain fully
+supported — only the Cosmos-side ZETA row and the non-standard-sighash UTXO
+chains above were removed.
 
-- **sr25519** (native Polkadot/Kusama) — implemented; sign/verify round-trip only.
-- **TON** and a handful of long-tail chains whose address scheme isn't reproduced
-  against a vector yet (see `registry.go`).
-
-Deferred signing features:
-
-- **Cardano transaction** signing (CBOR body + payment-extended-key) — ADA address
-  derivation works; tx building is roadmap.
-- **Ethermint-keyed Cosmos** chains beyond EVMOS and INJ (CANTO/ZETA/ONE — each
-  needs its own vector since the pubkey type URL enters the signed bytes); see
-  `tx_families.go`.
-- **Bitcoin testnet/regtest** (mainnet params only), bare **P2PK** input/output,
-  arbitrary/custom output scriptPubKey, a general Taproot **script-path** spend
-  input (the primitives exist but are wired only to the BRC-20 reveal flow), and
-  Taproot SIGHASH flags beyond `DEFAULT`.
-- **UTXO altcoins with non-standard sighash** (GRS/BTG/BCD/XEC/KMD/ZEN/FLUX/NEBL/XVG)
-  — addresses derive, but tx signing is deferred to avoid a wrong, fund-losing
-  signature; see `tx_utxo.go`.
+A PR re-adding any of these must follow the same rule as every other chain in
+this registry: **no fund-critical address or signature ships without an
+authoritative Trust Wallet Core (or equivalent) test vector.**
 
 Contributions with test vectors welcome.
 
@@ -490,12 +467,11 @@ independent sources of truth:
 1. **Encoders** (`encoders_test.go`) — every address encoder is run against the
    exact addresses Trust Wallet Core's `CoinAddressDerivationTests` produces for
    a fixed key, isolating address-format correctness.
-2. **Derivation** (`slip10_test.go`) — ed25519 and nist256p1 derivation are
-   checked against the official **SLIP-0010** specification test vectors
-   (including non-hardened P-256 derivation).
+2. **Derivation** (`slip10_test.go`) — ed25519 derivation is checked against
+   the official **SLIP-0010** specification test vectors.
 3. **End-to-end** (`hdwallet_test.go`) — full mnemonic→seed→derive→encode
    against the BIP-84 spec (BTC), the canonical ETH vector, and Trust Wallet
-   Core's `HDWalletTests` mnemonic vectors (NEAR ed25519, Cosmos secp256k1).
+   Core's `HDWalletTests` Cosmos secp256k1 mnemonic vector.
 
 ```bash
 go test -race -cover ./...
@@ -598,8 +574,8 @@ Append one row to the registry in `registry.go`:
 ```
 
 Provide an `Encode func(pub []byte) (string, error)` for the address format
-(the compressed key for secp256k1/nist256p1, the raw 32-byte key for ed25519),
-and add a test vector. EVM chains can reuse `encodeETH`; Cosmos chains can reuse
+(the compressed key for secp256k1, the raw 32-byte key for ed25519), and add a
+test vector. EVM chains can reuse `encodeETH`; Cosmos chains can reuse
 `cosmosEncoder("<hrp>")`.
 
 ---
