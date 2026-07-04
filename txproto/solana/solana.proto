@@ -17,6 +17,7 @@ message TokenTransfer {
   string recipient_token_address = 3;  // base58 (the destination ATA)
   uint64 amount = 4;
   uint32 decimals = 5;
+  uint32 token_program_id = 6; // 0=classic SPL Token, 1=Token-2022
 }
 
 // Create the associated token account (ATA) for main_address+mint, funded by
@@ -38,6 +39,7 @@ message CreateAndTransferToken {
   string sender_token_address = 4;    // base58 source token account
   uint64 amount = 5;
   uint32 decimals = 6;
+  uint32 token_program_id = 7; // 0=classic SPL Token, 1=Token-2022
 }
 
 // Create and initialize a durable-nonce account. The new account must co-sign

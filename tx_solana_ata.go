@@ -17,9 +17,14 @@ import (
 // exactly, otherwise rent/tokens could fund an account nobody controls.
 
 // solanaATAAccounts decodes the fixed program/sysvar accounts every ATA
-// instruction references.
-func solanaATAAccounts() (tokenProgram, rent, ataProgram []byte, err error) {
-	if tokenProgram, err = base58DecodeFixed(solanaTokenProgramID, 32); err != nil {
+// instruction references. tokenProgramID selects the classic SPL Token
+// program or Token-2022, per solanaTokenProgramAddress.
+func solanaATAAccounts(tokenProgramID uint32) (tokenProgram, rent, ataProgram []byte, err error) {
+	tokenProgramAddr, err := solanaTokenProgramAddress(tokenProgramID)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	if tokenProgram, err = base58DecodeFixed(tokenProgramAddr, 32); err != nil {
 		return nil, nil, nil, fmt.Errorf("%w: solana: token program id: %v", ErrTxInput, err)
 	}
 	if rent, err = base58DecodeFixed(solanaSysvarRentID, 32); err != nil {
@@ -31,10 +36,11 @@ func solanaATAAccounts() (tokenProgram, rent, ataProgram []byte, err error) {
 	return tokenProgram, rent, ataProgram, nil
 }
 
-// solanaDeriveATAGuarded derives the canonical ATA for (wallet, mint) and, if
-// the caller supplied an expected address, requires an exact match.
-func solanaDeriveATAGuarded(wallet, mint, supplied string) ([]byte, error) {
-	derived, err := SolanaTokenAccountAddress(wallet, mint)
+// solanaDeriveATAGuarded derives the canonical ATA for (wallet, mint) under
+// the given token-program id and, if the caller supplied an expected address,
+// requires an exact match.
+func solanaDeriveATAGuarded(wallet, mint, supplied, tokenProgramAddr string) ([]byte, error) {
+	derived, err := SolanaTokenAccountAddressWithProgram(wallet, mint, tokenProgramAddr)
 	if err != nil {
 		return nil, fmt.Errorf("%w: solana: derive ata: %v", ErrTxInput, err)
 	}
@@ -67,7 +73,7 @@ func (w *HDWallet) signSolanaCreateTokenAccount(chain Chain, index uint32, in *t
 	if err != nil {
 		return nil, fmt.Errorf("%w: solana: token_mint_address: %v", ErrTxInput, err)
 	}
-	ata, err := solanaDeriveATAGuarded(cta.GetMainAddress(), cta.GetTokenMintAddress(), cta.GetTokenAddress())
+	ata, err := solanaDeriveATAGuarded(cta.GetMainAddress(), cta.GetTokenMintAddress(), cta.GetTokenAddress(), solanaTokenProgramID)
 	if err != nil {
 		return nil, err
 	}
@@ -75,7 +81,7 @@ func (w *HDWallet) signSolanaCreateTokenAccount(chain Chain, index uint32, in *t
 	if err != nil {
 		return nil, fmt.Errorf("%w: solana: recent_blockhash: %v", ErrTxInput, err)
 	}
-	tokenProgram, rent, ataProgram, err := solanaATAAccounts()
+	tokenProgram, rent, ataProgram, err := solanaATAAccounts(SolanaTokenProgramClassic)
 	if err != nil {
 		return nil, err
 	}
@@ -112,7 +118,11 @@ func (w *HDWallet) signSolanaCreateAndTransferToken(chain Chain, index uint32, i
 	if err != nil {
 		return nil, fmt.Errorf("%w: solana: sender_token_address: %v", ErrTxInput, err)
 	}
-	recipientATA, err := solanaDeriveATAGuarded(ct.GetRecipientMainAddress(), ct.GetTokenMintAddress(), ct.GetRecipientTokenAddress())
+	tokenProgramAddr, err := solanaTokenProgramAddress(ct.GetTokenProgramId())
+	if err != nil {
+		return nil, err
+	}
+	recipientATA, err := solanaDeriveATAGuarded(ct.GetRecipientMainAddress(), ct.GetTokenMintAddress(), ct.GetRecipientTokenAddress(), tokenProgramAddr)
 	if err != nil {
 		return nil, err
 	}
@@ -120,7 +130,7 @@ func (w *HDWallet) signSolanaCreateAndTransferToken(chain Chain, index uint32, i
 	if err != nil {
 		return nil, fmt.Errorf("%w: solana: recent_blockhash: %v", ErrTxInput, err)
 	}
-	tokenProgram, rent, ataProgram, err := solanaATAAccounts()
+	tokenProgram, rent, ataProgram, err := solanaATAAccounts(ct.GetTokenProgramId())
 	if err != nil {
 		return nil, err
 	}

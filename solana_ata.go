@@ -77,7 +77,20 @@ func solanaFindProgramAddress(seeds [][]byte, programID []byte) ([]byte, error) 
 // both base58. It is a pure offline derivation: no wallet, no secrets, no
 // network. Use it to compute deposit token accounts and withdrawal
 // destinations for SPL tokens.
+//
+// This derives against the classic SPL Token program; for a Token-2022
+// (Token Extensions) mint use SolanaTokenAccountAddressWithProgram.
 func SolanaTokenAccountAddress(walletAddress, mintAddress string) (string, error) {
+	return SolanaTokenAccountAddressWithProgram(walletAddress, mintAddress, solanaTokenProgramID)
+}
+
+// SolanaTokenAccountAddressWithProgram is SolanaTokenAccountAddress with an
+// explicit token-program id (base58), so the ATA can be derived for the
+// classic SPL Token program or the Token-2022 (Token Extensions) program —
+// the seeds are [wallet, tokenProgramID, mint], and the token-program id enters
+// the PDA derivation directly. Pure offline derivation: no wallet, no
+// secrets, no network.
+func SolanaTokenAccountAddressWithProgram(walletAddress, mintAddress, tokenProgramID string) (string, error) {
 	wallet, err := base58DecodeFixed(walletAddress, 32)
 	if err != nil {
 		return "", fmt.Errorf("%w: solana wallet address: %v", ErrInvalidAddress, err)
@@ -86,7 +99,7 @@ func SolanaTokenAccountAddress(walletAddress, mintAddress string) (string, error
 	if err != nil {
 		return "", fmt.Errorf("%w: solana mint address: %v", ErrInvalidAddress, err)
 	}
-	tokenProgram, err := base58DecodeFixed(solanaTokenProgramID, 32)
+	tokenProgram, err := base58DecodeFixed(tokenProgramID, 32)
 	if err != nil {
 		return "", fmt.Errorf("%w: token program id: %v", ErrInvalidAddress, err)
 	}

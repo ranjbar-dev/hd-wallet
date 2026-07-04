@@ -44,6 +44,33 @@ var solanaSystemProgramID = make([]byte, 32)
 // well-known program address, not a secret.
 const solanaTokenProgramID = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" // #nosec G101 -- public SPL Token program id, not a credential
 
+// solanaToken2022ProgramID is the SPL Token-2022 (Token Extensions) program
+// account, base58. It is a public well-known program address, not a
+// credential. Pinned via the two byte-exact TWC vectors in
+// tx_solana_token2022_test.go.
+const solanaToken2022ProgramID = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb" // #nosec G101 -- public SPL Token-2022 program id, not a credential
+
+// SolanaTokenProgramClassic and SolanaTokenProgram2022 select which SPL token
+// program a TransferChecked/CreateAndTransferToken instruction targets, via
+// the SigningInput's token_program_id field.
+const (
+	SolanaTokenProgramClassic uint32 = 0
+	SolanaTokenProgram2022    uint32 = 1
+)
+
+// solanaTokenProgramAddress resolves a token_program_id selector to the
+// program's base58 address.
+func solanaTokenProgramAddress(id uint32) (string, error) {
+	switch id {
+	case SolanaTokenProgramClassic:
+		return solanaTokenProgramID, nil
+	case SolanaTokenProgram2022:
+		return solanaToken2022ProgramID, nil
+	default:
+		return "", fmt.Errorf("%w: solana: unsupported token_program_id %d", ErrTxInput, id)
+	}
+}
+
 // solanaTransferInstruction is the System Program instruction index for Transfer.
 const solanaTransferInstruction uint32 = 2
 
@@ -187,7 +214,11 @@ func (w *HDWallet) signSolanaTokenTransfer(chain Chain, index uint32, in *txsola
 	if err != nil {
 		return nil, fmt.Errorf("%w: solana: recent_blockhash: %v", ErrTxInput, err)
 	}
-	tokenProgram, err := base58DecodeFixed(solanaTokenProgramID, 32)
+	tokenProgramID, err := solanaTokenProgramAddress(tt.GetTokenProgramId())
+	if err != nil {
+		return nil, err
+	}
+	tokenProgram, err := base58DecodeFixed(tokenProgramID, 32)
 	if err != nil {
 		return nil, fmt.Errorf("%w: solana: token program id: %v", ErrTxInput, err)
 	}
