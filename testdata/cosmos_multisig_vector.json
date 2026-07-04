@@ -1,0 +1,30 @@
+{
+  "threshold": 2,
+  "pubkeys_hex": [
+    "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+    "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5",
+    "02f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9"
+  ],
+  "multisig_address": "cosmos16nsuts7ccq7c64tat6sm4uar2ammtwgv667hzc",
+  "amino_pubkey_hex": "22c1f7e208021226eb5ae987210279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f817981226eb5ae9872102c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee51226eb5ae9872102f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9",
+  "to_address": "cosmos1csh8a7f0mdsr47zy6pj04tv4mwdumlfax9x0r7",
+  "chain_id": "cosmoshub-4",
+  "account_number": 1234,
+  "sequence": 7,
+  "memo": "hd-wallet multisig vector",
+  "denom": "uatom",
+  "send_amount": "1000000",
+  "fee_amount": "5000",
+  "gas": 200000,
+  "sign_doc_json": "{\"account_number\":\"1234\",\"chain_id\":\"cosmoshub-4\",\"fee\":{\"amount\":[{\"amount\":\"5000\",\"denom\":\"uatom\"}],\"gas\":\"200000\"},\"memo\":\"hd-wallet multisig vector\",\"msgs\":[{\"type\":\"cosmos-sdk/MsgSend\",\"value\":{\"amount\":[{\"amount\":\"1000000\",\"denom\":\"uatom\"}],\"from_address\":\"cosmos16nsuts7ccq7c64tat6sm4uar2ammtwgv667hzc\",\"to_address\":\"cosmos1csh8a7f0mdsr47zy6pj04tv4mwdumlfax9x0r7\"}}],\"sequence\":\"7\"}",
+  "signer_indices": [
+    0,
+    2
+  ],
+  "partial_sigs_hex": {
+    "0": "5030bc0d19c136885c8b7a243029ad3280222f6a3b4f1ed7ddacc604bcda835574f9e94ddd5b8fd48768f81914fcdf2c07fc63c43c4404e4ed75608c540fd6cb",
+    "2": "d42992cb0ea345abd368ce389cb82a50d8ce2b21d1ba4e247c8c2a965a4a56d920e2bef9da3e8d38c3913937dc5d1fd0bd81c3f76f6dfdc863475ae197d482c7"
+  },
+  "tx_raw_base64": "Cq4BCpABChwvY29zbW9zLmJhbmsudjFiZXRhMS5Nc2dTZW5kEnAKLWNvc21vczE2bnN1dHM3Y2NxN2M2NHRhdDZzbTR1YXIyYW1tdHdndjY2N2h6YxItY29zbW9zMWNzaDhhN2YwbWRzcjQ3enk2cGowNHR2NG13ZHVtbGZheDl4MHI3GhAKBXVhdG9tEgcxMDAwMDAwEhloZC13YWxsZXQgbXVsdGlzaWcgdmVjdG9yErwCCqQCCogCCikvY29zbW9zLmNyeXB0by5tdWx0aXNpZy5MZWdhY3lBbWlub1B1YktleRLaAQgCEkYKHy9jb3Ntb3MuY3J5cHRvLnNlY3AyNTZrMS5QdWJLZXkSIwohAnm+Zn753LusVaBilc6HCwcCm/zbLc4o2VnygVsW+BeYEkYKHy9jb3Ntb3MuY3J5cHRvLnNlY3AyNTZrMS5QdWJLZXkSIwohAsYEf5RB7X1tMEVAbpXAfNhcd45LjO88p6usCblccJ7lEkYKHy9jb3Ntb3MuY3J5cHRvLnNlY3AyNTZrMS5QdWJLZXkSIwohAvkwigGSWMMQSTRPhfidUim1MchFg2+ZsIYB8RO84Db5EhUSEwoFCAMSAaASBAoCCH8SBAoCCH8YBxITCg0KBXVhdG9tEgQ1MDAwEMCaDBqEAQpAUDC8DRnBNohci3okMCmtMoAiL2o7Tx7X3azGBLzag1V0+elN3VuP1Ido+BkU/N8sB/xjxDxEBOTtdWCMVA/WywpA1CmSyw6jRavTaM44nLgqUNjOKyHRuk4kfIwqllpKVtkg4r752j6NOMOROTfcXR/QvYHD929t/chjR1rhl9SCxw==",
+  "tx_id_hex": "B384E3F298B637A88BDB8FD3AE66291836764407411397714A70099B940FDF24"
+}
