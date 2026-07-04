@@ -23,6 +23,32 @@ message SigningInput {
   uint64 amount = 7;
   // Fee in microAlgos.
   uint64 fee = 8;
+  // Asset (ASA) transfer. When set, the flat pay fields `to`/`amount` above
+  // are ignored and the tx is encoded as msgpack type "axfer".
+  AssetTransfer asset_transfer = 9;
+  // Asset opt-in: a 0-amount axfer to self, required before an account can
+  // receive a given ASA. When set, the flat pay fields `to`/`amount` above
+  // are ignored.
+  AssetOptIn asset_opt_in = 10;
+}
+
+// AssetTransfer is an Algorand Standard Asset (ASA) transfer, msgpack type
+// "axfer".
+message AssetTransfer {
+  // Asset ID ("xaid" field).
+  uint64 asset_id = 1;
+  // Amount in the asset's base unit ("aamt" field). Omitted from msgpack
+  // when 0.
+  uint64 amount = 2;
+  // Recipient public key (32 raw bytes, not the base32 address; "arcv" field).
+  bytes to = 3;
+}
+
+// AssetOptIn opts the sender in to receive a given ASA: a 0-amount axfer to
+// self ("arcv" == sender's own public key, no "aamt" field at all).
+message AssetOptIn {
+  // Asset ID ("xaid" field).
+  uint64 asset_id = 1;
 }
 
 // SigningOutput mirrors a minimal subset of TW.Algorand.Proto.SigningOutput.
