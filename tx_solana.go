@@ -58,6 +58,10 @@ func (w *HDWallet) signSolanaTx(symbol Symbol, index uint32, in *txsolana.Signin
 		return w.signSolanaSystemTransfer(symbol, index, in)
 	case in.GetTokenTransferTransaction() != nil:
 		return w.signSolanaTokenTransfer(symbol, index, in)
+	case in.GetCreateTokenAccountTransaction() != nil:
+		return w.signSolanaCreateTokenAccount(symbol, index, in)
+	case in.GetCreateAndTransferTokenTransaction() != nil:
+		return w.signSolanaCreateAndTransferToken(symbol, index, in)
 	default:
 		return nil, fmt.Errorf("%w: solana: no supported transaction set", ErrTxInput)
 	}
