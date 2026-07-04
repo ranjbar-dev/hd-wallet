@@ -81,6 +81,9 @@ const xlmMemoHashLen = 32
 // xlmTimeBoundsAbsent is the XDR optional pointer for absent TimeBounds in V0 = 0.
 const xlmTimeBoundsAbsent uint32 = 0
 
+// xlmOpCreateAccount is the OperationBody discriminant CREATE_ACCOUNT = 0.
+const xlmOpCreateAccount uint32 = 0
+
 // xlmOpPayment is the OperationBody discriminant PAYMENT = 1.
 const xlmOpPayment uint32 = 1
 
@@ -102,17 +105,10 @@ func (w *HDWallet) signXLMTx(_ Chain, index uint32, in *txstellar.SigningInput) 
 		return nil, fmt.Errorf("%w: XLM: fee must be positive (got %d)", ErrTxInput, in.Fee)
 	}
 
-	// Validate and decode the operation.
-	payment := in.GetPayment()
-	if payment == nil {
-		return nil, fmt.Errorf("%w: XLM: no payment operation provided", ErrTxInput)
-	}
-	if payment.Amount <= 0 {
-		return nil, fmt.Errorf("%w: XLM: payment amount must be positive (got %d stroops)", ErrTxInput, payment.Amount)
-	}
-	destPub, err := validators[XLM](payment.Destination)
+	// Validate and encode the operation (Payment or CreateAccount).
+	opXDR, err := xlmBuildOperationXDR(in)
 	if err != nil {
-		return nil, fmt.Errorf("%w: XLM: invalid destination %q: %v", ErrTxInput, payment.Destination, err)
+		return nil, err
 	}
 
 	// Build the XDR-encoded memo (defaults to MEMO_NONE if no memo oneof case is set).
@@ -122,7 +118,7 @@ func (w *HDWallet) signXLMTx(_ Chain, index uint32, in *txstellar.SigningInput) 
 	}
 
 	// Build the XDR-encoded Transaction body.
-	txXDR := xlmBuildTransactionXDR(sourcePub, uint32(in.Fee), in.Sequence, destPub, payment.Amount, memoXDR) // #nosec G115 -- fee is int32, validated positive above; safe narrowing to uint32
+	txXDR := xlmBuildTransactionXDR(sourcePub, uint32(in.Fee), in.Sequence, opXDR, memoXDR) // #nosec G115 -- fee is int32, validated positive above; safe narrowing to uint32
 
 	// Determine the network passphrase.
 	passphrase := in.Passphrase
@@ -207,12 +203,66 @@ func xlmBuildMemoXDR(in *txstellar.SigningInput) ([]byte, error) {
 	}
 }
 
+// xlmBuildOperationXDR encodes the Operation.body (OperationBody discriminant
+// plus the operation-specific fields) selected from the SigningInput operation
+// oneof — either Payment (PAYMENT=1) or CreateAccount (CREATE_ACCOUNT=0).
+// CreateAccount funds a not-yet-existing account (Stellar rejects Payment to
+// unfunded accounts); unlike Payment it has no asset field, since it always
+// funds with native XLM.
+func xlmBuildOperationXDR(in *txstellar.SigningInput) ([]byte, error) {
+	switch {
+	case in.GetPayment() != nil:
+		payment := in.GetPayment()
+		if payment.Amount <= 0 {
+			return nil, fmt.Errorf("%w: XLM: payment amount must be positive (got %d stroops)", ErrTxInput, payment.Amount)
+		}
+		destPub, err := validators[XLM](payment.Destination)
+		if err != nil {
+			return nil, fmt.Errorf("%w: XLM: invalid destination %q: %v", ErrTxInput, payment.Destination, err)
+		}
+		var b []byte
+		// body: OperationBody { type=PAYMENT(1), PaymentOp }
+		b = xlmAppendUint32(b, xlmOpPayment)
+		// PaymentOp.destination: MuxedAccount
+		b = xlmAppendUint32(b, xlmKeyTypeED25519)
+		b = append(b, destPub...) // opaque[32]
+		// PaymentOp.asset: Asset { type=ASSET_TYPE_NATIVE(0) }
+		b = xlmAppendUint32(b, xlmAssetTypeNative)
+		// PaymentOp.amount: int64
+		b = xlmAppendInt64(b, payment.Amount)
+		return b, nil
+
+	case in.GetCreateAccount() != nil:
+		createAccount := in.GetCreateAccount()
+		if createAccount.StartingBalance <= 0 {
+			return nil, fmt.Errorf("%w: XLM: starting_balance must be positive (got %d stroops)", ErrTxInput, createAccount.StartingBalance)
+		}
+		destPub, err := validators[XLM](createAccount.Destination)
+		if err != nil {
+			return nil, fmt.Errorf("%w: XLM: invalid destination %q: %v", ErrTxInput, createAccount.Destination, err)
+		}
+		var b []byte
+		// body: OperationBody { type=CREATE_ACCOUNT(0), CreateAccountOp }
+		b = xlmAppendUint32(b, xlmOpCreateAccount)
+		// CreateAccountOp.destination: AccountID (MuxedAccount-style encoding, as used
+		// throughout this V0 preimage layout — see the file-level comment).
+		b = xlmAppendUint32(b, xlmKeyTypeED25519)
+		b = append(b, destPub...) // opaque[32]
+		// CreateAccountOp.startingBalance: int64 — no asset field (always native XLM).
+		b = xlmAppendInt64(b, createAccount.StartingBalance)
+		return b, nil
+
+	default:
+		return nil, fmt.Errorf("%w: XLM: no operation provided (payment or create_account)", ErrTxInput)
+	}
+}
+
 // xlmBuildTransactionXDR encodes a Stellar TransactionV0 body (without the
-// envelope wrapper) as XDR bytes. Only the PAYMENT operation is supported.
-// This is the V0 format: source account is a raw uint256 (32 bytes) with no
-// MuxedAccount discriminant prefix. memoXDR is the pre-encoded Memo union
-// (see xlmBuildMemoXDR).
-func xlmBuildTransactionXDR(sourcePub []byte, fee uint32, seqNum int64, destPub []byte, amount int64, memoXDR []byte) []byte {
+// envelope wrapper) as XDR bytes. This is the V0 format: source account is a
+// raw uint256 (32 bytes) with no MuxedAccount discriminant prefix. opXDR is
+// the pre-encoded Operation.body (see xlmBuildOperationXDR) and memoXDR is the
+// pre-encoded Memo union (see xlmBuildMemoXDR).
+func xlmBuildTransactionXDR(sourcePub []byte, fee uint32, seqNum int64, opXDR []byte, memoXDR []byte) []byte {
 	var b []byte
 
 	// sourceAccountEd25519: uint256 — V0 raw 32-byte key, NO MuxedAccount discriminant.
@@ -235,15 +285,8 @@ func xlmBuildTransactionXDR(sourcePub []byte, fee uint32, seqNum int64, destPub 
 	// Operation {
 	//   sourceAccount: absent (optional presence flag = 0)
 	b = xlmAppendUint32(b, 0) // present=0 (absent)
-	//   body: OperationBody { type=PAYMENT(1), PaymentOp }
-	b = xlmAppendUint32(b, xlmOpPayment)
-	// PaymentOp.destination: MuxedAccount
-	b = xlmAppendUint32(b, xlmKeyTypeED25519)
-	b = append(b, destPub...) // opaque[32]
-	// PaymentOp.asset: Asset { type=ASSET_TYPE_NATIVE(0) }
-	b = xlmAppendUint32(b, xlmAssetTypeNative)
-	// PaymentOp.amount: int64
-	b = xlmAppendInt64(b, amount)
+	//   body: OperationBody (pre-encoded — Payment or CreateAccount)
+	b = append(b, opXDR...)
 	// }
 
 	// ext: TransactionExt { v=0 }

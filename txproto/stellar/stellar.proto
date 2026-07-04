@@ -10,6 +10,12 @@ message PaymentOp {
   int64 amount = 2;       // amount in stroops (1 XLM = 10_000_000 stroops)
 }
 
+// Fund a not-yet-existing account (Stellar rejects Payment to unfunded accounts).
+message CreateAccountOp {
+  string destination = 1;      // G-address
+  int64 starting_balance = 2;  // stroops
+}
+
 message MemoText { string text = 1; }        // <=28 bytes
 message MemoId   { uint64 id = 1; }
 message MemoHash { bytes hash = 1; }         // exactly 32 bytes
@@ -28,6 +34,7 @@ message SigningInput {
 
   oneof operation {
     PaymentOp payment = 5;
+    CreateAccountOp create_account = 9;
   }
 
   oneof memo {

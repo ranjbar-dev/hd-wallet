@@ -74,6 +74,59 @@ func (x *PaymentOp) GetAmount() int64 {
 	return 0
 }
 
+// Fund a not-yet-existing account (Stellar rejects Payment to unfunded accounts).
+type CreateAccountOp struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	Destination     string                 `protobuf:"bytes,1,opt,name=destination,proto3" json:"destination,omitempty"`                                 // G-address
+	StartingBalance int64                  `protobuf:"varint,2,opt,name=starting_balance,json=startingBalance,proto3" json:"starting_balance,omitempty"` // stroops
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *CreateAccountOp) Reset() {
+	*x = CreateAccountOp{}
+	mi := &file_txproto_stellar_stellar_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateAccountOp) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateAccountOp) ProtoMessage() {}
+
+func (x *CreateAccountOp) ProtoReflect() protoreflect.Message {
+	mi := &file_txproto_stellar_stellar_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateAccountOp.ProtoReflect.Descriptor instead.
+func (*CreateAccountOp) Descriptor() ([]byte, []int) {
+	return file_txproto_stellar_stellar_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *CreateAccountOp) GetDestination() string {
+	if x != nil {
+		return x.Destination
+	}
+	return ""
+}
+
+func (x *CreateAccountOp) GetStartingBalance() int64 {
+	if x != nil {
+		return x.StartingBalance
+	}
+	return 0
+}
+
 type MemoText struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Text          string                 `protobuf:"bytes,1,opt,name=text,proto3" json:"text,omitempty"`
@@ -83,7 +136,7 @@ type MemoText struct {
 
 func (x *MemoText) Reset() {
 	*x = MemoText{}
-	mi := &file_txproto_stellar_stellar_proto_msgTypes[1]
+	mi := &file_txproto_stellar_stellar_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -95,7 +148,7 @@ func (x *MemoText) String() string {
 func (*MemoText) ProtoMessage() {}
 
 func (x *MemoText) ProtoReflect() protoreflect.Message {
-	mi := &file_txproto_stellar_stellar_proto_msgTypes[1]
+	mi := &file_txproto_stellar_stellar_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -108,7 +161,7 @@ func (x *MemoText) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MemoText.ProtoReflect.Descriptor instead.
 func (*MemoText) Descriptor() ([]byte, []int) {
-	return file_txproto_stellar_stellar_proto_rawDescGZIP(), []int{1}
+	return file_txproto_stellar_stellar_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *MemoText) GetText() string {
@@ -127,7 +180,7 @@ type MemoId struct {
 
 func (x *MemoId) Reset() {
 	*x = MemoId{}
-	mi := &file_txproto_stellar_stellar_proto_msgTypes[2]
+	mi := &file_txproto_stellar_stellar_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -139,7 +192,7 @@ func (x *MemoId) String() string {
 func (*MemoId) ProtoMessage() {}
 
 func (x *MemoId) ProtoReflect() protoreflect.Message {
-	mi := &file_txproto_stellar_stellar_proto_msgTypes[2]
+	mi := &file_txproto_stellar_stellar_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -152,7 +205,7 @@ func (x *MemoId) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MemoId.ProtoReflect.Descriptor instead.
 func (*MemoId) Descriptor() ([]byte, []int) {
-	return file_txproto_stellar_stellar_proto_rawDescGZIP(), []int{2}
+	return file_txproto_stellar_stellar_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *MemoId) GetId() uint64 {
@@ -171,7 +224,7 @@ type MemoHash struct {
 
 func (x *MemoHash) Reset() {
 	*x = MemoHash{}
-	mi := &file_txproto_stellar_stellar_proto_msgTypes[3]
+	mi := &file_txproto_stellar_stellar_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -183,7 +236,7 @@ func (x *MemoHash) String() string {
 func (*MemoHash) ProtoMessage() {}
 
 func (x *MemoHash) ProtoReflect() protoreflect.Message {
-	mi := &file_txproto_stellar_stellar_proto_msgTypes[3]
+	mi := &file_txproto_stellar_stellar_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -196,7 +249,7 @@ func (x *MemoHash) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MemoHash.ProtoReflect.Descriptor instead.
 func (*MemoHash) Descriptor() ([]byte, []int) {
-	return file_txproto_stellar_stellar_proto_rawDescGZIP(), []int{3}
+	return file_txproto_stellar_stellar_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *MemoHash) GetHash() []byte {
@@ -222,6 +275,7 @@ type SigningInput struct {
 	// Types that are valid to be assigned to Operation:
 	//
 	//	*SigningInput_Payment
+	//	*SigningInput_CreateAccount
 	Operation isSigningInput_Operation `protobuf_oneof:"operation"`
 	// Types that are valid to be assigned to Memo:
 	//
@@ -235,7 +289,7 @@ type SigningInput struct {
 
 func (x *SigningInput) Reset() {
 	*x = SigningInput{}
-	mi := &file_txproto_stellar_stellar_proto_msgTypes[4]
+	mi := &file_txproto_stellar_stellar_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -247,7 +301,7 @@ func (x *SigningInput) String() string {
 func (*SigningInput) ProtoMessage() {}
 
 func (x *SigningInput) ProtoReflect() protoreflect.Message {
-	mi := &file_txproto_stellar_stellar_proto_msgTypes[4]
+	mi := &file_txproto_stellar_stellar_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -260,7 +314,7 @@ func (x *SigningInput) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SigningInput.ProtoReflect.Descriptor instead.
 func (*SigningInput) Descriptor() ([]byte, []int) {
-	return file_txproto_stellar_stellar_proto_rawDescGZIP(), []int{4}
+	return file_txproto_stellar_stellar_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *SigningInput) GetAccount() string {
@@ -302,6 +356,15 @@ func (x *SigningInput) GetPayment() *PaymentOp {
 	if x != nil {
 		if x, ok := x.Operation.(*SigningInput_Payment); ok {
 			return x.Payment
+		}
+	}
+	return nil
+}
+
+func (x *SigningInput) GetCreateAccount() *CreateAccountOp {
+	if x != nil {
+		if x, ok := x.Operation.(*SigningInput_CreateAccount); ok {
+			return x.CreateAccount
 		}
 	}
 	return nil
@@ -349,7 +412,13 @@ type SigningInput_Payment struct {
 	Payment *PaymentOp `protobuf:"bytes,5,opt,name=payment,proto3,oneof"`
 }
 
+type SigningInput_CreateAccount struct {
+	CreateAccount *CreateAccountOp `protobuf:"bytes,9,opt,name=create_account,json=createAccount,proto3,oneof"`
+}
+
 func (*SigningInput_Payment) isSigningInput_Operation() {}
+
+func (*SigningInput_CreateAccount) isSigningInput_Operation() {}
 
 type isSigningInput_Memo interface {
 	isSigningInput_Memo()
@@ -388,7 +457,7 @@ type SigningOutput struct {
 
 func (x *SigningOutput) Reset() {
 	*x = SigningOutput{}
-	mi := &file_txproto_stellar_stellar_proto_msgTypes[5]
+	mi := &file_txproto_stellar_stellar_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -400,7 +469,7 @@ func (x *SigningOutput) String() string {
 func (*SigningOutput) ProtoMessage() {}
 
 func (x *SigningOutput) ProtoReflect() protoreflect.Message {
-	mi := &file_txproto_stellar_stellar_proto_msgTypes[5]
+	mi := &file_txproto_stellar_stellar_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -413,7 +482,7 @@ func (x *SigningOutput) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SigningOutput.ProtoReflect.Descriptor instead.
 func (*SigningOutput) Descriptor() ([]byte, []int) {
-	return file_txproto_stellar_stellar_proto_rawDescGZIP(), []int{5}
+	return file_txproto_stellar_stellar_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *SigningOutput) GetEncoded() string {
@@ -444,13 +513,16 @@ const file_txproto_stellar_stellar_proto_rawDesc = "" +
 	"\x1dtxproto/stellar/stellar.proto\x12\x16hdwallet.stellar.proto\"E\n" +
 	"\tPaymentOp\x12 \n" +
 	"\vdestination\x18\x01 \x01(\tR\vdestination\x12\x16\n" +
-	"\x06amount\x18\x02 \x01(\x03R\x06amount\"\x1e\n" +
+	"\x06amount\x18\x02 \x01(\x03R\x06amount\"^\n" +
+	"\x0fCreateAccountOp\x12 \n" +
+	"\vdestination\x18\x01 \x01(\tR\vdestination\x12)\n" +
+	"\x10starting_balance\x18\x02 \x01(\x03R\x0fstartingBalance\"\x1e\n" +
 	"\bMemoText\x12\x12\n" +
 	"\x04text\x18\x01 \x01(\tR\x04text\"\x18\n" +
 	"\x06MemoId\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x04R\x02id\"\x1e\n" +
 	"\bMemoHash\x12\x12\n" +
-	"\x04hash\x18\x01 \x01(\fR\x04hash\"\x87\x03\n" +
+	"\x04hash\x18\x01 \x01(\fR\x04hash\"\xd9\x03\n" +
 	"\fSigningInput\x12\x18\n" +
 	"\aaccount\x18\x01 \x01(\tR\aaccount\x12\x10\n" +
 	"\x03fee\x18\x02 \x01(\x05R\x03fee\x12\x1a\n" +
@@ -458,7 +530,8 @@ const file_txproto_stellar_stellar_proto_rawDesc = "" +
 	"\n" +
 	"passphrase\x18\x04 \x01(\tR\n" +
 	"passphrase\x12=\n" +
-	"\apayment\x18\x05 \x01(\v2!.hdwallet.stellar.proto.PaymentOpH\x00R\apayment\x12?\n" +
+	"\apayment\x18\x05 \x01(\v2!.hdwallet.stellar.proto.PaymentOpH\x00R\apayment\x12P\n" +
+	"\x0ecreate_account\x18\t \x01(\v2'.hdwallet.stellar.proto.CreateAccountOpH\x00R\rcreateAccount\x12?\n" +
 	"\tmemo_text\x18\x06 \x01(\v2 .hdwallet.stellar.proto.MemoTextH\x01R\bmemoText\x129\n" +
 	"\amemo_id\x18\a \x01(\v2\x1e.hdwallet.stellar.proto.MemoIdH\x01R\x06memoId\x12?\n" +
 	"\tmemo_hash\x18\b \x01(\v2 .hdwallet.stellar.proto.MemoHashH\x01R\bmemoHashB\v\n" +
@@ -481,25 +554,27 @@ func file_txproto_stellar_stellar_proto_rawDescGZIP() []byte {
 	return file_txproto_stellar_stellar_proto_rawDescData
 }
 
-var file_txproto_stellar_stellar_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
+var file_txproto_stellar_stellar_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
 var file_txproto_stellar_stellar_proto_goTypes = []any{
-	(*PaymentOp)(nil),     // 0: hdwallet.stellar.proto.PaymentOp
-	(*MemoText)(nil),      // 1: hdwallet.stellar.proto.MemoText
-	(*MemoId)(nil),        // 2: hdwallet.stellar.proto.MemoId
-	(*MemoHash)(nil),      // 3: hdwallet.stellar.proto.MemoHash
-	(*SigningInput)(nil),  // 4: hdwallet.stellar.proto.SigningInput
-	(*SigningOutput)(nil), // 5: hdwallet.stellar.proto.SigningOutput
+	(*PaymentOp)(nil),       // 0: hdwallet.stellar.proto.PaymentOp
+	(*CreateAccountOp)(nil), // 1: hdwallet.stellar.proto.CreateAccountOp
+	(*MemoText)(nil),        // 2: hdwallet.stellar.proto.MemoText
+	(*MemoId)(nil),          // 3: hdwallet.stellar.proto.MemoId
+	(*MemoHash)(nil),        // 4: hdwallet.stellar.proto.MemoHash
+	(*SigningInput)(nil),    // 5: hdwallet.stellar.proto.SigningInput
+	(*SigningOutput)(nil),   // 6: hdwallet.stellar.proto.SigningOutput
 }
 var file_txproto_stellar_stellar_proto_depIdxs = []int32{
 	0, // 0: hdwallet.stellar.proto.SigningInput.payment:type_name -> hdwallet.stellar.proto.PaymentOp
-	1, // 1: hdwallet.stellar.proto.SigningInput.memo_text:type_name -> hdwallet.stellar.proto.MemoText
-	2, // 2: hdwallet.stellar.proto.SigningInput.memo_id:type_name -> hdwallet.stellar.proto.MemoId
-	3, // 3: hdwallet.stellar.proto.SigningInput.memo_hash:type_name -> hdwallet.stellar.proto.MemoHash
-	4, // [4:4] is the sub-list for method output_type
-	4, // [4:4] is the sub-list for method input_type
-	4, // [4:4] is the sub-list for extension type_name
-	4, // [4:4] is the sub-list for extension extendee
-	0, // [0:4] is the sub-list for field type_name
+	1, // 1: hdwallet.stellar.proto.SigningInput.create_account:type_name -> hdwallet.stellar.proto.CreateAccountOp
+	2, // 2: hdwallet.stellar.proto.SigningInput.memo_text:type_name -> hdwallet.stellar.proto.MemoText
+	3, // 3: hdwallet.stellar.proto.SigningInput.memo_id:type_name -> hdwallet.stellar.proto.MemoId
+	4, // 4: hdwallet.stellar.proto.SigningInput.memo_hash:type_name -> hdwallet.stellar.proto.MemoHash
+	5, // [5:5] is the sub-list for method output_type
+	5, // [5:5] is the sub-list for method input_type
+	5, // [5:5] is the sub-list for extension type_name
+	5, // [5:5] is the sub-list for extension extendee
+	0, // [0:5] is the sub-list for field type_name
 }
 
 func init() { file_txproto_stellar_stellar_proto_init() }
@@ -507,8 +582,9 @@ func file_txproto_stellar_stellar_proto_init() {
 	if File_txproto_stellar_stellar_proto != nil {
 		return
 	}
-	file_txproto_stellar_stellar_proto_msgTypes[4].OneofWrappers = []any{
+	file_txproto_stellar_stellar_proto_msgTypes[5].OneofWrappers = []any{
 		(*SigningInput_Payment)(nil),
+		(*SigningInput_CreateAccount)(nil),
 		(*SigningInput_MemoText)(nil),
 		(*SigningInput_MemoId)(nil),
 		(*SigningInput_MemoHash)(nil),
@@ -519,7 +595,7 @@ func file_txproto_stellar_stellar_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_txproto_stellar_stellar_proto_rawDesc), len(file_txproto_stellar_stellar_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   6,
+			NumMessages:   7,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
