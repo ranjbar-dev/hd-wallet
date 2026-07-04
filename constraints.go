@@ -82,7 +82,10 @@ func DustThreshold(chain Chain) (*big.Int, bool) {
 }
 
 // ActivationCost returns the one-off cost charged when first funding a
-// previously unseen account (TRX account-creation fee, XLM/XRP reserves).
+// previously unseen account (e.g. TRX's account-creation fee). This is
+// distinct from an ongoing reserve requirement: XLM/XRP's reserve is not a
+// one-off fee consumed on activation but a floor the balance must stay above
+// indefinitely, so it is modeled under MinimumBalance instead — not here.
 func ActivationCost(chain Chain) (*big.Int, bool) {
 	switch chain {
 	case TRX:
