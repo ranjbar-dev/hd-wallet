@@ -19,14 +19,71 @@ message TokenTransfer {
   uint32 decimals = 5;
 }
 
+// Create the associated token account (ATA) for main_address+mint, funded by
+// the signing wallet. token_address is optional: when set it MUST equal the
+// derived ATA (fund-critical guard); when empty the ATA is derived internally.
+message CreateTokenAccount {
+  string main_address = 1;       // base58 wallet that will OWN the new ATA
+  string token_mint_address = 2; // base58 mint
+  string token_address = 3;      // optional expected ATA, base58
+}
+
+// Create the recipient's ATA and transfer SPL tokens to it in one transaction
+// (the standard "withdraw to a wallet that may not have a token account" op).
+// recipient_token_address is optional with the same must-match guard.
+message CreateAndTransferToken {
+  string recipient_main_address = 1;  // base58 recipient WALLET address
+  string token_mint_address = 2;      // base58 mint
+  string recipient_token_address = 3; // optional expected recipient ATA, base58
+  string sender_token_address = 4;    // base58 source token account
+  uint64 amount = 5;
+  uint32 decimals = 6;
+}
+
+// Create and initialize a durable-nonce account. The new account must co-sign
+// its own creation, so its 32-byte ed25519 seed is supplied here; the library
+// wipes its internal copies after signing (the caller owns and should wipe
+// this field's buffer). The signing wallet pays rent and becomes the nonce
+// authority.
+message CreateNonceAccount {
+  bytes nonce_account_private_key = 1; // 32-byte ed25519 seed of the NEW nonce account
+  uint64 rent = 2;                     // lamports to fund (rent-exempt reserve)
+}
+
+// Withdraw lamports from a nonce account (signer must be the nonce authority).
+message WithdrawNonceAccount {
+  string nonce_account = 1; // base58
+  string recipient = 2;     // base58
+  uint64 value = 3;         // lamports
+}
+
+// Advance a durable nonce without any other operation (signer must be the
+// nonce authority).
+message AdvanceNonceAccount {
+  string nonce_account = 1; // base58
+}
+
 // SigningInput mirrors a minimal subset of TW.Solana.Proto.SigningInput.
 message SigningInput {
-  // Recent blockhash, base58.
+  // Recent blockhash, base58. When nonce_account is set this carries the
+  // DURABLE NONCE VALUE instead (the current nonce stored in the account).
   string recent_blockhash = 1;
+
+  // Optional durable-nonce account, base58. When set, an AdvanceNonceAccount
+  // instruction is prepended and recent_blockhash is interpreted as the nonce
+  // value. Supported for transfer, token_transfer and
+  // create_and_transfer_token transactions (plus create/withdraw nonce
+  // account); not supported for create_token_account.
+  string nonce_account = 4;
 
   oneof transaction_type {
     Transfer transfer_transaction = 2;
     TokenTransfer token_transfer_transaction = 3;
+    CreateTokenAccount create_token_account_transaction = 5;
+    CreateAndTransferToken create_and_transfer_token_transaction = 6;
+    CreateNonceAccount create_nonce_account = 7;
+    WithdrawNonceAccount withdraw_nonce_account = 8;
+    AdvanceNonceAccount advance_nonce_account = 9;
   }
 }
 

@@ -151,15 +151,341 @@ func (x *TokenTransfer) GetDecimals() uint32 {
 	return 0
 }
 
+// Create the associated token account (ATA) for main_address+mint, funded by
+// the signing wallet. token_address is optional: when set it MUST equal the
+// derived ATA (fund-critical guard); when empty the ATA is derived internally.
+type CreateTokenAccount struct {
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	MainAddress      string                 `protobuf:"bytes,1,opt,name=main_address,json=mainAddress,proto3" json:"main_address,omitempty"`                  // base58 wallet that will OWN the new ATA
+	TokenMintAddress string                 `protobuf:"bytes,2,opt,name=token_mint_address,json=tokenMintAddress,proto3" json:"token_mint_address,omitempty"` // base58 mint
+	TokenAddress     string                 `protobuf:"bytes,3,opt,name=token_address,json=tokenAddress,proto3" json:"token_address,omitempty"`               // optional expected ATA, base58
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *CreateTokenAccount) Reset() {
+	*x = CreateTokenAccount{}
+	mi := &file_txproto_solana_solana_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateTokenAccount) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateTokenAccount) ProtoMessage() {}
+
+func (x *CreateTokenAccount) ProtoReflect() protoreflect.Message {
+	mi := &file_txproto_solana_solana_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateTokenAccount.ProtoReflect.Descriptor instead.
+func (*CreateTokenAccount) Descriptor() ([]byte, []int) {
+	return file_txproto_solana_solana_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *CreateTokenAccount) GetMainAddress() string {
+	if x != nil {
+		return x.MainAddress
+	}
+	return ""
+}
+
+func (x *CreateTokenAccount) GetTokenMintAddress() string {
+	if x != nil {
+		return x.TokenMintAddress
+	}
+	return ""
+}
+
+func (x *CreateTokenAccount) GetTokenAddress() string {
+	if x != nil {
+		return x.TokenAddress
+	}
+	return ""
+}
+
+// Create the recipient's ATA and transfer SPL tokens to it in one transaction
+// (the standard "withdraw to a wallet that may not have a token account" op).
+// recipient_token_address is optional with the same must-match guard.
+type CreateAndTransferToken struct {
+	state                 protoimpl.MessageState `protogen:"open.v1"`
+	RecipientMainAddress  string                 `protobuf:"bytes,1,opt,name=recipient_main_address,json=recipientMainAddress,proto3" json:"recipient_main_address,omitempty"`    // base58 recipient WALLET address
+	TokenMintAddress      string                 `protobuf:"bytes,2,opt,name=token_mint_address,json=tokenMintAddress,proto3" json:"token_mint_address,omitempty"`                // base58 mint
+	RecipientTokenAddress string                 `protobuf:"bytes,3,opt,name=recipient_token_address,json=recipientTokenAddress,proto3" json:"recipient_token_address,omitempty"` // optional expected recipient ATA, base58
+	SenderTokenAddress    string                 `protobuf:"bytes,4,opt,name=sender_token_address,json=senderTokenAddress,proto3" json:"sender_token_address,omitempty"`          // base58 source token account
+	Amount                uint64                 `protobuf:"varint,5,opt,name=amount,proto3" json:"amount,omitempty"`
+	Decimals              uint32                 `protobuf:"varint,6,opt,name=decimals,proto3" json:"decimals,omitempty"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
+}
+
+func (x *CreateAndTransferToken) Reset() {
+	*x = CreateAndTransferToken{}
+	mi := &file_txproto_solana_solana_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateAndTransferToken) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateAndTransferToken) ProtoMessage() {}
+
+func (x *CreateAndTransferToken) ProtoReflect() protoreflect.Message {
+	mi := &file_txproto_solana_solana_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateAndTransferToken.ProtoReflect.Descriptor instead.
+func (*CreateAndTransferToken) Descriptor() ([]byte, []int) {
+	return file_txproto_solana_solana_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *CreateAndTransferToken) GetRecipientMainAddress() string {
+	if x != nil {
+		return x.RecipientMainAddress
+	}
+	return ""
+}
+
+func (x *CreateAndTransferToken) GetTokenMintAddress() string {
+	if x != nil {
+		return x.TokenMintAddress
+	}
+	return ""
+}
+
+func (x *CreateAndTransferToken) GetRecipientTokenAddress() string {
+	if x != nil {
+		return x.RecipientTokenAddress
+	}
+	return ""
+}
+
+func (x *CreateAndTransferToken) GetSenderTokenAddress() string {
+	if x != nil {
+		return x.SenderTokenAddress
+	}
+	return ""
+}
+
+func (x *CreateAndTransferToken) GetAmount() uint64 {
+	if x != nil {
+		return x.Amount
+	}
+	return 0
+}
+
+func (x *CreateAndTransferToken) GetDecimals() uint32 {
+	if x != nil {
+		return x.Decimals
+	}
+	return 0
+}
+
+// Create and initialize a durable-nonce account. The new account must co-sign
+// its own creation, so its 32-byte ed25519 seed is supplied here; the library
+// wipes its internal copies after signing (the caller owns and should wipe
+// this field's buffer). The signing wallet pays rent and becomes the nonce
+// authority.
+type CreateNonceAccount struct {
+	state                  protoimpl.MessageState `protogen:"open.v1"`
+	NonceAccountPrivateKey []byte                 `protobuf:"bytes,1,opt,name=nonce_account_private_key,json=nonceAccountPrivateKey,proto3" json:"nonce_account_private_key,omitempty"` // 32-byte ed25519 seed of the NEW nonce account
+	Rent                   uint64                 `protobuf:"varint,2,opt,name=rent,proto3" json:"rent,omitempty"`                                                                      // lamports to fund (rent-exempt reserve)
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
+}
+
+func (x *CreateNonceAccount) Reset() {
+	*x = CreateNonceAccount{}
+	mi := &file_txproto_solana_solana_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateNonceAccount) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateNonceAccount) ProtoMessage() {}
+
+func (x *CreateNonceAccount) ProtoReflect() protoreflect.Message {
+	mi := &file_txproto_solana_solana_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateNonceAccount.ProtoReflect.Descriptor instead.
+func (*CreateNonceAccount) Descriptor() ([]byte, []int) {
+	return file_txproto_solana_solana_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *CreateNonceAccount) GetNonceAccountPrivateKey() []byte {
+	if x != nil {
+		return x.NonceAccountPrivateKey
+	}
+	return nil
+}
+
+func (x *CreateNonceAccount) GetRent() uint64 {
+	if x != nil {
+		return x.Rent
+	}
+	return 0
+}
+
+// Withdraw lamports from a nonce account (signer must be the nonce authority).
+type WithdrawNonceAccount struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	NonceAccount  string                 `protobuf:"bytes,1,opt,name=nonce_account,json=nonceAccount,proto3" json:"nonce_account,omitempty"` // base58
+	Recipient     string                 `protobuf:"bytes,2,opt,name=recipient,proto3" json:"recipient,omitempty"`                           // base58
+	Value         uint64                 `protobuf:"varint,3,opt,name=value,proto3" json:"value,omitempty"`                                  // lamports
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WithdrawNonceAccount) Reset() {
+	*x = WithdrawNonceAccount{}
+	mi := &file_txproto_solana_solana_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WithdrawNonceAccount) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WithdrawNonceAccount) ProtoMessage() {}
+
+func (x *WithdrawNonceAccount) ProtoReflect() protoreflect.Message {
+	mi := &file_txproto_solana_solana_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WithdrawNonceAccount.ProtoReflect.Descriptor instead.
+func (*WithdrawNonceAccount) Descriptor() ([]byte, []int) {
+	return file_txproto_solana_solana_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *WithdrawNonceAccount) GetNonceAccount() string {
+	if x != nil {
+		return x.NonceAccount
+	}
+	return ""
+}
+
+func (x *WithdrawNonceAccount) GetRecipient() string {
+	if x != nil {
+		return x.Recipient
+	}
+	return ""
+}
+
+func (x *WithdrawNonceAccount) GetValue() uint64 {
+	if x != nil {
+		return x.Value
+	}
+	return 0
+}
+
+// Advance a durable nonce without any other operation (signer must be the
+// nonce authority).
+type AdvanceNonceAccount struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	NonceAccount  string                 `protobuf:"bytes,1,opt,name=nonce_account,json=nonceAccount,proto3" json:"nonce_account,omitempty"` // base58
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AdvanceNonceAccount) Reset() {
+	*x = AdvanceNonceAccount{}
+	mi := &file_txproto_solana_solana_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AdvanceNonceAccount) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AdvanceNonceAccount) ProtoMessage() {}
+
+func (x *AdvanceNonceAccount) ProtoReflect() protoreflect.Message {
+	mi := &file_txproto_solana_solana_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AdvanceNonceAccount.ProtoReflect.Descriptor instead.
+func (*AdvanceNonceAccount) Descriptor() ([]byte, []int) {
+	return file_txproto_solana_solana_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *AdvanceNonceAccount) GetNonceAccount() string {
+	if x != nil {
+		return x.NonceAccount
+	}
+	return ""
+}
+
 // SigningInput mirrors a minimal subset of TW.Solana.Proto.SigningInput.
 type SigningInput struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// Recent blockhash, base58.
+	// Recent blockhash, base58. When nonce_account is set this carries the
+	// DURABLE NONCE VALUE instead (the current nonce stored in the account).
 	RecentBlockhash string `protobuf:"bytes,1,opt,name=recent_blockhash,json=recentBlockhash,proto3" json:"recent_blockhash,omitempty"`
+	// Optional durable-nonce account, base58. When set, an AdvanceNonceAccount
+	// instruction is prepended and recent_blockhash is interpreted as the nonce
+	// value. Supported for transfer, token_transfer and
+	// create_and_transfer_token transactions (plus create/withdraw nonce
+	// account); not supported for create_token_account.
+	NonceAccount string `protobuf:"bytes,4,opt,name=nonce_account,json=nonceAccount,proto3" json:"nonce_account,omitempty"`
 	// Types that are valid to be assigned to TransactionType:
 	//
 	//	*SigningInput_TransferTransaction
 	//	*SigningInput_TokenTransferTransaction
+	//	*SigningInput_CreateTokenAccountTransaction
+	//	*SigningInput_CreateAndTransferTokenTransaction
+	//	*SigningInput_CreateNonceAccount
+	//	*SigningInput_WithdrawNonceAccount
+	//	*SigningInput_AdvanceNonceAccount
 	TransactionType isSigningInput_TransactionType `protobuf_oneof:"transaction_type"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
@@ -167,7 +493,7 @@ type SigningInput struct {
 
 func (x *SigningInput) Reset() {
 	*x = SigningInput{}
-	mi := &file_txproto_solana_solana_proto_msgTypes[2]
+	mi := &file_txproto_solana_solana_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -179,7 +505,7 @@ func (x *SigningInput) String() string {
 func (*SigningInput) ProtoMessage() {}
 
 func (x *SigningInput) ProtoReflect() protoreflect.Message {
-	mi := &file_txproto_solana_solana_proto_msgTypes[2]
+	mi := &file_txproto_solana_solana_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -192,12 +518,19 @@ func (x *SigningInput) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SigningInput.ProtoReflect.Descriptor instead.
 func (*SigningInput) Descriptor() ([]byte, []int) {
-	return file_txproto_solana_solana_proto_rawDescGZIP(), []int{2}
+	return file_txproto_solana_solana_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *SigningInput) GetRecentBlockhash() string {
 	if x != nil {
 		return x.RecentBlockhash
+	}
+	return ""
+}
+
+func (x *SigningInput) GetNonceAccount() string {
+	if x != nil {
+		return x.NonceAccount
 	}
 	return ""
 }
@@ -227,6 +560,51 @@ func (x *SigningInput) GetTokenTransferTransaction() *TokenTransfer {
 	return nil
 }
 
+func (x *SigningInput) GetCreateTokenAccountTransaction() *CreateTokenAccount {
+	if x != nil {
+		if x, ok := x.TransactionType.(*SigningInput_CreateTokenAccountTransaction); ok {
+			return x.CreateTokenAccountTransaction
+		}
+	}
+	return nil
+}
+
+func (x *SigningInput) GetCreateAndTransferTokenTransaction() *CreateAndTransferToken {
+	if x != nil {
+		if x, ok := x.TransactionType.(*SigningInput_CreateAndTransferTokenTransaction); ok {
+			return x.CreateAndTransferTokenTransaction
+		}
+	}
+	return nil
+}
+
+func (x *SigningInput) GetCreateNonceAccount() *CreateNonceAccount {
+	if x != nil {
+		if x, ok := x.TransactionType.(*SigningInput_CreateNonceAccount); ok {
+			return x.CreateNonceAccount
+		}
+	}
+	return nil
+}
+
+func (x *SigningInput) GetWithdrawNonceAccount() *WithdrawNonceAccount {
+	if x != nil {
+		if x, ok := x.TransactionType.(*SigningInput_WithdrawNonceAccount); ok {
+			return x.WithdrawNonceAccount
+		}
+	}
+	return nil
+}
+
+func (x *SigningInput) GetAdvanceNonceAccount() *AdvanceNonceAccount {
+	if x != nil {
+		if x, ok := x.TransactionType.(*SigningInput_AdvanceNonceAccount); ok {
+			return x.AdvanceNonceAccount
+		}
+	}
+	return nil
+}
+
 type isSigningInput_TransactionType interface {
 	isSigningInput_TransactionType()
 }
@@ -239,9 +617,39 @@ type SigningInput_TokenTransferTransaction struct {
 	TokenTransferTransaction *TokenTransfer `protobuf:"bytes,3,opt,name=token_transfer_transaction,json=tokenTransferTransaction,proto3,oneof"`
 }
 
+type SigningInput_CreateTokenAccountTransaction struct {
+	CreateTokenAccountTransaction *CreateTokenAccount `protobuf:"bytes,5,opt,name=create_token_account_transaction,json=createTokenAccountTransaction,proto3,oneof"`
+}
+
+type SigningInput_CreateAndTransferTokenTransaction struct {
+	CreateAndTransferTokenTransaction *CreateAndTransferToken `protobuf:"bytes,6,opt,name=create_and_transfer_token_transaction,json=createAndTransferTokenTransaction,proto3,oneof"`
+}
+
+type SigningInput_CreateNonceAccount struct {
+	CreateNonceAccount *CreateNonceAccount `protobuf:"bytes,7,opt,name=create_nonce_account,json=createNonceAccount,proto3,oneof"`
+}
+
+type SigningInput_WithdrawNonceAccount struct {
+	WithdrawNonceAccount *WithdrawNonceAccount `protobuf:"bytes,8,opt,name=withdraw_nonce_account,json=withdrawNonceAccount,proto3,oneof"`
+}
+
+type SigningInput_AdvanceNonceAccount struct {
+	AdvanceNonceAccount *AdvanceNonceAccount `protobuf:"bytes,9,opt,name=advance_nonce_account,json=advanceNonceAccount,proto3,oneof"`
+}
+
 func (*SigningInput_TransferTransaction) isSigningInput_TransactionType() {}
 
 func (*SigningInput_TokenTransferTransaction) isSigningInput_TransactionType() {}
+
+func (*SigningInput_CreateTokenAccountTransaction) isSigningInput_TransactionType() {}
+
+func (*SigningInput_CreateAndTransferTokenTransaction) isSigningInput_TransactionType() {}
+
+func (*SigningInput_CreateNonceAccount) isSigningInput_TransactionType() {}
+
+func (*SigningInput_WithdrawNonceAccount) isSigningInput_TransactionType() {}
+
+func (*SigningInput_AdvanceNonceAccount) isSigningInput_TransactionType() {}
 
 // SigningOutput mirrors a minimal subset of TW.Solana.Proto.SigningOutput.
 type SigningOutput struct {
@@ -261,7 +669,7 @@ type SigningOutput struct {
 
 func (x *SigningOutput) Reset() {
 	*x = SigningOutput{}
-	mi := &file_txproto_solana_solana_proto_msgTypes[3]
+	mi := &file_txproto_solana_solana_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -273,7 +681,7 @@ func (x *SigningOutput) String() string {
 func (*SigningOutput) ProtoMessage() {}
 
 func (x *SigningOutput) ProtoReflect() protoreflect.Message {
-	mi := &file_txproto_solana_solana_proto_msgTypes[3]
+	mi := &file_txproto_solana_solana_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -286,7 +694,7 @@ func (x *SigningOutput) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SigningOutput.ProtoReflect.Descriptor instead.
 func (*SigningOutput) Descriptor() ([]byte, []int) {
-	return file_txproto_solana_solana_proto_rawDescGZIP(), []int{3}
+	return file_txproto_solana_solana_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *SigningOutput) GetEncoded() string {
@@ -330,11 +738,37 @@ const file_txproto_solana_solana_proto_rawDesc = "" +
 	"\x14sender_token_address\x18\x02 \x01(\tR\x12senderTokenAddress\x126\n" +
 	"\x17recipient_token_address\x18\x03 \x01(\tR\x15recipientTokenAddress\x12\x16\n" +
 	"\x06amount\x18\x04 \x01(\x04R\x06amount\x12\x1a\n" +
-	"\bdecimals\x18\x05 \x01(\rR\bdecimals\"\x89\x02\n" +
+	"\bdecimals\x18\x05 \x01(\rR\bdecimals\"\x8a\x01\n" +
+	"\x12CreateTokenAccount\x12!\n" +
+	"\fmain_address\x18\x01 \x01(\tR\vmainAddress\x12,\n" +
+	"\x12token_mint_address\x18\x02 \x01(\tR\x10tokenMintAddress\x12#\n" +
+	"\rtoken_address\x18\x03 \x01(\tR\ftokenAddress\"\x9a\x02\n" +
+	"\x16CreateAndTransferToken\x124\n" +
+	"\x16recipient_main_address\x18\x01 \x01(\tR\x14recipientMainAddress\x12,\n" +
+	"\x12token_mint_address\x18\x02 \x01(\tR\x10tokenMintAddress\x126\n" +
+	"\x17recipient_token_address\x18\x03 \x01(\tR\x15recipientTokenAddress\x120\n" +
+	"\x14sender_token_address\x18\x04 \x01(\tR\x12senderTokenAddress\x12\x16\n" +
+	"\x06amount\x18\x05 \x01(\x04R\x06amount\x12\x1a\n" +
+	"\bdecimals\x18\x06 \x01(\rR\bdecimals\"c\n" +
+	"\x12CreateNonceAccount\x129\n" +
+	"\x19nonce_account_private_key\x18\x01 \x01(\fR\x16nonceAccountPrivateKey\x12\x12\n" +
+	"\x04rent\x18\x02 \x01(\x04R\x04rent\"o\n" +
+	"\x14WithdrawNonceAccount\x12#\n" +
+	"\rnonce_account\x18\x01 \x01(\tR\fnonceAccount\x12\x1c\n" +
+	"\trecipient\x18\x02 \x01(\tR\trecipient\x12\x14\n" +
+	"\x05value\x18\x03 \x01(\x04R\x05value\":\n" +
+	"\x13AdvanceNonceAccount\x12#\n" +
+	"\rnonce_account\x18\x01 \x01(\tR\fnonceAccount\"\xce\x06\n" +
 	"\fSigningInput\x12)\n" +
-	"\x10recent_blockhash\x18\x01 \x01(\tR\x0frecentBlockhash\x12T\n" +
+	"\x10recent_blockhash\x18\x01 \x01(\tR\x0frecentBlockhash\x12#\n" +
+	"\rnonce_account\x18\x04 \x01(\tR\fnonceAccount\x12T\n" +
 	"\x14transfer_transaction\x18\x02 \x01(\v2\x1f.hdwallet.solana.proto.TransferH\x00R\x13transferTransaction\x12d\n" +
-	"\x1atoken_transfer_transaction\x18\x03 \x01(\v2$.hdwallet.solana.proto.TokenTransferH\x00R\x18tokenTransferTransactionB\x12\n" +
+	"\x1atoken_transfer_transaction\x18\x03 \x01(\v2$.hdwallet.solana.proto.TokenTransferH\x00R\x18tokenTransferTransaction\x12t\n" +
+	" create_token_account_transaction\x18\x05 \x01(\v2).hdwallet.solana.proto.CreateTokenAccountH\x00R\x1dcreateTokenAccountTransaction\x12\x81\x01\n" +
+	"%create_and_transfer_token_transaction\x18\x06 \x01(\v2-.hdwallet.solana.proto.CreateAndTransferTokenH\x00R!createAndTransferTokenTransaction\x12]\n" +
+	"\x14create_nonce_account\x18\a \x01(\v2).hdwallet.solana.proto.CreateNonceAccountH\x00R\x12createNonceAccount\x12c\n" +
+	"\x16withdraw_nonce_account\x18\b \x01(\v2+.hdwallet.solana.proto.WithdrawNonceAccountH\x00R\x14withdrawNonceAccount\x12`\n" +
+	"\x15advance_nonce_account\x18\t \x01(\v2*.hdwallet.solana.proto.AdvanceNonceAccountH\x00R\x13advanceNonceAccountB\x12\n" +
 	"\x10transaction_type\"f\n" +
 	"\rSigningOutput\x12\x18\n" +
 	"\aencoded\x18\x01 \x01(\tR\aencoded\x12\x10\n" +
@@ -354,21 +788,31 @@ func file_txproto_solana_solana_proto_rawDescGZIP() []byte {
 	return file_txproto_solana_solana_proto_rawDescData
 }
 
-var file_txproto_solana_solana_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_txproto_solana_solana_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
 var file_txproto_solana_solana_proto_goTypes = []any{
-	(*Transfer)(nil),      // 0: hdwallet.solana.proto.Transfer
-	(*TokenTransfer)(nil), // 1: hdwallet.solana.proto.TokenTransfer
-	(*SigningInput)(nil),  // 2: hdwallet.solana.proto.SigningInput
-	(*SigningOutput)(nil), // 3: hdwallet.solana.proto.SigningOutput
+	(*Transfer)(nil),               // 0: hdwallet.solana.proto.Transfer
+	(*TokenTransfer)(nil),          // 1: hdwallet.solana.proto.TokenTransfer
+	(*CreateTokenAccount)(nil),     // 2: hdwallet.solana.proto.CreateTokenAccount
+	(*CreateAndTransferToken)(nil), // 3: hdwallet.solana.proto.CreateAndTransferToken
+	(*CreateNonceAccount)(nil),     // 4: hdwallet.solana.proto.CreateNonceAccount
+	(*WithdrawNonceAccount)(nil),   // 5: hdwallet.solana.proto.WithdrawNonceAccount
+	(*AdvanceNonceAccount)(nil),    // 6: hdwallet.solana.proto.AdvanceNonceAccount
+	(*SigningInput)(nil),           // 7: hdwallet.solana.proto.SigningInput
+	(*SigningOutput)(nil),          // 8: hdwallet.solana.proto.SigningOutput
 }
 var file_txproto_solana_solana_proto_depIdxs = []int32{
 	0, // 0: hdwallet.solana.proto.SigningInput.transfer_transaction:type_name -> hdwallet.solana.proto.Transfer
 	1, // 1: hdwallet.solana.proto.SigningInput.token_transfer_transaction:type_name -> hdwallet.solana.proto.TokenTransfer
-	2, // [2:2] is the sub-list for method output_type
-	2, // [2:2] is the sub-list for method input_type
-	2, // [2:2] is the sub-list for extension type_name
-	2, // [2:2] is the sub-list for extension extendee
-	0, // [0:2] is the sub-list for field type_name
+	2, // 2: hdwallet.solana.proto.SigningInput.create_token_account_transaction:type_name -> hdwallet.solana.proto.CreateTokenAccount
+	3, // 3: hdwallet.solana.proto.SigningInput.create_and_transfer_token_transaction:type_name -> hdwallet.solana.proto.CreateAndTransferToken
+	4, // 4: hdwallet.solana.proto.SigningInput.create_nonce_account:type_name -> hdwallet.solana.proto.CreateNonceAccount
+	5, // 5: hdwallet.solana.proto.SigningInput.withdraw_nonce_account:type_name -> hdwallet.solana.proto.WithdrawNonceAccount
+	6, // 6: hdwallet.solana.proto.SigningInput.advance_nonce_account:type_name -> hdwallet.solana.proto.AdvanceNonceAccount
+	7, // [7:7] is the sub-list for method output_type
+	7, // [7:7] is the sub-list for method input_type
+	7, // [7:7] is the sub-list for extension type_name
+	7, // [7:7] is the sub-list for extension extendee
+	0, // [0:7] is the sub-list for field type_name
 }
 
 func init() { file_txproto_solana_solana_proto_init() }
@@ -376,9 +820,14 @@ func file_txproto_solana_solana_proto_init() {
 	if File_txproto_solana_solana_proto != nil {
 		return
 	}
-	file_txproto_solana_solana_proto_msgTypes[2].OneofWrappers = []any{
+	file_txproto_solana_solana_proto_msgTypes[7].OneofWrappers = []any{
 		(*SigningInput_TransferTransaction)(nil),
 		(*SigningInput_TokenTransferTransaction)(nil),
+		(*SigningInput_CreateTokenAccountTransaction)(nil),
+		(*SigningInput_CreateAndTransferTokenTransaction)(nil),
+		(*SigningInput_CreateNonceAccount)(nil),
+		(*SigningInput_WithdrawNonceAccount)(nil),
+		(*SigningInput_AdvanceNonceAccount)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -386,7 +835,7 @@ func file_txproto_solana_solana_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_txproto_solana_solana_proto_rawDesc), len(file_txproto_solana_solana_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   4,
+			NumMessages:   9,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
