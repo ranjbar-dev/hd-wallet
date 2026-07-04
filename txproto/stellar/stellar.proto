@@ -10,6 +10,10 @@ message PaymentOp {
   int64 amount = 2;       // amount in stroops (1 XLM = 10_000_000 stroops)
 }
 
+message MemoText { string text = 1; }        // <=28 bytes
+message MemoId   { uint64 id = 1; }
+message MemoHash { bytes hash = 1; }         // exactly 32 bytes
+
 // SigningInput mirrors a minimal subset of TW.Stellar.Proto.SigningInput.
 message SigningInput {
   // Source account G-address (needed for XDR source-account field).
@@ -24,6 +28,12 @@ message SigningInput {
 
   oneof operation {
     PaymentOp payment = 5;
+  }
+
+  oneof memo {
+    MemoText memo_text = 6;
+    MemoId   memo_id = 7;
+    MemoHash memo_hash = 8;
   }
 }
 
