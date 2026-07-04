@@ -191,3 +191,152 @@ func TestDecodeSolanaV0AddressTableLookups(t *testing.T) {
 		t.Fatalf("AddressTableLookups = %d, want 1", f.AddressTableLookups)
 	}
 }
+
+// assertSolanaV0 is the shared structural check for the v0_msg smoke tests
+// below: no TWC vector exists for these v0 + (token-transfer / ATA / durable
+// nonce) combinations, so — following the TokenTransfer+nonce precedent in
+// tx_solana_nonce_test.go — we anchor on structure rather than a byte-exact
+// vector: the signer must not error, the message body must carry the 0x80
+// v0 version prefix, and DecodeSolanaTx must round-trip Version == 0.
+func assertSolanaV0(t *testing.T, so *txsolana.SigningOutput) *SolanaTxFields {
+	t.Helper()
+	if so.GetError() != "" {
+		t.Fatalf("signing error: %s", so.GetError())
+	}
+	raw := so.GetRaw()
+	if len(raw) < 1+64+1 {
+		t.Fatalf("raw tx too short: %d bytes", len(raw))
+	}
+	message := raw[1+64:]
+	if message[0] != 0x80 {
+		t.Fatalf("message[0] = 0x%02x, want 0x80 (v0 version prefix)", message[0])
+	}
+	f, err := DecodeSolanaTx(raw)
+	if err != nil {
+		t.Fatalf("DecodeSolanaTx: %v", err)
+	}
+	if f.Version != 0 {
+		t.Fatalf("Version = %d, want 0", f.Version)
+	}
+	return f
+}
+
+// No TWC vector exists for TokenTransfer+v0_msg. Structure-anchored smoke
+// test (see assertSolanaV0): the same fixture as
+// TestSignTxSolanaTokenTransfer, with v0_msg=true added.
+func TestSignSolanaTokenTransferV0(t *testing.T) {
+	priv, err := base58Decode(base58BTC, "9YtuoD4sH4h88CVM8DSnkfoAaLY7YeGC2TarDJ8eyMS5")
+	if err != nil {
+		t.Fatalf("decode priv: %v", err)
+	}
+	w, err := FromPrivateKeyBytes(priv, Ed25519)
+	if err != nil {
+		t.Fatalf("FromPrivateKeyBytes: %v", err)
+	}
+	defer w.Destroy()
+
+	in := &txsolana.SigningInput{
+		RecentBlockhash: "CNaHfvqePgGYMvtYi9RuUdVxDYttr1zs4TWrTXYabxZi",
+		V0Msg:           true,
+		TransactionType: &txsolana.SigningInput_TokenTransferTransaction{
+			TokenTransferTransaction: &txsolana.TokenTransfer{
+				TokenMintAddress:      "SRMuApVNdxXokk5GT7XD5cUUgXMBCoAz2LHeuAoKWRt",
+				SenderTokenAddress:    "EDNd1ycsydWYwVmrYZvqYazFqwk1QjBgAUKFjBoz1jKP",
+				RecipientTokenAddress: "3WUX9wASxyScbA7brDipioKfXS1XEYkQ4vo3Kej9bKei",
+				Amount:                4000,
+				Decimals:              6,
+			},
+		},
+	}
+	out, err := w.SignTransaction(SOL, 0, in)
+	if err != nil {
+		t.Fatalf("SignTransaction: %v", err)
+	}
+	so, ok := out.(*txsolana.SigningOutput)
+	if !ok {
+		t.Fatalf("output type = %T, want *solana.SigningOutput", out)
+	}
+	f := assertSolanaV0(t, so)
+	if len(f.Instructions) != 1 || f.Instructions[0].Kind != SolanaInstructionSPLTransferChecked {
+		t.Fatalf("instructions = %+v", f.Instructions)
+	}
+}
+
+// No TWC vector exists for CreateAndTransferToken+v0_msg. Structure-anchored
+// smoke test (see assertSolanaV0): the same fixture as
+// TestSignSolanaCreateAndTransferToken, with v0_msg=true added.
+func TestSignSolanaCreateAndTransferTokenV0(t *testing.T) {
+	w, err := FromPrivateKeyBytes(mustB58Priv(t, "66ApBuKpo2uSzpjGBraHq7HP8UZMUJzp3um8FdEjkC9c"), Ed25519)
+	if err != nil {
+		t.Fatalf("FromPrivateKeyBytes: %v", err)
+	}
+	defer w.Destroy()
+
+	in := &txsolana.SigningInput{
+		RecentBlockhash: "DMmDdJP41M9mw8Z4586VSvxqGCrqPy5uciF6HsKUVDja",
+		V0Msg:           true,
+		TransactionType: &txsolana.SigningInput_CreateAndTransferTokenTransaction{
+			CreateAndTransferTokenTransaction: &txsolana.CreateAndTransferToken{
+				RecipientMainAddress:  "71e8mDsh3PR6gN64zL1HjwuxyKpgRXrPDUJT7XXojsVd",
+				TokenMintAddress:      "SRMuApVNdxXokk5GT7XD5cUUgXMBCoAz2LHeuAoKWRt",
+				RecipientTokenAddress: "EF6L8yJT1SoRoDCkAZfSVmaweqMzfhxZiptKi7Tgj5XY",
+				SenderTokenAddress:    "ANVCrmRw7Ww7rTFfMbrjApSPXEEcZpBa6YEiBdf98pAf",
+				Amount:                2900,
+				Decimals:              6,
+			},
+		},
+	}
+	out, err := w.SignTransaction(SOL, 0, in)
+	if err != nil {
+		t.Fatalf("SignTransaction: %v", err)
+	}
+	so, ok := out.(*txsolana.SigningOutput)
+	if !ok {
+		t.Fatalf("output type = %T, want *solana.SigningOutput", out)
+	}
+	assertSolanaV0(t, so)
+}
+
+// Durable nonce + v0_msg combination — no TWC vector exists for this either.
+// Structure-anchored smoke test (see assertSolanaV0): the same fixture as
+// TestSignSolanaTransferDurableNonce, with v0_msg=true added, confirming the
+// AdvanceNonceAccount + transfer instruction pair still compiles correctly
+// underneath the v0 version wrapper.
+func TestSignSolanaTransferDurableNonceV0(t *testing.T) {
+	priv := mustHexTx(t, "044014463e2ee3cc9c67a6f191dbac82288eb1d5c1111d21245bdc6a855082a1")
+	w, err := FromPrivateKeyBytes(priv, Ed25519)
+	if err != nil {
+		t.Fatalf("FromPrivateKeyBytes: %v", err)
+	}
+	defer w.Destroy()
+
+	in := &txsolana.SigningInput{
+		RecentBlockhash: "5ycoKxPRpW2GdD4byZuMptHU3VU5MgUCh6NLGQ2U8VE5", // durable nonce VALUE
+		NonceAccount:    "ALAaqqt4Cc8hWH22GT2L16xKNAn6gv7XCTF7JkbfWsc",
+		V0Msg:           true,
+		TransactionType: &txsolana.SigningInput_TransferTransaction{
+			TransferTransaction: &txsolana.Transfer{
+				Recipient: "3UVYmECPPMZSCqWKfENfuoTv51fTDTWicX9xmBD2euKe",
+				Value:     1000,
+			},
+		},
+	}
+	out, err := w.SignTransaction(SOL, 0, in)
+	if err != nil {
+		t.Fatalf("SignTransaction: %v", err)
+	}
+	so, ok := out.(*txsolana.SigningOutput)
+	if !ok {
+		t.Fatalf("output type = %T, want *solana.SigningOutput", out)
+	}
+	// AdvanceNonceAccount has no dedicated decode Kind (it decodes as
+	// SolanaInstructionUnknown); the second instruction is the actual
+	// transfer, confirming the advance-nonce insertion didn't clobber it.
+	f := assertSolanaV0(t, so)
+	if len(f.Instructions) != 2 || f.Instructions[1].Kind != SolanaInstructionSystemTransfer {
+		t.Fatalf("instructions = %+v", f.Instructions)
+	}
+	if f.Instructions[1].LamportAmount != 1000 {
+		t.Fatalf("lamport amount = %d, want 1000", f.Instructions[1].LamportAmount)
+	}
+}
