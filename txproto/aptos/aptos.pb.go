@@ -104,6 +104,62 @@ func (x *EntryFunction) GetArgs() [][]byte {
 	return nil
 }
 
+// Structured native APT transfer (0x1::aptos_account::transfer). The library
+// builds the EntryFunction internally — no hand-BCS'd args.
+type TransferMessage struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// 0x-prefixed 32-byte recipient account address.
+	To string `protobuf:"bytes,1,opt,name=to,proto3" json:"to,omitempty"`
+	// Amount to transfer, in octas.
+	Amount        uint64 `protobuf:"varint,2,opt,name=amount,proto3" json:"amount,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TransferMessage) Reset() {
+	*x = TransferMessage{}
+	mi := &file_txproto_aptos_aptos_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TransferMessage) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TransferMessage) ProtoMessage() {}
+
+func (x *TransferMessage) ProtoReflect() protoreflect.Message {
+	mi := &file_txproto_aptos_aptos_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TransferMessage.ProtoReflect.Descriptor instead.
+func (*TransferMessage) Descriptor() ([]byte, []int) {
+	return file_txproto_aptos_aptos_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *TransferMessage) GetTo() string {
+	if x != nil {
+		return x.To
+	}
+	return ""
+}
+
+func (x *TransferMessage) GetAmount() uint64 {
+	if x != nil {
+		return x.Amount
+	}
+	return 0
+}
+
 // SigningInput mirrors a minimal subset of TW.Aptos.Proto.SigningInput.
 type SigningInput struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -117,15 +173,17 @@ type SigningInput struct {
 	ExpirationTimestampSecs uint64 `protobuf:"varint,4,opt,name=expiration_timestamp_secs,json=expirationTimestampSecs,proto3" json:"expiration_timestamp_secs,omitempty"`
 	// Chain ID (u8).
 	ChainId uint32 `protobuf:"varint,5,opt,name=chain_id,json=chainId,proto3" json:"chain_id,omitempty"`
-	// The entry function payload.
+	// The entry function payload. Mutually exclusive with transfer.
 	EntryFunction *EntryFunction `protobuf:"bytes,6,opt,name=entry_function,json=entryFunction,proto3" json:"entry_function,omitempty"`
+	// Structured native APT transfer. Mutually exclusive with entry_function.
+	Transfer      *TransferMessage `protobuf:"bytes,7,opt,name=transfer,proto3" json:"transfer,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *SigningInput) Reset() {
 	*x = SigningInput{}
-	mi := &file_txproto_aptos_aptos_proto_msgTypes[1]
+	mi := &file_txproto_aptos_aptos_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -137,7 +195,7 @@ func (x *SigningInput) String() string {
 func (*SigningInput) ProtoMessage() {}
 
 func (x *SigningInput) ProtoReflect() protoreflect.Message {
-	mi := &file_txproto_aptos_aptos_proto_msgTypes[1]
+	mi := &file_txproto_aptos_aptos_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -150,7 +208,7 @@ func (x *SigningInput) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SigningInput.ProtoReflect.Descriptor instead.
 func (*SigningInput) Descriptor() ([]byte, []int) {
-	return file_txproto_aptos_aptos_proto_rawDescGZIP(), []int{1}
+	return file_txproto_aptos_aptos_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *SigningInput) GetSequenceNumber() uint64 {
@@ -195,6 +253,13 @@ func (x *SigningInput) GetEntryFunction() *EntryFunction {
 	return nil
 }
 
+func (x *SigningInput) GetTransfer() *TransferMessage {
+	if x != nil {
+		return x.Transfer
+	}
+	return nil
+}
+
 // SigningOutput mirrors a minimal subset of TW.Aptos.Proto.SigningOutput.
 type SigningOutput struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -210,7 +275,7 @@ type SigningOutput struct {
 
 func (x *SigningOutput) Reset() {
 	*x = SigningOutput{}
-	mi := &file_txproto_aptos_aptos_proto_msgTypes[2]
+	mi := &file_txproto_aptos_aptos_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -222,7 +287,7 @@ func (x *SigningOutput) String() string {
 func (*SigningOutput) ProtoMessage() {}
 
 func (x *SigningOutput) ProtoReflect() protoreflect.Message {
-	mi := &file_txproto_aptos_aptos_proto_msgTypes[2]
+	mi := &file_txproto_aptos_aptos_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -235,7 +300,7 @@ func (x *SigningOutput) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SigningOutput.ProtoReflect.Descriptor instead.
 func (*SigningOutput) Descriptor() ([]byte, []int) {
-	return file_txproto_aptos_aptos_proto_rawDescGZIP(), []int{2}
+	return file_txproto_aptos_aptos_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *SigningOutput) GetRawTxn() []byte {
@@ -270,14 +335,18 @@ const file_txproto_aptos_aptos_proto_rawDesc = "" +
 	"moduleName\x12#\n" +
 	"\rfunction_name\x18\x03 \x01(\tR\ffunctionName\x12\x1b\n" +
 	"\ttype_args\x18\x04 \x03(\fR\btypeArgs\x12\x12\n" +
-	"\x04args\x18\x05 \x03(\fR\x04args\"\xa6\x02\n" +
+	"\x04args\x18\x05 \x03(\fR\x04args\"9\n" +
+	"\x0fTransferMessage\x12\x0e\n" +
+	"\x02to\x18\x01 \x01(\tR\x02to\x12\x16\n" +
+	"\x06amount\x18\x02 \x01(\x04R\x06amount\"\xe9\x02\n" +
 	"\fSigningInput\x12'\n" +
 	"\x0fsequence_number\x18\x01 \x01(\x04R\x0esequenceNumber\x12$\n" +
 	"\x0emax_gas_amount\x18\x02 \x01(\x04R\fmaxGasAmount\x12$\n" +
 	"\x0egas_unit_price\x18\x03 \x01(\x04R\fgasUnitPrice\x12:\n" +
 	"\x19expiration_timestamp_secs\x18\x04 \x01(\x04R\x17expirationTimestampSecs\x12\x19\n" +
 	"\bchain_id\x18\x05 \x01(\rR\achainId\x12J\n" +
-	"\x0eentry_function\x18\x06 \x01(\v2#.hdwallet.aptos.proto.EntryFunctionR\rentryFunction\"X\n" +
+	"\x0eentry_function\x18\x06 \x01(\v2#.hdwallet.aptos.proto.EntryFunctionR\rentryFunction\x12A\n" +
+	"\btransfer\x18\a \x01(\v2%.hdwallet.aptos.proto.TransferMessageR\btransfer\"X\n" +
 	"\rSigningOutput\x12\x17\n" +
 	"\araw_txn\x18\x01 \x01(\fR\x06rawTxn\x12\x18\n" +
 	"\aencoded\x18\x02 \x01(\tR\aencoded\x12\x14\n" +
@@ -295,19 +364,21 @@ func file_txproto_aptos_aptos_proto_rawDescGZIP() []byte {
 	return file_txproto_aptos_aptos_proto_rawDescData
 }
 
-var file_txproto_aptos_aptos_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
+var file_txproto_aptos_aptos_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
 var file_txproto_aptos_aptos_proto_goTypes = []any{
-	(*EntryFunction)(nil), // 0: hdwallet.aptos.proto.EntryFunction
-	(*SigningInput)(nil),  // 1: hdwallet.aptos.proto.SigningInput
-	(*SigningOutput)(nil), // 2: hdwallet.aptos.proto.SigningOutput
+	(*EntryFunction)(nil),   // 0: hdwallet.aptos.proto.EntryFunction
+	(*TransferMessage)(nil), // 1: hdwallet.aptos.proto.TransferMessage
+	(*SigningInput)(nil),    // 2: hdwallet.aptos.proto.SigningInput
+	(*SigningOutput)(nil),   // 3: hdwallet.aptos.proto.SigningOutput
 }
 var file_txproto_aptos_aptos_proto_depIdxs = []int32{
 	0, // 0: hdwallet.aptos.proto.SigningInput.entry_function:type_name -> hdwallet.aptos.proto.EntryFunction
-	1, // [1:1] is the sub-list for method output_type
-	1, // [1:1] is the sub-list for method input_type
-	1, // [1:1] is the sub-list for extension type_name
-	1, // [1:1] is the sub-list for extension extendee
-	0, // [0:1] is the sub-list for field type_name
+	1, // 1: hdwallet.aptos.proto.SigningInput.transfer:type_name -> hdwallet.aptos.proto.TransferMessage
+	2, // [2:2] is the sub-list for method output_type
+	2, // [2:2] is the sub-list for method input_type
+	2, // [2:2] is the sub-list for extension type_name
+	2, // [2:2] is the sub-list for extension extendee
+	0, // [0:2] is the sub-list for field type_name
 }
 
 func init() { file_txproto_aptos_aptos_proto_init() }
@@ -321,7 +392,7 @@ func file_txproto_aptos_aptos_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_txproto_aptos_aptos_proto_rawDesc), len(file_txproto_aptos_aptos_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   3,
+			NumMessages:   4,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

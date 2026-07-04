@@ -19,6 +19,15 @@ message EntryFunction {
   repeated bytes args = 5;
 }
 
+// Structured native APT transfer (0x1::aptos_account::transfer). The library
+// builds the EntryFunction internally — no hand-BCS'd args.
+message TransferMessage {
+  // 0x-prefixed 32-byte recipient account address.
+  string to = 1;
+  // Amount to transfer, in octas.
+  uint64 amount = 2;
+}
+
 // SigningInput mirrors a minimal subset of TW.Aptos.Proto.SigningInput.
 message SigningInput {
   // Account sequence number (uint64 LE in BCS).
@@ -31,8 +40,10 @@ message SigningInput {
   uint64 expiration_timestamp_secs = 4;
   // Chain ID (u8).
   uint32 chain_id = 5;
-  // The entry function payload.
+  // The entry function payload. Mutually exclusive with transfer.
   EntryFunction entry_function = 6;
+  // Structured native APT transfer. Mutually exclusive with entry_function.
+  TransferMessage transfer = 7;
 }
 
 // SigningOutput mirrors a minimal subset of TW.Aptos.Proto.SigningOutput.
