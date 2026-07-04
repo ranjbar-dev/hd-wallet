@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
+	"strconv"
 	"testing"
 
 	"github.com/btcsuite/btcd/btcutil/bech32"
@@ -133,8 +134,7 @@ func TestSignCosmosMultisigPartialVector(t *testing.T) {
 	}
 }
 
-// itoa avoids importing strconv for two digits.
-func itoa(i int) string { return string(rune('0' + i)) }
+func itoa(i int) string { return strconv.Itoa(i) }
 
 func TestCombineCosmosMultisigVector(t *testing.T) {
 	v := loadCosmosMultisigVector(t)
