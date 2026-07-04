@@ -252,16 +252,19 @@ func cosmosAuthInfo(fee *txcosmos.Fee, pub []byte, sequence uint64, pubKeyTypeUR
 	signerInfo = appendBytesField(signerInfo, 2, modeInfo)
 	signerInfo = appendVarintField(signerInfo, 3, sequence)
 
-	// Fee { 1: amount[Coin], 2: gas_limit }.
+	var authInfo []byte
+	authInfo = appendBytesField(authInfo, 1, signerInfo)
+	authInfo = appendBytesField(authInfo, 2, cosmosFeeBytes(fee))
+	return authInfo
+}
+
+// cosmosFeeBytes serializes Fee { 1: amount[Coin], 2: gas_limit }.
+func cosmosFeeBytes(fee *txcosmos.Fee) []byte {
 	feeCoin := cosmosCoin(fee.GetDenom(), fee.GetAmount())
 	var feeMsg []byte
 	feeMsg = appendBytesField(feeMsg, 1, feeCoin)
 	feeMsg = appendVarintField(feeMsg, 2, fee.GetGas())
-
-	var authInfo []byte
-	authInfo = appendBytesField(authInfo, 1, signerInfo)
-	authInfo = appendBytesField(authInfo, 2, feeMsg)
-	return authInfo
+	return feeMsg
 }
 
 // cosmosSignDoc serializes SignDoc { body, auth_info, chain_id, account_number }.
