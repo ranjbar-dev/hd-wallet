@@ -1,0 +1,22 @@
+syntax = "proto3";
+package hdwallet.ton.proto;
+option go_package = "github.com/ranjbar-dev/hd-wallet/txproto/ton";
+
+message Transfer {
+  string dest = 1;         // any accepted TON address form
+  uint64 amount = 2;       // nanotons
+  uint32 mode = 3;         // send-mode flags; default 3 = PAY_FEES_SEPARATELY|IGNORE_ACTION_PHASE_ERRORS
+  string comment = 4;      // optional text comment (op=0 payload)
+  bool   bounceable = 5;   // internal-message bounce flag
+}
+message SigningInput {
+  uint32 sequence_number = 1;  // wallet seqno; 0 => attach StateInit (deploy)
+  uint32 expire_at = 2;        // unix seconds
+  Transfer transfer = 3;
+}
+message SigningOutput {
+  string encoded = 1;  // base64 BoC of the signed external message
+  bytes  raw = 2;      // raw BoC bytes
+  string hash = 3;     // hex repr-hash of the external message cell (poll key)
+  string error = 4;
+}

@@ -35,6 +35,7 @@ import (
 	txripple "github.com/ranjbar-dev/hd-wallet/txproto/ripple"
 	txsolana "github.com/ranjbar-dev/hd-wallet/txproto/solana"
 	txstellar "github.com/ranjbar-dev/hd-wallet/txproto/stellar"
+	txton "github.com/ranjbar-dev/hd-wallet/txproto/ton"
 	txtron "github.com/ranjbar-dev/hd-wallet/txproto/tron"
 )
 
@@ -63,6 +64,7 @@ const (
 	familyAlgorand
 	familyAptos   // APTOS: BCS + SHA3-256("APTOS::RawTransaction")||bcs
 	familyStellar // XLM: XDR TransactionV0 + SHA256(networkId||ENVELOPE_TYPE_TX||xdr)
+	familyTON     // TON: wallet-v4r2 BoC cell tree, ed25519 over the unsigned-body repr hash
 )
 
 // txFamilyOf maps a chain to its transaction-building family. EVM and standard
@@ -97,6 +99,8 @@ func txFamilyOf(chain Chain) txFamily {
 		return familyAptos
 	case XLM:
 		return familyStellar
+	case TON:
+		return familyTON
 	default:
 		return familyNone
 	}
@@ -176,6 +180,12 @@ func (w *HDWallet) SignTransaction(chain Chain, index uint32, input proto.Messag
 			return nil, fmt.Errorf("%w: %s expects *stellar.SigningInput", ErrTxInput, chain)
 		}
 		return w.signXLMTx(chain, index, in)
+	case familyTON:
+		in, ok := input.(*txton.SigningInput)
+		if !ok {
+			return nil, fmt.Errorf("%w: %s expects *ton.SigningInput", ErrTxInput, chain)
+		}
+		return w.signTONTx(chain, index, in)
 	default:
 		return nil, fmt.Errorf("%w: %s", ErrTxUnsupported, chain)
 	}

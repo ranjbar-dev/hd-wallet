@@ -45,9 +45,10 @@ func tonWalletV4R2Code() (*tonCell, error) {
 	return tonCellFromBoCBase64(walletV4R2CodeBoC)
 }
 
-// tonStateInitHash builds the wallet-v4r2 StateInit cell for a 32-byte ed25519
-// public key and returns its 32-byte representation hash (the account id).
-func tonStateInitHash(pub []byte) ([]byte, error) {
+// tonStateInitCell builds the wallet-v4r2 StateInit cell (code + data) for a
+// 32-byte ed25519 public key. Its representation hash is the account id; the
+// cell itself is attached as a ref in a deploy (seqno==0) external message.
+func tonStateInitCell(pub []byte) (*tonCell, error) {
 	if len(pub) != 32 {
 		return nil, fmt.Errorf("hdwallet: TON: public key must be 32 bytes, got %d", len(pub))
 	}
@@ -75,6 +76,16 @@ func tonStateInitHash(pub []byte) ([]byte, error) {
 	si.appendRef(code)
 	si.appendRef(data)
 
+	return si, nil
+}
+
+// tonStateInitHash builds the wallet-v4r2 StateInit cell for a 32-byte ed25519
+// public key and returns its 32-byte representation hash (the account id).
+func tonStateInitHash(pub []byte) ([]byte, error) {
+	si, err := tonStateInitCell(pub)
+	if err != nil {
+		return nil, err
+	}
 	return si.reprHash(), nil
 }
 
@@ -109,51 +120,68 @@ func encodeTONAddress(pub []byte) (string, error) {
 // either base64 alphabet, and raw `workchain:hex64` (workchain 0 or -1).
 // Testnet-only addresses (tag bit 0x80 set) are rejected.
 func tonParseAddress(addr string) ([]byte, error) {
+	_, hash, err := tonParseAddressFull(addr)
+	return hash, err
+}
+
+// tonParseAddressFull decodes any accepted TON address form and returns both the
+// signed workchain id and the 32-byte account hash. Workchain is 0 (basechain)
+// or -1 (masterchain). The internal-message addr_std encoding needs the
+// workchain byte, so transaction building uses this richer form.
+func tonParseAddressFull(addr string) (int32, []byte, error) {
 	// Raw form: "0:<64 hex>" or "-1:<64 hex>".
 	if i := strings.IndexByte(addr, ':'); i >= 0 {
-		wc := addr[:i]
-		if wc != "0" && wc != "-1" {
-			return nil, addrErr(TON, "raw address: workchain must be 0 or -1")
+		wcStr := addr[:i]
+		var wc int32
+		switch wcStr {
+		case "0":
+			wc = 0
+		case "-1":
+			wc = -1
+		default:
+			return 0, nil, addrErr(TON, "raw address: workchain must be 0 or -1")
 		}
 		h := addr[i+1:]
 		if len(h) != 64 {
-			return nil, addrErr(TON, "raw address: hash must be 64 hex chars")
+			return 0, nil, addrErr(TON, "raw address: hash must be 64 hex chars")
 		}
 		raw, err := hex.DecodeString(h)
 		if err != nil {
-			return nil, addrErr(TON, "raw address: invalid hex")
+			return 0, nil, addrErr(TON, "raw address: invalid hex")
 		}
-		return raw, nil
+		return wc, raw, nil
 	}
 
 	// User-friendly form: 48 base64 chars, either alphabet.
 	if len(addr) != 48 {
-		return nil, addrErr(TON, fmt.Sprintf("user-friendly address must be 48 chars, got %d", len(addr)))
+		return 0, nil, addrErr(TON, fmt.Sprintf("user-friendly address must be 48 chars, got %d", len(addr)))
 	}
 	norm := strings.NewReplacer("-", "+", "_", "/").Replace(addr)
 	raw, err := base64.StdEncoding.DecodeString(norm)
 	if err != nil {
-		return nil, addrErr(TON, "base64 decode failed")
+		return 0, nil, addrErr(TON, "base64 decode failed")
 	}
 	if len(raw) != 36 {
-		return nil, addrErr(TON, fmt.Sprintf("decoded length %d (want 36)", len(raw)))
+		return 0, nil, addrErr(TON, fmt.Sprintf("decoded length %d (want 36)", len(raw)))
 	}
 	tag := raw[0]
 	if tag&tonTagTestOnly != 0 {
-		return nil, addrErr(TON, "testnet-only address not accepted")
+		return 0, nil, addrErr(TON, "testnet-only address not accepted")
 	}
 	base := tag &^ tonTagTestOnly
 	if base != tonTagBounceable && base != tonTagNonBounceable {
-		return nil, addrErr(TON, fmt.Sprintf("unknown address tag 0x%02x", tag))
+		return 0, nil, addrErr(TON, fmt.Sprintf("unknown address tag 0x%02x", tag))
 	}
-	// raw[1] is the workchain byte (0x00 basechain / 0xff masterchain); accepted.
+	// raw[1] is the workchain byte (0x00 basechain / 0xff masterchain), a signed
+	// int8; sign-extend it to int32.
+	wc := int32(int8(raw[1])) // #nosec G115 -- deliberate two's-complement reinterpretation of the 1-byte workchain tag
 	body := raw[:34]
 	want := crc16XModem(body)
 	got := uint16(raw[34])<<8 | uint16(raw[35])
 	if got != want {
-		return nil, addrErr(TON, "bad checksum")
+		return 0, nil, addrErr(TON, "bad checksum")
 	}
-	return raw[2:34], nil
+	return wc, raw[2:34], nil
 }
 
 // tonValidator is the address-validator registry entry for TON.

@@ -275,21 +275,32 @@ func tonCellFromBoC(b []byte) (*tonCell, error) {
 }
 
 // ---------------------------------------------------------------------------
-// BoC serialization — a spec-correct serialized_boc#b5ee9c72 writer.
+// BoC serialization — a serialized_boc#b5ee9c72 writer matching Trust Wallet
+// Core byte-for-byte (verified by Task 12's TON transfer-signing vector).
 //
-// NOTE (flagged, unverified until Task 12): this produces a valid single-root
-// BoC (no index, no CRC32C). Its exact byte layout — in particular the flag/size
-// bytes and whether TWC's transfer output carries a CRC32C — is not vector-pinned
-// in this task; Task 12's signing vector is the authoritative check. The address
-// derivation in this task does NOT depend on this serializer (it uses reprHash),
-// so any layout discrepancy here cannot affect Task 11's fund-critical output.
+// TWC's C++ TON serializer (src/Everscale/CommonTON/Cell.cpp) uses FIXED
+// reference- and offset-index sizes of sizeof(uint16_t) = 2 bytes each,
+// regardless of how few cells/bytes the BoC actually holds (the comment there
+// notes "uint16_t will be enough for wallet transactions, e.g. 64k is the size
+// of the whole elector"). A minimal-width writer (1 byte for a 4-cell BoC) would
+// still be a *valid* BoC but would not reproduce TWC's exact bytes, so this
+// writer hard-codes the 2-byte widths to stay byte-identical.
+//
+// No index section and no trailing CRC32C are emitted (flags byte = 0x02:
+// has_idx=0, has_crc32c=0, has_cache_bits=0, ref_size=2).
 // ---------------------------------------------------------------------------
 
+// tonBoCRefSize is TWC's fixed reference/offset index width in bytes (uint16_t).
+const tonBoCRefSize = 2
+
 // tonCellToBoC serializes cell (as the single root) into a standard BoC without
-// an index section and without a trailing CRC32C.
+// an index section and without a trailing CRC32C, byte-for-byte compatible with
+// Trust Wallet Core's TON serializer.
 func tonCellToBoC(root *tonCell) []byte {
 	// Topologically order cells: root first, each cell before its refs, deduped
-	// by repr hash so shared subcells are emitted once.
+	// by repr hash so shared subcells are emitted once. For the linear wallet-v4
+	// transfer tree this yields [external, signed-body, internal, payload], which
+	// matches TWC's ordering.
 	order := []*tonCell{}
 	indexOf := map[string]int{}
 	var visit func(c *tonCell)
@@ -307,7 +318,6 @@ func tonCellToBoC(root *tonCell) []byte {
 	visit(root)
 
 	cellCount := len(order)
-	sizeBytes := bytesFor(cellCount)
 
 	// Build each cell's serialized record and the total data size.
 	var cellData []byte
@@ -317,36 +327,22 @@ func tonCellToBoC(root *tonCell) []byte {
 		cellData = append(cellData, c.paddedData()...)
 		for _, r := range c.refs {
 			ri := indexOf[string(r.reprHash())]
-			cellData = append(cellData, intToBytes(ri, sizeBytes)...)
+			cellData = append(cellData, intToBytes(ri, tonBoCRefSize)...)
 		}
 	}
-	offBytes := bytesFor(len(cellData) + 1)
 
 	out := make([]byte, 0, 16+len(cellData))
 	out = append(out, 0xb5, 0xee, 0x9c, 0x72)
-	// flags byte: no idx, no crc, no cache, flags=0, size=sizeBytes.
-	out = append(out, byte(sizeBytes))
-	out = append(out, byte(offBytes))
-	out = append(out, intToBytes(cellCount, sizeBytes)...) // cells
-	out = append(out, intToBytes(1, sizeBytes)...)         // roots
-	out = append(out, intToBytes(0, sizeBytes)...)         // absent
-	out = append(out, intToBytes(len(cellData), offBytes)...)
-	out = append(out, intToBytes(0, sizeBytes)...) // root index 0
+	// flags byte: no idx, no crc, no cache, flags=0, ref_size=tonBoCRefSize.
+	out = append(out, byte(tonBoCRefSize))
+	out = append(out, byte(tonBoCRefSize))                     // offset size (fixed uint16_t)
+	out = append(out, intToBytes(cellCount, tonBoCRefSize)...) // cells
+	out = append(out, intToBytes(1, tonBoCRefSize)...)         // roots
+	out = append(out, intToBytes(0, tonBoCRefSize)...)         // absent
+	out = append(out, intToBytes(len(cellData), tonBoCRefSize)...)
+	out = append(out, intToBytes(0, tonBoCRefSize)...) // root index 0
 	out = append(out, cellData...)
 	return out
-}
-
-// bytesFor returns the minimum number of bytes needed to represent n (>=1).
-func bytesFor(n int) int {
-	if n <= 0 {
-		return 1
-	}
-	b := 0
-	for n > 0 {
-		b++
-		n >>= 8
-	}
-	return b
 }
 
 // intToBytes encodes v big-endian into exactly n bytes.

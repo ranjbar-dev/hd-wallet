@@ -24,6 +24,7 @@ import (
 	txeth "github.com/ranjbar-dev/hd-wallet/txproto/ethereum"
 	txripple "github.com/ranjbar-dev/hd-wallet/txproto/ripple"
 	txsolana "github.com/ranjbar-dev/hd-wallet/txproto/solana"
+	txton "github.com/ranjbar-dev/hd-wallet/txproto/ton"
 	txtron "github.com/ranjbar-dev/hd-wallet/txproto/tron"
 )
 
@@ -131,6 +132,17 @@ func BroadcastPayload(chain Chain, out proto.Message) (string, error) {
 		// rippled submit accepts the tx_blob as hex; uppercase matches the form
 		// rippled itself uses when returning transaction data.
 		return strings.ToUpper(bytesToHex(encoded)), nil
+
+	case *txton.SigningOutput:
+		if family != familyTON {
+			return "", fmt.Errorf("%w: %s does not produce *ton.SigningOutput", ErrTxInput, chain)
+		}
+		encoded := o.GetEncoded()
+		if encoded == "" {
+			return "", fmt.Errorf("%w: ton SigningOutput: missing encoded BoC", ErrTxInput)
+		}
+		// toncenter sendBocReturnHash accepts the base64 BoC in the "boc" field.
+		return encoded, nil
 
 	default:
 		return "", fmt.Errorf("%w: unrecognised SigningOutput type for %s", ErrTxInput, chain)
