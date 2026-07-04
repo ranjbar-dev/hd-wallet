@@ -63,6 +63,48 @@ func (w *HDWallet) signSolanaTx(symbol Symbol, index uint32, in *txsolana.Signin
 	}
 }
 
+// solanaNonceParams resolves the optional durable-nonce inputs: the nonce
+// account and the RecentBlockhashes sysvar it references. Both nil when
+// nonce_account is unset. When set, the SigningInput's recent_blockhash field
+// carries the durable nonce VALUE, which lands in the message blockhash slot.
+func solanaNonceParams(in *txsolana.SigningInput) (nonce, sysvarRBH []byte, err error) {
+	if in.GetNonceAccount() == "" {
+		return nil, nil, nil
+	}
+	nonce, err = base58DecodeFixed(in.GetNonceAccount(), 32)
+	if err != nil {
+		return nil, nil, fmt.Errorf("%w: solana: nonce_account: %v", ErrTxInput, err)
+	}
+	sysvarRBH, err = base58DecodeFixed(solanaSysvarRecentBlockhashesID, 32)
+	if err != nil {
+		return nil, nil, fmt.Errorf("%w: solana: recent-blockhashes sysvar: %v", ErrTxInput, err)
+	}
+	return nonce, sysvarRBH, nil
+}
+
+// solanaFinishTx signs message with the wallet key (single required signature)
+// and assembles [compact-u16 1][signature][message].
+func (w *HDWallet) solanaFinishTx(symbol Symbol, index uint32, message []byte) (*txsolana.SigningOutput, error) {
+	sig, err := w.SignIndex(symbol, index, message)
+	if err != nil {
+		return nil, err
+	}
+	sigBytes := sig.Bytes()
+	if len(sigBytes) != 64 {
+		return nil, fmt.Errorf("%w: solana: expected 64-byte signature", ErrTxInput)
+	}
+	tx := make([]byte, 0, 1+len(sigBytes)+len(message))
+	tx = append(tx, solanaCompactU16(1)...)
+	tx = append(tx, sigBytes...)
+	tx = append(tx, message...)
+	return &txsolana.SigningOutput{
+		Encoded: base58Encode(base58BTC, tx),
+		Raw:     tx,
+		// On Solana the fee-payer's signature IS the transaction id.
+		TxId: base58Encode(base58BTC, sigBytes),
+	}, nil
+}
+
 // signSolanaSystemTransfer builds, signs and base58-encodes a Solana system
 // (native SOL) transfer.
 func (w *HDWallet) signSolanaSystemTransfer(symbol Symbol, index uint32, in *txsolana.SigningInput) (*txsolana.SigningOutput, error) {
@@ -84,31 +126,20 @@ func (w *HDWallet) signSolanaSystemTransfer(symbol Symbol, index uint32, in *txs
 		return nil, fmt.Errorf("%w: solana: recent_blockhash: %v", ErrTxInput, err)
 	}
 
-	message := solanaTransferMessage(from, to, blockhash, transfer.GetValue())
-
-	// ed25519 signs the raw serialized message.
-	sig, err := w.SignIndex(symbol, index, message)
+	nonce, sysvarRBH, err := solanaNonceParams(in)
 	if err != nil {
 		return nil, err
 	}
-	sigBytes := sig.Bytes()
-	if len(sigBytes) != 64 {
-		return nil, fmt.Errorf("%w: solana: expected 64-byte signature", ErrTxInput)
+	var message []byte
+	if nonce != nil {
+		message = solanaCompileMessage(from, []solanaInstruction{
+			solanaInstrAdvanceNonce(nonce, from, sysvarRBH),
+			solanaInstrSystemTransfer(from, to, transfer.GetValue()),
+		}, blockhash)
+	} else {
+		message = solanaTransferMessage(from, to, blockhash, transfer.GetValue())
 	}
-
-	// [compact-u16 sig count = 1][signature][message].
-	tx := make([]byte, 0, 1+len(sigBytes)+len(message))
-	tx = append(tx, solanaCompactU16(1)...)
-	tx = append(tx, sigBytes...)
-	tx = append(tx, message...)
-
-	encoded := base58Encode(base58BTC, tx)
-	return &txsolana.SigningOutput{
-		Encoded: encoded,
-		Raw:     tx,
-		// On Solana the fee-payer's signature IS the transaction id.
-		TxId: base58Encode(base58BTC, sigBytes),
-	}, nil
+	return w.solanaFinishTx(symbol, index, message)
 }
 
 // signSolanaTokenTransfer builds, signs and base58-encodes an SPL token
@@ -151,29 +182,21 @@ func (w *HDWallet) signSolanaTokenTransfer(symbol Symbol, index uint32, in *txso
 		return nil, fmt.Errorf("%w: solana: token program id: %v", ErrTxInput, err)
 	}
 
-	decimals := byte(tt.GetDecimals()) // #nosec G115 -- range-checked (<= 255) above
-	message := solanaTokenTransferMessage(owner, source, dest, mint, tokenProgram, blockhash, tt.GetAmount(), decimals)
-
-	sig, err := w.SignIndex(symbol, index, message)
+	nonce, sysvarRBH, err := solanaNonceParams(in)
 	if err != nil {
 		return nil, err
 	}
-	sigBytes := sig.Bytes()
-	if len(sigBytes) != 64 {
-		return nil, fmt.Errorf("%w: solana: expected 64-byte signature", ErrTxInput)
+	decimals := byte(tt.GetDecimals()) // #nosec G115 -- range-checked (<= 255) above
+	var message []byte
+	if nonce != nil {
+		message = solanaCompileMessage(owner, []solanaInstruction{
+			solanaInstrAdvanceNonce(nonce, owner, sysvarRBH),
+			solanaInstrTransferChecked(source, mint, dest, owner, tokenProgram, tt.GetAmount(), decimals),
+		}, blockhash)
+	} else {
+		message = solanaTokenTransferMessage(owner, source, dest, mint, tokenProgram, blockhash, tt.GetAmount(), decimals)
 	}
-
-	tx := make([]byte, 0, 1+len(sigBytes)+len(message))
-	tx = append(tx, solanaCompactU16(1)...)
-	tx = append(tx, sigBytes...)
-	tx = append(tx, message...)
-
-	return &txsolana.SigningOutput{
-		Encoded: base58Encode(base58BTC, tx),
-		Raw:     tx,
-		// On Solana the fee-payer's signature IS the transaction id.
-		TxId: base58Encode(base58BTC, sigBytes),
-	}, nil
+	return w.solanaFinishTx(symbol, index, message)
 }
 
 // solanaTokenTransferMessage serializes the legacy message for an SPL
