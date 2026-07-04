@@ -304,20 +304,39 @@ func FuzzDecodeContractCall(f *testing.F) {
 // FuzzDecodeEthLog fuzzes the EVM event-log decode path (topics + data) using
 // the same shape of Transfer(address,address,uint256) log constructed in
 // tx_decode_log_test.go's makeTransferLog: a real event signature topic, two
-// zero-padded address topics, and a uint256 amount in Data.
+// zero-padded address topics, a fourth (tokenId) topic, and a uint256 amount
+// in Data. topicCount selects how many of the four topic strings actually go
+// into log.Topics — with a fixed 3-topic signature, ERC721TransferLog's
+// len(Topics)>=4 guard always fails and its tokenID-parsing body
+// (decodeLogTopic on Topics[3]) is never reached by mutation; letting the
+// fuzzer mutate topicCount up to 4 lets it actually get past that guard and
+// into the real parsing code, not just the length check.
 func FuzzDecodeEthLog(f *testing.F) {
 	transferSig := "0x" + bytesToHex(keccak256([]byte("Transfer(address,address,uint256)")))
 	zeroPad := "0x" + bytesToHex(make([]byte, 32))
 	amountData := make([]byte, 32)
 	amountData[31] = 100
 
-	f.Add(transferSig, zeroPad, zeroPad, amountData)
-	f.Fuzz(func(t *testing.T, topic0, topic1, topic2 string, data []byte) {
+	// tokenIdTopic mirrors tx_decode_log_test.go's makeTransferLog(erc721=true)
+	// encoding of tokenId=42 as an indexed (right-aligned) topic.
+	tokenIDTopic := make([]byte, 32)
+	tokenIDTopic[31] = 42
+	tokenIDTopicHex := "0x" + bytesToHex(tokenIDTopic)
+
+	// ERC-20 Transfer seed: 3 topics (sig, from, to), amount in Data.
+	f.Add(transferSig, zeroPad, zeroPad, tokenIDTopicHex, uint8(3), amountData)
+	// ERC-721 Transfer seed: 4 topics (sig, from, to, tokenId), empty Data —
+	// this is the seed that actually reaches ERC721TransferLog's body.
+	f.Add(transferSig, zeroPad, zeroPad, tokenIDTopicHex, uint8(4), []byte{})
+
+	f.Fuzz(func(t *testing.T, topic0, topic1, topic2, topic3 string, topicCount uint8, data []byte) {
 		if len(data) > fuzzMaxInput {
 			return
 		}
+		allTopics := []string{topic0, topic1, topic2, topic3}
+		n := int(topicCount) % (len(allTopics) + 1) // 0..4
 		log := &EthLog{
-			Topics: []string{topic0, topic1, topic2},
+			Topics: allTopics[:n],
 			Data:   data,
 		}
 		_, _, _, _ = ERC20TransferLog(log)
