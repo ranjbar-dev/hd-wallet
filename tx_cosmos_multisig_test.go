@@ -8,6 +8,8 @@ import (
 	"os"
 	"testing"
 
+	"github.com/btcsuite/btcd/btcutil/bech32"
+
 	txcosmos "github.com/ranjbar-dev/hd-wallet/txproto/cosmos"
 )
 
@@ -204,5 +206,80 @@ func TestCosmosMultisigErrors(t *testing.T) {
 	bad := make([]byte, 64)
 	if _, err := CombineCosmosMultisig(2, pubs, in, map[int][]byte{0: good, 1: bad}); !errors.Is(err, ErrTxInput) {
 		t.Errorf("invalid partial: %v, want ErrTxInput", err)
+	}
+}
+
+// TestCosmosMultisigSignBytesAddressEscaping is a regression test for a JSON
+// injection defect: cosmosMultisigSignBytes used to write
+// from_address/to_address RAW into the amino-JSON template (only memo/
+// chain_id went through jsonStr). Bech32's HRP charset (BIP-173) permits
+// ASCII 33-126, which includes '"' and '\\' — so a crafted address that still
+// passes bech32.Decode could break out of its JSON string literal and
+// corrupt the StdSignDoc structure that gets hashed and signed, making the
+// signed bytes diverge from what a reviewing co-signer believes they sign.
+//
+// The fix wraps both addresses with jsonStr (matching memo/chain_id), while
+// keeping the existing bech32.Decode shape check. This test proves a
+// bech32-decodable address containing an embedded '"' no longer corrupts the
+// resulting JSON: the output must be valid JSON with the malicious payload
+// safely contained inside the to_address string value, not injected as a
+// sibling key.
+func TestCosmosMultisigSignBytesAddressEscaping(t *testing.T) {
+	evilAddr, err := bech32.Encode(`cosmos1abc","evil":"pwn`, []byte{0, 1, 2, 3, 4})
+	if err != nil {
+		t.Fatalf("bech32.Encode: %v", err)
+	}
+	// Sanity: the crafted string is itself bech32-decodable (proves the
+	// bech32.Decode validation alone is not a sufficient guard).
+	if hrp, _, derr := bech32.Decode(evilAddr); derr != nil || hrp == "" {
+		t.Fatalf("PoC address failed to decode: hrp=%q err=%v", hrp, derr)
+	}
+
+	in := &txcosmos.SigningInput{
+		ChainId:       "cosmoshub-4",
+		AccountNumber: 1,
+		Sequence:      1,
+		Fee:           &txcosmos.Fee{Denom: "uatom", Amount: "5000", Gas: 200000},
+		Send: &txcosmos.SendCoinsMessage{
+			FromAddress: "cosmos16nsuts7ccq7c64tat6sm4uar2ammtwgv667hzc",
+			ToAddress:   evilAddr,
+			Denom:       "uatom",
+			Amount:      "1000000",
+		},
+	}
+
+	sb, err := cosmosMultisigSignBytes(in)
+	if err != nil {
+		t.Fatalf("cosmosMultisigSignBytes: %v", err)
+	}
+	if !json.Valid(sb) {
+		t.Fatalf("sign doc is not valid JSON:\n%s", sb)
+	}
+
+	var doc struct {
+		Msgs []struct {
+			Value struct {
+				ToAddress string `json:"to_address"`
+			} `json:"value"`
+		} `json:"msgs"`
+	}
+	if err := json.Unmarshal(sb, &doc); err != nil {
+		t.Fatalf("unmarshal sign doc: %v", err)
+	}
+	if len(doc.Msgs) != 1 {
+		t.Fatalf("expected 1 msg, got %d", len(doc.Msgs))
+	}
+	if doc.Msgs[0].Value.ToAddress != evilAddr {
+		t.Fatalf("to_address round-trip = %q, want %q", doc.Msgs[0].Value.ToAddress, evilAddr)
+	}
+
+	// The injected "evil" key must NOT appear as a sibling JSON field — it
+	// must be trapped inside the to_address string value.
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(sb, &raw); err != nil {
+		t.Fatalf("unmarshal top-level: %v", err)
+	}
+	if _, ok := raw["evil"]; ok {
+		t.Fatalf("JSON injection succeeded: top-level %q key present in sign doc", "evil")
 	}
 }
