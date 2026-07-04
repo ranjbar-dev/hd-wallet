@@ -147,24 +147,24 @@ func Verify(curve Curve, pub, data []byte, sig *Signature) bool {
 }
 
 // VerifySignature reports whether sig is a valid signature of data by the public
-// key pub for the coin symbol. It is the Symbol-keyed counterpart to Sign: the
+// key pub for the coin chain. It is the Chain-keyed counterpart to Sign: the
 // curve is resolved from the registry rather than supplied directly.
 //
 // As with Sign/SignIndex, data is the 32-byte digest for ECDSA chains
 // (secp256k1) and the raw message for ed25519 chains. A non-32-byte input for
 // an ECDSA chain returns a wrapped ErrInvalidDigest, mirroring SignIndex; an
-// unknown symbol returns a wrapped ErrUnsupportedCoin.
+// unknown chain returns a wrapped ErrUnsupportedCoin.
 //
 // It needs no secret and so is a free function, not a wallet method.
-func VerifySignature(symbol Symbol, pub, data []byte, sig *Signature) (bool, error) {
-	coin, ok := coins[symbol]
+func VerifySignature(chain Chain, pub, data []byte, sig *Signature) (bool, error) {
+	coin, ok := coins[chain]
 	if !ok {
-		return false, fmt.Errorf("%w: %s", ErrUnsupportedCoin, symbol)
+		return false, fmt.Errorf("%w: %s", ErrUnsupportedCoin, chain)
 	}
 	switch coin.Curve {
 	case Secp256k1:
 		if len(data) != 32 {
-			return false, fmt.Errorf("hdwallet: %s: %w", symbol, ErrInvalidDigest)
+			return false, fmt.Errorf("hdwallet: %s: %w", chain, ErrInvalidDigest)
 		}
 	}
 	return Verify(coin.Curve, pub, data, sig), nil

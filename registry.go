@@ -29,136 +29,136 @@ func (c Curve) String() string {
 	}
 }
 
-// Symbol is a typed network identifier used to look up a registry entry. Use the
+// Chain is a typed network identifier used to look up a registry entry. Use the
 // exported constants below (hdwallet.BTC, hdwallet.ETH, …) when calling methods
 // such as (*HDWallet).Address and AddressIndex; the typed enum gives
 // compile-time checking and editor autocomplete instead of bare strings.
-type Symbol string
+type Chain string
 
 // String implements fmt.Stringer.
-func (s Symbol) String() string { return string(s) }
+func (s Chain) String() string { return string(s) }
 
-// IsValid reports whether the symbol is a registered network.
-func (s Symbol) IsValid() bool { _, ok := coins[s]; return ok }
+// IsValid reports whether the chain is a registered network.
+func (s Chain) IsValid() bool { _, ok := coins[s]; return ok }
 
-// Supported network symbols. These mirror the registry below and match Trust
+// Supported network chains. These mirror the registry below and match Trust
 // Wallet's tickers.
 const (
 	// secp256k1 — Bitcoin-style UTXO chains.
-	BTC  Symbol = "BTC"
-	LTC  Symbol = "LTC"
-	DOGE Symbol = "DOGE"
-	BCH  Symbol = "BCH"
-	DASH Symbol = "DASH"
-	ZEC  Symbol = "ZEC"
+	BTC  Chain = "BTC"
+	LTC  Chain = "LTC"
+	DOGE Chain = "DOGE"
+	BCH  Chain = "BCH"
+	DASH Chain = "DASH"
+	ZEC  Chain = "ZEC"
 
 	// secp256k1 — additional UTXO chains.
-	DGB   Symbol = "DGB"   // DigiByte (segwit)
-	SYS   Symbol = "SYS"   // Syscoin (segwit)
-	VIA   Symbol = "VIA"   // Viacoin (segwit)
-	QTUM  Symbol = "QTUM"  // Qtum (base58check P2PKH)
-	RVN   Symbol = "RVN"   // Ravencoin (base58check P2PKH)
-	FIRO  Symbol = "FIRO"  // Firo (base58check P2PKH)
-	MONA  Symbol = "MONA"  // MonaCoin (base58check P2PKH)
-	PIVX  Symbol = "PIVX"  // PIVX (base58check P2PKH)
-	STRAX Symbol = "STRAX" // Stratis (segwit)
+	DGB   Chain = "DGB"   // DigiByte (segwit)
+	SYS   Chain = "SYS"   // Syscoin (segwit)
+	VIA   Chain = "VIA"   // Viacoin (segwit)
+	QTUM  Chain = "QTUM"  // Qtum (base58check P2PKH)
+	RVN   Chain = "RVN"   // Ravencoin (base58check P2PKH)
+	FIRO  Chain = "FIRO"  // Firo (base58check P2PKH)
+	MONA  Chain = "MONA"  // MonaCoin (base58check P2PKH)
+	PIVX  Chain = "PIVX"  // PIVX (base58check P2PKH)
+	STRAX Chain = "STRAX" // Stratis (segwit)
 
 	// secp256k1 — account-based / keccak.
-	ETH Symbol = "ETH"
-	TRX Symbol = "TRX"
-	XRP Symbol = "XRP"
+	ETH Chain = "ETH"
+	TRX Chain = "TRX"
+	XRP Chain = "XRP"
 
 	// secp256k1 — EVM chains (same key & address format as Ethereum).
-	BNB   Symbol = "BNB"
-	MATIC Symbol = "MATIC"
-	AVAX  Symbol = "AVAX"
-	ARB   Symbol = "ARB"
-	OP    Symbol = "OP"
-	FTM   Symbol = "FTM"
-	BASE  Symbol = "BASE"
-	CRO   Symbol = "CRO"
-	GNO   Symbol = "GNO"
-	CELO  Symbol = "CELO"
+	BNB   Chain = "BNB"
+	MATIC Chain = "MATIC"
+	AVAX  Chain = "AVAX"
+	ARB   Chain = "ARB"
+	OP    Chain = "OP"
+	FTM   Chain = "FTM"
+	BASE  Chain = "BASE"
+	CRO   Chain = "CRO"
+	GNO   Chain = "GNO"
+	CELO  Chain = "CELO"
 
 	// secp256k1 — additional EVM chains (Ethereum address format, EIP-55).
-	ETC      Symbol = "ETC"
-	RONIN    Symbol = "RONIN"
-	ZKSYNC   Symbol = "ZKSYNC"
-	LINEA    Symbol = "LINEA"
-	SCROLL   Symbol = "SCROLL"
-	MANTLE   Symbol = "MANTLE"
-	BLAST    Symbol = "BLAST"
-	KAIA     Symbol = "KAIA"
-	AURORA   Symbol = "AURORA"
-	GLMR     Symbol = "GLMR"
-	MOVR     Symbol = "MOVR"
-	BOBA     Symbol = "BOBA"
-	METIS    Symbol = "METIS"
-	OPBNB    Symbol = "OPBNB"
-	POLZKEVM Symbol = "POLZKEVM"
-	MANTA    Symbol = "MANTA"
-	RBTC     Symbol = "RBTC"
-	HECO     Symbol = "HECO"
-	OKT      Symbol = "OKT"
-	KCS      Symbol = "KCS"
-	WAN      Symbol = "WAN"
-	POA      Symbol = "POA"
-	CLO      Symbol = "CLO"
-	GO       Symbol = "GO"
-	TT       Symbol = "TT"
-	VET      Symbol = "VET"
-	IOTX     Symbol = "IOTX"
-	THETA    Symbol = "THETA"
-	NEON     Symbol = "NEON"
-	MERLIN   Symbol = "MERLIN"
-	LIGHT    Symbol = "LIGHT"
-	SONIC    Symbol = "SONIC"
-	ZENEON   Symbol = "ZENEON"
-	ZETAEVM  Symbol = "ZETAEVM"
+	ETC      Chain = "ETC"
+	RONIN    Chain = "RONIN"
+	ZKSYNC   Chain = "ZKSYNC"
+	LINEA    Chain = "LINEA"
+	SCROLL   Chain = "SCROLL"
+	MANTLE   Chain = "MANTLE"
+	BLAST    Chain = "BLAST"
+	KAIA     Chain = "KAIA"
+	AURORA   Chain = "AURORA"
+	GLMR     Chain = "GLMR"
+	MOVR     Chain = "MOVR"
+	BOBA     Chain = "BOBA"
+	METIS    Chain = "METIS"
+	OPBNB    Chain = "OPBNB"
+	POLZKEVM Chain = "POLZKEVM"
+	MANTA    Chain = "MANTA"
+	RBTC     Chain = "RBTC"
+	HECO     Chain = "HECO"
+	OKT      Chain = "OKT"
+	KCS      Chain = "KCS"
+	WAN      Chain = "WAN"
+	POA      Chain = "POA"
+	CLO      Chain = "CLO"
+	GO       Chain = "GO"
+	TT       Chain = "TT"
+	VET      Chain = "VET"
+	IOTX     Chain = "IOTX"
+	THETA    Chain = "THETA"
+	NEON     Chain = "NEON"
+	MERLIN   Chain = "MERLIN"
+	LIGHT    Chain = "LIGHT"
+	SONIC    Chain = "SONIC"
+	ZENEON   Chain = "ZENEON"
+	ZETAEVM  Chain = "ZETAEVM"
 
 	// secp256k1 — Cosmos SDK chains.
-	ATOM Symbol = "ATOM"
-	OSMO Symbol = "OSMO"
-	JUNO Symbol = "JUNO"
-	TIA  Symbol = "TIA"
+	ATOM Chain = "ATOM"
+	OSMO Chain = "OSMO"
+	JUNO Chain = "JUNO"
+	TIA  Chain = "TIA"
 
 	// secp256k1 — additional Cosmos SDK chains (hash160 bech32, per-chain HRP).
-	LUNA      Symbol = "LUNA"
-	KAVA      Symbol = "KAVA"
-	SCRT      Symbol = "SCRT"
-	BAND      Symbol = "BAND"
-	RUNE      Symbol = "RUNE"
-	STARS     Symbol = "STARS"
-	AXL       Symbol = "AXL"
-	STRD      Symbol = "STRD"
-	BLD       Symbol = "BLD"
-	CRE       Symbol = "CRE"
-	KUJI      Symbol = "KUJI"
-	CMDX      Symbol = "CMDX"
-	NTRN      Symbol = "NTRN"
-	SOMM      Symbol = "SOMM"
-	FET       Symbol = "FET"
-	MARS      Symbol = "MARS"
-	UMEE      Symbol = "UMEE"
-	COREUM    Symbol = "COREUM"
-	QSR       Symbol = "QSR"
-	XPRT      Symbol = "XPRT"
-	AKT       Symbol = "AKT"
-	NOBLE     Symbol = "NOBLE"
-	SEI       Symbol = "SEI"
-	DYDX      Symbol = "DYDX"
-	BLZ       Symbol = "BLZ"
-	CRYPTOORG Symbol = "CRYPTOORG"
+	LUNA      Chain = "LUNA"
+	KAVA      Chain = "KAVA"
+	SCRT      Chain = "SCRT"
+	BAND      Chain = "BAND"
+	RUNE      Chain = "RUNE"
+	STARS     Chain = "STARS"
+	AXL       Chain = "AXL"
+	STRD      Chain = "STRD"
+	BLD       Chain = "BLD"
+	CRE       Chain = "CRE"
+	KUJI      Chain = "KUJI"
+	CMDX      Chain = "CMDX"
+	NTRN      Chain = "NTRN"
+	SOMM      Chain = "SOMM"
+	FET       Chain = "FET"
+	MARS      Chain = "MARS"
+	UMEE      Chain = "UMEE"
+	COREUM    Chain = "COREUM"
+	QSR       Chain = "QSR"
+	XPRT      Chain = "XPRT"
+	AKT       Chain = "AKT"
+	NOBLE     Chain = "NOBLE"
+	SEI       Chain = "SEI"
+	DYDX      Chain = "DYDX"
+	BLZ       Chain = "BLZ"
+	CRYPTOORG Chain = "CRYPTOORG"
 
 	// secp256k1 — Cosmos chains with EVM-style keys (keccak address, bech32).
-	EVMOS Symbol = "EVMOS"
-	INJ   Symbol = "INJ"
+	EVMOS Chain = "EVMOS"
+	INJ   Chain = "INJ"
 
 	// ed25519 (SLIP-0010).
-	SOL   Symbol = "SOL"
-	XLM   Symbol = "XLM"
-	ALGO  Symbol = "ALGO"
-	APTOS Symbol = "APTOS"
+	SOL   Chain = "SOL"
+	XLM   Chain = "XLM"
+	ALGO  Chain = "ALGO"
+	APTOS Chain = "APTOS"
 
 	// Roadmap — Trust Wallet Core networks intentionally NOT registered yet (each
 	// needs more than a vector-verified encoder over the standard seed path, so
@@ -190,7 +190,7 @@ const (
 // via the SLIP44 method below.
 type Coin struct {
 	Name     string
-	Symbol   Symbol
+	Chain    Chain
 	Curve    Curve
 	Path     string
 	Encode   func(pub []byte) (string, error)
@@ -220,11 +220,11 @@ func (c Coin) SLIP44() uint32 {
 // defaults so seeds are interchangeable. Encoders verified against Trust Wallet
 // Core's CoinAddressDerivation test vectors are marked accordingly in the tests.
 //
-// Field order is positional: Name, Symbol, Curve, Path, Encode, Decimals, ChainID.
+// Field order is positional: Name, Chain, Curve, Path, Encode, Decimals, ChainID.
 // Decimals is the native-unit precision (verified against Trust Wallet Core's
 // registry.json); ChainID is the EIP-155 chain id and is non-zero ONLY for EVM
 // chains (the evmTxChains set in tx_families.go), 0 for everything else.
-var coins = map[Symbol]Coin{
+var coins = map[Chain]Coin{
 	// ---- secp256k1 : Bitcoin-style UTXO chains ----
 	"BTC":  {"Bitcoin", "BTC", Secp256k1, "m/84'/0'/0'/0/0", encodeBTC, 8, 0},
 	"LTC":  {"Litecoin", "LTC", Secp256k1, "m/84'/2'/0'/0/0", encodeLTC, 8, 0},
@@ -355,7 +355,7 @@ var coins = map[Symbol]Coin{
 // the AddressFromPublicKey round-trip test stay correct for every coin.
 func init() {
 	// EVM chains validate exactly like Ethereum (0x + EIP-55).
-	for _, s := range []Symbol{
+	for _, s := range []Chain{
 		ETC, ZKSYNC, LINEA, SCROLL, MANTLE, BLAST, KAIA, AURORA, GLMR, MOVR,
 		BOBA, METIS, OPBNB, POLZKEVM, MANTA, RBTC, HECO, OKT, KCS, WAN,
 		POA, CLO, GO, TT, VET, IOTX, THETA, NEON, MERLIN, LIGHT,
@@ -381,7 +381,7 @@ func init() {
 	// Additional Cosmos SDK chains (bech32, 20-byte payload, per-HRP). The same
 	// validator handles both hash160-key and EVM-key chains since both encode a
 	// 20-byte account identifier under the chain HRP.
-	cosmos := map[Symbol]string{
+	cosmos := map[Chain]string{
 		LUNA: "terra", KAVA: "kava", SCRT: "secret", BAND: "band", RUNE: "thor",
 		STARS: "stars", AXL: "axelar", STRD: "stride", BLD: "agoric", CRE: "cre",
 		KUJI: "kujira", CMDX: "comdex", NTRN: "neutron", SOMM: "somm", FET: "fetch",
@@ -398,20 +398,20 @@ func init() {
 // CoinFamily returns a string identifying the chain family for routing purposes.
 // Values: "evm", "cosmos", "bitcoin-utxo", "solana", "tron", "ripple", "stellar",
 // or "unknown".
-func CoinFamily(symbol Symbol) string {
-	if _, ok := evmTxChains[symbol]; ok {
+func CoinFamily(chain Chain) string {
+	if _, ok := evmTxChains[chain]; ok {
 		return "evm"
 	}
-	if _, ok := cosmosTxChains[symbol]; ok {
+	if _, ok := cosmosTxChains[chain]; ok {
 		return "cosmos"
 	}
-	if _, ok := ethermintTxChains[symbol]; ok {
+	if _, ok := ethermintTxChains[chain]; ok {
 		return "cosmos"
 	}
-	if IsUTXO(symbol) {
+	if IsUTXO(chain) {
 		return "bitcoin-utxo"
 	}
-	switch symbol {
+	switch chain {
 	case TRX:
 		return "tron"
 	case XRP:
@@ -425,38 +425,38 @@ func CoinFamily(symbol Symbol) string {
 	}
 }
 
-// IsEVM returns true if symbol is an EVM-compatible chain (Ethereum, BNB, Polygon, etc.)
-func IsEVM(symbol Symbol) bool { _, ok := evmTxChains[symbol]; return ok }
+// IsEVM returns true if chain is an EVM-compatible chain (Ethereum, BNB, Polygon, etc.)
+func IsEVM(chain Chain) bool { _, ok := evmTxChains[chain]; return ok }
 
-// IsCosmosSDK returns true if symbol uses the Cosmos SDK signing path.
-func IsCosmosSDK(symbol Symbol) bool {
-	_, ok1 := cosmosTxChains[symbol]
-	_, ok2 := ethermintTxChains[symbol]
+// IsCosmosSDK returns true if chain uses the Cosmos SDK signing path.
+func IsCosmosSDK(chain Chain) bool {
+	_, ok1 := cosmosTxChains[chain]
+	_, ok2 := ethermintTxChains[chain]
 	return ok1 || ok2
 }
 
-// IsUTXO returns true if symbol uses Bitcoin-style UTXO transaction model.
-func IsUTXO(symbol Symbol) bool {
-	if _, ok := utxoTxChains[symbol]; ok {
+// IsUTXO returns true if chain uses Bitcoin-style UTXO transaction model.
+func IsUTXO(chain Chain) bool {
+	if _, ok := utxoTxChains[chain]; ok {
 		return true
 	}
-	return symbol == BTC || symbol == LTC
+	return chain == BTC || chain == LTC
 }
 
-// CoinDecimals returns the number of decimal places for the base unit of symbol.
-// Returns 0 if symbol is not registered.
-func CoinDecimals(symbol Symbol) int {
-	c, ok := coins[symbol]
+// CoinDecimals returns the number of decimal places for the base unit of chain.
+// Returns 0 if chain is not registered.
+func CoinDecimals(chain Chain) int {
+	c, ok := coins[chain]
 	if !ok {
 		return 0
 	}
 	return int(c.Decimals)
 }
 
-// SupportedTxCoins returns symbols for which SignTransaction is implemented,
+// SupportedTxCoins returns chains for which SignTransaction is implemented,
 // sorted alphabetically.
-func SupportedTxCoins() []Symbol {
-	set := make(map[Symbol]struct{})
+func SupportedTxCoins() []Chain {
+	set := make(map[Chain]struct{})
 	for s := range evmTxChains {
 		set[s] = struct{}{}
 	}
@@ -469,10 +469,10 @@ func SupportedTxCoins() []Symbol {
 	for s := range utxoTxChains {
 		set[s] = struct{}{}
 	}
-	for _, s := range []Symbol{BTC, LTC, TRX, XRP, SOL} {
+	for _, s := range []Chain{BTC, LTC, TRX, XRP, SOL} {
 		set[s] = struct{}{}
 	}
-	out := make([]Symbol, 0, len(set))
+	out := make([]Chain, 0, len(set))
 	for s := range set {
 		out = append(out, s)
 	}

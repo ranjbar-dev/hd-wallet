@@ -26,35 +26,35 @@ var (
 	ErrEthSignature = errors.New("hdwallet: invalid ethereum signature")
 )
 
-// SignMessage signs message with EIP-191 personal_sign using the key for symbol
+// SignMessage signs message with EIP-191 personal_sign using the key for chain
 // at the given address index, returning a 65-byte r||s||v signature (v = 27/28).
-// symbol must be a secp256k1/EVM coin (e.g. ETH); other curves return an error.
-func (w *HDWallet) SignMessage(symbol Symbol, index uint32, message []byte) ([]byte, error) {
+// chain must be a secp256k1/EVM coin (e.g. ETH); other curves return an error.
+func (w *HDWallet) SignMessage(chain Chain, index uint32, message []byte) ([]byte, error) {
 	digest := EthereumPersonalMessageHash(message)
-	return w.signEthDigest(symbol, index, digest)
+	return w.signEthDigest(chain, index, digest)
 }
 
 // SignTypedData signs the EIP-712 digest of MetaMask-shape typed-data JSON using
-// the key for symbol at the given address index, returning a 65-byte r||s||v
+// the key for chain at the given address index, returning a 65-byte r||s||v
 // signature (v = 27/28).
-func (w *HDWallet) SignTypedData(symbol Symbol, index uint32, typedDataJSON []byte) ([]byte, error) {
+func (w *HDWallet) SignTypedData(chain Chain, index uint32, typedDataJSON []byte) ([]byte, error) {
 	digest, err := EIP712Hash(typedDataJSON)
 	if err != nil {
 		return nil, err
 	}
-	return w.signEthDigest(symbol, index, digest)
+	return w.signEthDigest(chain, index, digest)
 }
 
 // signEthDigest signs a 32-byte digest with the secp256k1 signer and returns the
 // 65-byte r||s||v form with v in {27, 28}.
-func (w *HDWallet) signEthDigest(symbol Symbol, index uint32, digest []byte) ([]byte, error) {
-	sig, err := w.SignIndex(symbol, index, digest)
+func (w *HDWallet) signEthDigest(chain Chain, index uint32, digest []byte) ([]byte, error) {
+	sig, err := w.SignIndex(chain, index, digest)
 	if err != nil {
 		return nil, err
 	}
 	rec := sig.Recoverable() // 65 bytes r||s||v with v in {0,1}
 	if rec == nil {
-		return nil, fmt.Errorf("%w: %s is not a recoverable (secp256k1) coin", ErrEthSignature, symbol)
+		return nil, fmt.Errorf("%w: %s is not a recoverable (secp256k1) coin", ErrEthSignature, chain)
 	}
 	out := make([]byte, 65)
 	copy(out, rec)

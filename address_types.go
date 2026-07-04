@@ -85,13 +85,13 @@ type btcParams struct {
 	p2shVer  byte
 }
 
-// btcAddrParams maps a symbol to its address-encoding constants. BTC and LTC are
+// btcAddrParams maps a chain to its address-encoding constants. BTC and LTC are
 // the wired/tested chains; the other native-SegWit UTXO altcoins below sign with
 // the same standard BIP-143 (double-SHA256) P2WPKH/legacy P2PKH sighash and are
 // proven by the btcd oracle (tx_utxo_altcoins_test.go). Per-coin version bytes are
 // taken from Trust Wallet Core's registry.json (and the chains' own
 // chainparams for STRAX).
-var btcAddrParams = map[Symbol]btcParams{
+var btcAddrParams = map[Chain]btcParams{
 	BTC: {hrp: "bc", p2pkhVer: 0x00, p2shVer: 0x05},
 	LTC: {hrp: "ltc", p2pkhVer: 0x30, p2shVer: 0x32},
 	// Native-SegWit altcoins (standard BIP-143 sighash; btcd-oracle-proven).
@@ -101,33 +101,33 @@ var btcAddrParams = map[Symbol]btcParams{
 	STRAX: {hrp: "strax", p2pkhVer: 0x4b, p2shVer: 0x8c}, // Stratis: P2PKH 75, P2SH 140
 }
 
-// BitcoinAddress returns the address for symbol in the given Bitcoin address
+// BitcoinAddress returns the address for chain in the given Bitcoin address
 // type, derived at the type's standard BIP path
 // "m/purpose'/coinType'/account'/change/index" (purpose = 44/49/84/86 for
 // P2PKH/P2SHP2WPKH/P2WPKH/P2TR; coinType taken from the coin's registry path).
 //
-// It is available for chains in btcAddrParams (BTC, LTC); any other symbol
+// It is available for chains in btcAddrParams (BTC, LTC); any other chain
 // returns ErrUnsupportedCoin. account/change/index must each be below 2^31. Like
 // the other derivation methods it is seed-only and the leaf key is wiped after
 // use; a key-only wallet returns ErrKeyOnlyWallet.
-func (w *HDWallet) BitcoinAddress(symbol Symbol, t BitcoinAddressType, account, change, index uint32) (string, error) {
-	p, ok := btcAddrParams[symbol]
+func (w *HDWallet) BitcoinAddress(chain Chain, t BitcoinAddressType, account, change, index uint32) (string, error) {
+	p, ok := btcAddrParams[chain]
 	if !ok {
-		return "", fmt.Errorf("%w: %s has no Bitcoin address-type support", ErrUnsupportedCoin, symbol)
+		return "", fmt.Errorf("%w: %s has no Bitcoin address-type support", ErrUnsupportedCoin, chain)
 	}
 	purpose, err := t.purpose()
 	if err != nil {
 		return "", err
 	}
-	coinType, err := btcCoinType(symbol)
+	coinType, err := btcCoinType(chain)
 	if err != nil {
 		return "", err
 	}
 	if account >= hardenedOffset || change >= hardenedOffset || index >= hardenedOffset {
-		return "", fmt.Errorf("hdwallet: %s: account/change/index must each be < %d", symbol, hardenedOffset)
+		return "", fmt.Errorf("hdwallet: %s: account/change/index must each be < %d", chain, hardenedOffset)
 	}
 	path := fmt.Sprintf("m/%d'/%d'/%d'/%d/%d", purpose, coinType, account, change, index)
-	pub, err := w.PublicKeyPath(symbol, path)
+	pub, err := w.PublicKeyPath(chain, path)
 	if err != nil {
 		return "", err
 	}
@@ -136,14 +136,14 @@ func (w *HDWallet) BitcoinAddress(symbol Symbol, t BitcoinAddressType, account, 
 
 // btcCoinType extracts the SLIP-44 coin-type number from a coin's registry path
 // (the second element, e.g. "0'" in "m/84'/0'/0'/0/0" → 0).
-func btcCoinType(symbol Symbol) (uint32, error) {
-	parts := strings.Split(coins[symbol].Path, "/")
+func btcCoinType(chain Chain) (uint32, error) {
+	parts := strings.Split(coins[chain].Path, "/")
 	if len(parts) < 3 {
-		return 0, fmt.Errorf("hdwallet: %s: unexpected path %q", symbol, coins[symbol].Path)
+		return 0, fmt.Errorf("hdwallet: %s: unexpected path %q", chain, coins[chain].Path)
 	}
 	n, err := strconv.ParseUint(strings.TrimSuffix(parts[2], "'"), 10, 32)
 	if err != nil {
-		return 0, fmt.Errorf("hdwallet: %s: bad coin type in path %q: %w", symbol, coins[symbol].Path, err)
+		return 0, fmt.Errorf("hdwallet: %s: bad coin type in path %q: %w", chain, coins[chain].Path, err)
 	}
 	return uint32(n), nil
 }
@@ -192,7 +192,7 @@ func encodeP2TR(hrp string, pub []byte) (string, error) {
 type BitcoinAddressKind int
 
 // BitcoinAddressKindUnknown is the zero value returned when the address format
-// is not recognised for the given symbol.
+// is not recognised for the given chain.
 const (
 	BitcoinAddressKindUnknown    BitcoinAddressKind = iota // address type could not be determined
 	BitcoinAddressKindP2PKH                                // 1… (base58check, version 0x00 for BTC)
@@ -204,9 +204,9 @@ const (
 // DetectBitcoinAddressKind returns the address type for a Bitcoin-family
 // address, using the coin's version bytes and bech32 HRP from btcAddrParams.
 // Returns BitcoinAddressKindUnknown if the format is not recognised for that
-// symbol (including symbols not in btcAddrParams).
-func DetectBitcoinAddressKind(symbol Symbol, addr string) BitcoinAddressKind {
-	p, ok := btcAddrParams[symbol]
+// chain (including chains not in btcAddrParams).
+func DetectBitcoinAddressKind(chain Chain, addr string) BitcoinAddressKind {
+	p, ok := btcAddrParams[chain]
 	if !ok {
 		return BitcoinAddressKindUnknown
 	}
@@ -240,37 +240,37 @@ func DetectBitcoinAddressKind(symbol Symbol, addr string) BitcoinAddressKind {
 // payload (20-byte hash for P2PKH/P2SH/P2WPKH, 32-byte output key for P2TR). It
 // replaces the single-format SegWit validator so a wallet can validate any
 // recipient address the user supplies.
-func bitcoinValidator(symbol Symbol) addressValidator {
+func bitcoinValidator(chain Chain) addressValidator {
 	return func(addr string) ([]byte, error) {
-		p, ok := btcAddrParams[symbol]
+		p, ok := btcAddrParams[chain]
 		if !ok {
-			return nil, fmt.Errorf("%w: %s", ErrUnsupportedCoin, symbol)
+			return nil, fmt.Errorf("%w: %s", ErrUnsupportedCoin, chain)
 		}
 		_, payload, err := decodeBitcoinAddress(p, addr)
 		if err != nil {
-			return nil, addrErr(symbol, err.Error())
+			return nil, addrErr(chain, err.Error())
 		}
 		return payload, nil
 	}
 }
 
 // bitcoinDecodeScript decodes a Bitcoin address (any of the four types) for
-// symbol and returns its scriptPubKey, used to build transaction outputs to an
+// chain and returns its scriptPubKey, used to build transaction outputs to an
 // arbitrary destination/change address.
-func bitcoinDecodeScript(symbol Symbol, addr string) ([]byte, error) {
-	if p, ok := btcAddrParams[symbol]; ok {
+func bitcoinDecodeScript(chain Chain, addr string) ([]byte, error) {
+	if p, ok := btcAddrParams[chain]; ok {
 		script, _, err := decodeBitcoinAddress(p, addr)
 		if err != nil {
-			return nil, fmt.Errorf("%w: %s: %v", ErrInvalidAddress, symbol, err)
+			return nil, fmt.Errorf("%w: %s: %v", ErrInvalidAddress, chain, err)
 		}
 		return script, nil
 	}
 	// The non-BTC/LTC UTXO chains (DOGE/DASH/BCH/ZEC) are base58check-only (plus
 	// CashAddr for BCH) with chain-specific version prefixes; see tx_utxo.go.
-	if up, ok := utxoOutParams[symbol]; ok {
-		return up.decodeScript(symbol, addr)
+	if up, ok := utxoOutParams[chain]; ok {
+		return up.decodeScript(chain, addr)
 	}
-	return nil, fmt.Errorf("%w: %s", ErrUnsupportedCoin, symbol)
+	return nil, fmt.Errorf("%w: %s", ErrUnsupportedCoin, chain)
 }
 
 // decodeBitcoinAddress decodes a Bitcoin address into its scriptPubKey and the

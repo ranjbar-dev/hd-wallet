@@ -25,11 +25,11 @@ var (
 // NativeDecimals returns the number of fractional digits in the coin's native
 // base unit (e.g. 8 for BTC/satoshis, 18 for ETH/wei, 6 for ATOM/uatom).
 //
-// The second return value reports whether symbol is a registered coin; an
-// unregistered symbol returns (0, false). This is a thin convenience wrapper
+// The second return value reports whether chain is a registered coin; an
+// unregistered chain returns (0, false). This is a thin convenience wrapper
 // over CoinInfo for callers that only need the decimal count.
-func NativeDecimals(symbol Symbol) (uint8, bool) {
-	c, ok := coins[symbol]
+func NativeDecimals(chain Chain) (uint8, bool) {
+	c, ok := coins[chain]
 	if !ok {
 		return 0, false
 	}
@@ -38,7 +38,7 @@ func NativeDecimals(symbol Symbol) (uint8, bool) {
 
 // FormatAmount converts a raw integer amount (in the coin's native smallest
 // unit) to a human-readable decimal string using the decimal count registered
-// for symbol. It returns ErrUnsupportedCoin for an unknown symbol.
+// for chain. It returns ErrUnsupportedCoin for an unknown chain.
 //
 // This is the native-coin helper. For ERC-20, SPL, or TRC-20 tokens whose
 // decimal count comes from the token contract, use FormatUnits directly.
@@ -47,17 +47,17 @@ func NativeDecimals(symbol Symbol) (uint8, bool) {
 //
 //	FormatAmount(BTC, big.NewInt(100_000_000)) // "1"   (1 BTC = 1e8 satoshis)
 //	FormatAmount(ETH, big.NewInt(1_500_000_000_000_000_000)) // "1.5"
-func FormatAmount(symbol Symbol, raw *big.Int) (string, error) {
-	dec, ok := NativeDecimals(symbol)
+func FormatAmount(chain Chain, raw *big.Int) (string, error) {
+	dec, ok := NativeDecimals(chain)
 	if !ok {
-		return "", fmt.Errorf("%w: %s", ErrUnsupportedCoin, symbol)
+		return "", fmt.Errorf("%w: %s", ErrUnsupportedCoin, chain)
 	}
 	return FormatUnits(raw, dec), nil
 }
 
 // ParseAmount parses a human-readable unsigned decimal string into its raw
-// integer representation using the decimal count registered for symbol.
-// Returns ErrUnsupportedCoin for an unknown symbol, ErrNegativeAmount for a
+// integer representation using the decimal count registered for chain.
+// Returns ErrUnsupportedCoin for an unknown chain, ErrNegativeAmount for a
 // negative input, and ErrInvalidAmount for a malformed string.
 //
 // This is the native-coin helper. For ERC-20, SPL, or TRC-20 tokens whose
@@ -67,10 +67,10 @@ func FormatAmount(symbol Symbol, raw *big.Int) (string, error) {
 //
 //	ParseAmount(BTC, "0.5")  // big.Int: 50_000_000
 //	ParseAmount(ETH, "1.5")  // big.Int: 1_500_000_000_000_000_000
-func ParseAmount(symbol Symbol, human string) (*big.Int, error) {
-	dec, ok := NativeDecimals(symbol)
+func ParseAmount(chain Chain, human string) (*big.Int, error) {
+	dec, ok := NativeDecimals(chain)
 	if !ok {
-		return nil, fmt.Errorf("%w: %s", ErrUnsupportedCoin, symbol)
+		return nil, fmt.Errorf("%w: %s", ErrUnsupportedCoin, chain)
 	}
 	return ParseUnits(human, dec)
 }

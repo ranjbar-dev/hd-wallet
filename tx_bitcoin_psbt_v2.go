@@ -87,13 +87,13 @@ type psbtV2Out struct {
 	script []byte
 }
 
-// BuildPSBTV2 constructs an unsigned BIP-370 PSBT for symbol from in. Coin
+// BuildPSBTV2 constructs an unsigned BIP-370 PSBT for chain from in. Coin
 // selection runs the same planBitcoinTx as the direct signer. Only segwit
 // input types (P2WPKH, P2SH-P2WPKH, P2TR) are accepted; P2PKH returns
 // ErrTxInput because the proto does not carry the full previous transaction.
-func BuildPSBTV2(symbol Symbol, in *txbtc.SigningInput) ([]byte, error) {
-	if _, ok := btcAddrParams[symbol]; !ok {
-		return nil, fmt.Errorf("%w: %s", ErrTxUnsupported, symbol)
+func BuildPSBTV2(chain Chain, in *txbtc.SigningInput) ([]byte, error) {
+	if _, ok := btcAddrParams[chain]; !ok {
+		return nil, fmt.Errorf("%w: %s", ErrTxUnsupported, chain)
 	}
 	if len(in.GetUtxo()) == 0 {
 		return nil, fmt.Errorf("%w: bitcoin: no utxo provided", ErrTxInput)
@@ -101,16 +101,16 @@ func BuildPSBTV2(symbol Symbol, in *txbtc.SigningInput) ([]byte, error) {
 	if in.GetToAddress() == "" {
 		return nil, fmt.Errorf("%w: bitcoin: missing to_address", ErrTxInput)
 	}
-	toScript, err := bitcoinDecodeScript(symbol, in.GetToAddress())
+	toScript, err := bitcoinDecodeScript(chain, in.GetToAddress())
 	if err != nil {
 		return nil, fmt.Errorf("%w: bitcoin: to_address: %v", ErrTxInput, err)
 	}
-	plan, err := planBitcoinTx(symbol, in, toScript)
+	plan, err := planBitcoinTx(chain, in, toScript)
 	if err != nil {
 		return nil, err
 	}
 	p := &psbtV2Packet{
-		txVersion: btcTxVersion(symbol),
+		txVersion: btcTxVersion(chain),
 		locktime:  in.GetLockTime(),
 	}
 	for i, bi := range plan.inputs {
@@ -135,17 +135,17 @@ func BuildPSBTV2(symbol Symbol, in *txbtc.SigningInput) ([]byte, error) {
 }
 
 // SignPSBTV2 parses psbtBytes, signs every input controlled by the
-// (symbol,index) key and returns the updated BIP-370 PSBT. The leaf key is
+// (chain,index) key and returns the updated BIP-370 PSBT. The leaf key is
 // derived under the package's wiped-on-return discipline.
-func (w *HDWallet) SignPSBTV2(symbol Symbol, index uint32, psbtBytes []byte) ([]byte, error) {
-	if _, ok := btcAddrParams[symbol]; !ok {
-		return nil, fmt.Errorf("%w: %s", ErrTxUnsupported, symbol)
+func (w *HDWallet) SignPSBTV2(chain Chain, index uint32, psbtBytes []byte) ([]byte, error) {
+	if _, ok := btcAddrParams[chain]; !ok {
+		return nil, fmt.Errorf("%w: %s", ErrTxUnsupported, chain)
 	}
 	p, err := parsePSBTV2(psbtBytes)
 	if err != nil {
 		return nil, err
 	}
-	pub, err := w.PublicKeyIndex(symbol, index)
+	pub, err := w.PublicKeyIndex(chain, index)
 	if err != nil {
 		return nil, err
 	}
@@ -171,7 +171,7 @@ func (w *HDWallet) SignPSBTV2(symbol Symbol, index uint32, psbtBytes []byte) ([]
 			if err != nil {
 				return nil, fmt.Errorf("hdwallet: bitcoin: psbt v2 sighash: %w", err)
 			}
-			sig, err := w.btcDERSig(symbol, index, digest, uint32(txscript.SigHashAll))
+			sig, err := w.btcDERSig(chain, index, digest, uint32(txscript.SigHashAll))
 			if err != nil {
 				return nil, err
 			}
@@ -186,7 +186,7 @@ func (w *HDWallet) SignPSBTV2(symbol Symbol, index uint32, psbtBytes []byte) ([]
 			if err != nil {
 				return nil, fmt.Errorf("hdwallet: bitcoin: psbt v2 sighash: %w", err)
 			}
-			sig, err := w.btcDERSig(symbol, index, digest, uint32(txscript.SigHashAll))
+			sig, err := w.btcDERSig(chain, index, digest, uint32(txscript.SigHashAll))
 			if err != nil {
 				return nil, err
 			}
@@ -199,7 +199,7 @@ func (w *HDWallet) SignPSBTV2(symbol Symbol, index uint32, psbtBytes []byte) ([]
 			if err != nil {
 				return nil, fmt.Errorf("hdwallet: bitcoin: psbt v2 taproot sighash: %w", err)
 			}
-			sig, err := w.signTaprootKeyPath(symbol, index, digest)
+			sig, err := w.signTaprootKeyPath(chain, index, digest)
 			if err != nil {
 				return nil, err
 			}

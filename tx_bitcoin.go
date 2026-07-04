@@ -90,17 +90,17 @@ type btcOutput struct {
 }
 
 // signBitcoinTx builds, signs and serializes a Bitcoin/Litecoin transaction.
-// By default all UTXOs are signed with the (symbol,index) key. When a UTXO
+// By default all UTXOs are signed with the (chain,index) key. When a UTXO
 // carries an explicit key_index field, that derivation index is used for that
 // input instead, allowing a single tx to sweep UTXOs from multiple indices.
-func (w *HDWallet) signBitcoinTx(symbol Symbol, index uint32, in *txbtc.SigningInput) (*txbtc.SigningOutput, error) {
+func (w *HDWallet) signBitcoinTx(chain Chain, index uint32, in *txbtc.SigningInput) (*txbtc.SigningOutput, error) {
 	// Zcash uses an entirely different (Sapling v4 / ZIP-243) wire format and
 	// sighash, so it has its own builder rather than the standard Bitcoin path.
-	if symbol == ZEC {
+	if chain == ZEC {
 		return w.signZcashTx(index, in)
 	}
-	if !bitcoinTxSupported(symbol) {
-		return nil, fmt.Errorf("%w: %s", ErrTxUnsupported, symbol)
+	if !bitcoinTxSupported(chain) {
+		return nil, fmt.Errorf("%w: %s", ErrTxUnsupported, chain)
 	}
 	if len(in.GetUtxo()) == 0 {
 		return nil, fmt.Errorf("%w: bitcoin: no utxo provided", ErrTxInput)
@@ -109,20 +109,20 @@ func (w *HDWallet) signBitcoinTx(symbol Symbol, index uint32, in *txbtc.SigningI
 		return nil, fmt.Errorf("%w: bitcoin: missing to_address", ErrTxInput)
 	}
 
-	toScript, err := bitcoinDecodeScript(symbol, in.GetToAddress())
+	toScript, err := bitcoinDecodeScript(chain, in.GetToAddress())
 	if err != nil {
 		return nil, fmt.Errorf("%w: bitcoin: to_address: %v", ErrTxInput, err)
 	}
 
-	plan, err := planBitcoinTx(symbol, in, toScript)
+	plan, err := planBitcoinTx(chain, in, toScript)
 	if err != nil {
 		return nil, err
 	}
 
-	version := btcTxVersion(symbol)
+	version := btcTxVersion(chain)
 	hashType := in.GetHashType()
 	if hashType == 0 {
-		hashType = bitcoinDefaultHashType(symbol)
+		hashType = bitcoinDefaultHashType(chain)
 	}
 	locktime := in.GetLockTime()
 
@@ -134,14 +134,14 @@ func (w *HDWallet) signBitcoinTx(symbol Symbol, index uint32, in *txbtc.SigningI
 		if plan.inputs[i].hasKeyIndex {
 			inputIndex = plan.inputs[i].keyIndex
 		}
-		inputPub, err := w.PublicKeyIndex(symbol, inputIndex)
+		inputPub, err := w.PublicKeyIndex(chain, inputIndex)
 		if err != nil {
 			return nil, err
 		}
 		if len(inputPub) != 33 {
 			return nil, fmt.Errorf("%w: bitcoin: expected 33-byte compressed key for input %d", ErrTxInput, i)
 		}
-		if err := w.signBitcoinInput(symbol, inputIndex, inputPub, plan.inputs, plan.outputs, i, version, locktime, hashType); err != nil {
+		if err := w.signBitcoinInput(chain, inputIndex, inputPub, plan.inputs, plan.outputs, i, version, locktime, hashType); err != nil {
 			return nil, err
 		}
 	}
@@ -161,7 +161,7 @@ func (w *HDWallet) signBitcoinTx(symbol Symbol, index uint32, in *txbtc.SigningI
 
 // signBitcoinInput computes the sighash for input i according to its script type
 // and fills in its witness.
-func (w *HDWallet) signBitcoinInput(symbol Symbol, index uint32, pub []byte, inputs []btcInput, outputs []btcOutput, i int, version, locktime, hashType uint32) error {
+func (w *HDWallet) signBitcoinInput(chain Chain, index uint32, pub []byte, inputs []btcInput, outputs []btcOutput, i int, version, locktime, hashType uint32) error {
 	script := inputs[i].script
 	switch {
 	case isP2PKH(script):
@@ -175,7 +175,7 @@ func (w *HDWallet) signBitcoinInput(symbol Symbol, index uint32, pub []byte, inp
 		// uses the pre-segwit legacy sighash. Both produce a legacy unlocking script
 		// push(DER‖hashType) push(pubkey) with no witness.
 		var digest []byte
-		if symbol == BCH {
+		if chain == BCH {
 			scriptCode := append(btcVarInt(uint64(len(script))), script...)
 			digest = bip143Sighash(inputs, outputs, i, scriptCode, version, locktime, hashType)
 		} else {
@@ -188,7 +188,7 @@ func (w *HDWallet) signBitcoinInput(symbol Symbol, index uint32, pub []byte, inp
 			}
 			digest = legacySighash(inputs, outputs, i, script, version, locktime, hashType)
 		}
-		sigWithType, err := w.btcDERSig(symbol, index, digest, hashType)
+		sigWithType, err := w.btcDERSig(chain, index, digest, hashType)
 		if err != nil {
 			return err
 		}
@@ -207,7 +207,7 @@ func (w *HDWallet) signBitcoinInput(symbol Symbol, index uint32, pub []byte, inp
 		scriptCode := append([]byte{0x19, 0x76, 0xa9, 0x14}, keyhash...) // implied P2WPKH scriptCode, 0x19 = len(25)
 		scriptCode = append(scriptCode, 0x88, 0xac)
 		digest := bip143Sighash(inputs, outputs, i, scriptCode, version, locktime, hashType)
-		sigWithType, err := w.btcDERSig(symbol, index, digest, hashType)
+		sigWithType, err := w.btcDERSig(chain, index, digest, hashType)
 		if err != nil {
 			return err
 		}
@@ -222,7 +222,7 @@ func (w *HDWallet) signBitcoinInput(symbol Symbol, index uint32, pub []byte, inp
 		scriptCode := append([]byte{0x19, 0x76, 0xa9, 0x14}, keyhash...) // 0x19 = len(25)
 		scriptCode = append(scriptCode, 0x88, 0xac)
 		digest := bip143Sighash(inputs, outputs, i, scriptCode, version, locktime, hashType)
-		sigWithType, err := w.btcDERSig(symbol, index, digest, hashType)
+		sigWithType, err := w.btcDERSig(chain, index, digest, hashType)
 		if err != nil {
 			return err
 		}
@@ -233,7 +233,7 @@ func (w *HDWallet) signBitcoinInput(symbol Symbol, index uint32, pub []byte, inp
 			return err
 		}
 		digest := bip341Sighash(inputs, outputs, i, version, locktime)
-		sigBytes, err := w.signTaprootKeyPath(symbol, index, digest)
+		sigBytes, err := w.signTaprootKeyPath(chain, index, digest)
 		if err != nil {
 			return err
 		}
@@ -244,17 +244,17 @@ func (w *HDWallet) signBitcoinInput(symbol Symbol, index uint32, pub []byte, inp
 	}
 }
 
-// btcDERSig signs a 32-byte digest with the (symbol,index) secp256k1 key and
+// btcDERSig signs a 32-byte digest with the (chain,index) secp256k1 key and
 // returns the DER encoding with the 1-byte hashType appended, as Bitcoin
 // scriptSig/witness signatures require.
-func (w *HDWallet) btcDERSig(symbol Symbol, index uint32, digest []byte, hashType uint32) ([]byte, error) {
-	sig, err := w.SignIndex(symbol, index, digest)
+func (w *HDWallet) btcDERSig(chain Chain, index uint32, digest []byte, hashType uint32) ([]byte, error) {
+	sig, err := w.SignIndex(chain, index, digest)
 	if err != nil {
 		return nil, err
 	}
 	der := sig.DER()
 	if der == nil {
-		return nil, fmt.Errorf("%w: bitcoin: %s is not an ECDSA coin", ErrTxInput, symbol)
+		return nil, fmt.Errorf("%w: bitcoin: %s is not an ECDSA coin", ErrTxInput, chain)
 	}
 	return append(append([]byte(nil), der...), byte(hashType)), nil // #nosec G115 -- hashType is a 1-byte SIGHASH flag
 }
@@ -286,9 +286,9 @@ func checkTaprootKey(pub, program []byte, i int) error {
 // signTaprootKeyPath signs a BIP-341 key-path sighash with the BIP-86 tweaked
 // key using BIP-340 Schnorr, returning the 64-byte signature. The raw and tweaked
 // keys are wiped before returning.
-func (w *HDWallet) signTaprootKeyPath(symbol Symbol, index uint32, sighash []byte) ([]byte, error) {
+func (w *HDWallet) signTaprootKeyPath(chain Chain, index uint32, sighash []byte) ([]byte, error) {
 	var out []byte
-	err := w.withLeafPrivateKey(symbol, index, func(raw []byte, _ Coin) error {
+	err := w.withLeafPrivateKey(chain, index, func(raw []byte, _ Coin) error {
 		priv, _ := btcec.PrivKeyFromBytes(raw)
 		defer priv.Zero()
 		tweaked := txscript.TweakTaprootPrivKey(*priv, []byte{}) // empty script root = BIP-86 key-spend
@@ -363,9 +363,9 @@ type BitcoinTxPlan struct {
 //
 // PlanBitcoinTx is a pure function over the proto — it requires no wallet or
 // seed and can be called before a signing session is available.
-func PlanBitcoinTx(symbol Symbol, in *txbtc.SigningInput) (*BitcoinTxPlan, error) {
-	if !bitcoinTxSupported(symbol) {
-		return nil, fmt.Errorf("%w: %s", ErrTxUnsupported, symbol)
+func PlanBitcoinTx(chain Chain, in *txbtc.SigningInput) (*BitcoinTxPlan, error) {
+	if !bitcoinTxSupported(chain) {
+		return nil, fmt.Errorf("%w: %s", ErrTxUnsupported, chain)
 	}
 	if len(in.GetUtxo()) == 0 {
 		return nil, fmt.Errorf("%w: bitcoin: no utxo provided", ErrTxInput)
@@ -373,7 +373,7 @@ func PlanBitcoinTx(symbol Symbol, in *txbtc.SigningInput) (*BitcoinTxPlan, error
 	if in.GetToAddress() == "" {
 		return nil, fmt.Errorf("%w: bitcoin: missing to_address", ErrTxInput)
 	}
-	toScript, err := bitcoinDecodeScript(symbol, in.GetToAddress())
+	toScript, err := bitcoinDecodeScript(chain, in.GetToAddress())
 	if err != nil {
 		return nil, fmt.Errorf("%w: bitcoin: to_address: %v", ErrTxInput, err)
 	}
@@ -384,7 +384,7 @@ func PlanBitcoinTx(symbol Symbol, in *txbtc.SigningInput) (*BitcoinTxPlan, error
 		availableAmount += u.GetAmount()
 	}
 
-	plan, err := planBitcoinTx(symbol, in, toScript)
+	plan, err := planBitcoinTx(chain, in, toScript)
 	if err != nil {
 		return nil, err
 	}
@@ -459,7 +459,7 @@ func sortUTXOs(utxos []*txbtc.UnspentTransaction, sel txbtc.InputSelector) []*tx
 //   - disable_dust_filter = true always emits the change output when > 0.
 //
 // Output order is deterministic: [to_address, extra_outputs…, op_return, change].
-func planBitcoinTx(symbol Symbol, in *txbtc.SigningInput, toScript []byte) (*btcPlan, error) {
+func planBitcoinTx(chain Chain, in *txbtc.SigningInput, toScript []byte) (*btcPlan, error) {
 	byteFee := in.GetByteFee()
 
 	// Decode extra output scripts up front so both paths (UseMaxAmount and
@@ -471,7 +471,7 @@ func planBitcoinTx(symbol Symbol, in *txbtc.SigningInput, toScript []byte) (*btc
 		if eo.GetAmount() <= 0 {
 			return nil, fmt.Errorf("%w: bitcoin: extra_output[%d] amount must be positive", ErrTxInput, i)
 		}
-		s, err := bitcoinDecodeScript(symbol, eo.GetToAddress())
+		s, err := bitcoinDecodeScript(chain, eo.GetToAddress())
 		if err != nil {
 			return nil, fmt.Errorf("%w: bitcoin: extra_output[%d] address: %v", ErrTxInput, i, err)
 		}
@@ -541,7 +541,7 @@ func planBitcoinTx(symbol Symbol, in *txbtc.SigningInput, toScript []byte) (*btc
 	var changeScript []byte
 	if in.GetChangeAddress() != "" {
 		var err error
-		changeScript, err = bitcoinDecodeScript(symbol, in.GetChangeAddress())
+		changeScript, err = bitcoinDecodeScript(chain, in.GetChangeAddress())
 		if err != nil {
 			return nil, fmt.Errorf("%w: bitcoin: change_address: %v", ErrTxInput, err)
 		}

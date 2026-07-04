@@ -184,11 +184,11 @@ func TestGenerateMnemonicValid(t *testing.T) {
 	w.Destroy()
 }
 
-func TestSymbolIsValid(t *testing.T) {
+func TestChainIsValid(t *testing.T) {
 	if !ETH.IsValid() {
 		t.Error("ETH should be valid")
 	}
-	if Symbol("NOPE").IsValid() {
+	if Chain("NOPE").IsValid() {
 		t.Error("NOPE should be invalid")
 	}
 }

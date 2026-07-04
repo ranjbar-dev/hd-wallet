@@ -40,7 +40,7 @@ var algoTxPrefix = []byte("TX")
 
 // signALGOTx signs an Algorand payment transaction and returns the canonical
 // msgpack-encoded signed transaction.
-func (w *HDWallet) signALGOTx(_ Symbol, index uint32, in *txalgo.SigningInput) (proto.Message, error) {
+func (w *HDWallet) signALGOTx(_ Chain, index uint32, in *txalgo.SigningInput) (proto.Message, error) {
 	if len(in.GenesisHash) != 32 {
 		return nil, fmt.Errorf("%w: ALGO: genesis_hash must be 32 bytes", ErrTxInput)
 	}

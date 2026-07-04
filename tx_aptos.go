@@ -52,7 +52,7 @@ const aptosEntryFunctionVariant = 2
 const aptosEd25519AuthVariant = 0
 
 // signAptosTx builds and signs an Aptos SignedTransaction.
-func (w *HDWallet) signAptosTx(_ Symbol, index uint32, in *txaptos.SigningInput) (proto.Message, error) {
+func (w *HDWallet) signAptosTx(_ Chain, index uint32, in *txaptos.SigningInput) (proto.Message, error) {
 	ef := in.GetEntryFunction()
 	if ef == nil {
 		return nil, fmt.Errorf("%w: Aptos: entry_function is required", ErrTxInput)

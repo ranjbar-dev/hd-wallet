@@ -43,23 +43,23 @@ func tronMessageDigest(message []byte) []byte {
 }
 
 // SignTronMessage signs message under the Tron TIP-191 standard with the key
-// derived for symbol at the given address index.
+// derived for chain at the given address index.
 //
-// symbol must be a secp256k1 coin (e.g. TRX); other curves return
+// chain must be a secp256k1 coin (e.g. TRX); other curves return
 // ErrNotRecoverable. The derived private key is wiped immediately after signing
 // and never leaves the package.
 //
 // The returned signature is a hex-encoded 65-byte string "0x{R‖S‖V}" where
 // V ∈ {27, 28}, matching the format TronWeb trx.signMessageV2 produces.
-func (w *HDWallet) SignTronMessage(symbol Symbol, index uint32, message []byte) (string, error) {
+func (w *HDWallet) SignTronMessage(chain Chain, index uint32, message []byte) (string, error) {
 	digest := tronMessageDigest(message)
-	sig, err := w.SignIndex(symbol, index, digest)
+	sig, err := w.SignIndex(chain, index, digest)
 	if err != nil {
-		return "", fmt.Errorf("hdwallet: SignTronMessage %s: %w", symbol, err)
+		return "", fmt.Errorf("hdwallet: SignTronMessage %s: %w", chain, err)
 	}
 	rec := sig.Recoverable() // 65-byte R‖S‖V, V ∈ {0,1}
 	if rec == nil {
-		return "", fmt.Errorf("%w: %s", ErrNotRecoverable, symbol)
+		return "", fmt.Errorf("%w: %s", ErrNotRecoverable, chain)
 	}
 	// Tron / TronWeb convention: V = 27 + recoveryID.
 	out := make([]byte, 65)

@@ -134,23 +134,23 @@ func TestSeedWalletPrivateKeyRoundTrip(t *testing.T) {
 	defer w.Destroy()
 
 	cases := []struct {
-		symbol Symbol
-		curve  Curve
+		chain Chain
+		curve Curve
 	}{
 		{ETH, Secp256k1},
 		{BTC, Secp256k1},
 		{SOL, Ed25519},
 	}
 	for _, tc := range cases {
-		t.Run(tc.symbol.String(), func(t *testing.T) {
-			wantAddr, err := w.Address(tc.symbol)
+		t.Run(tc.chain.String(), func(t *testing.T) {
+			wantAddr, err := w.Address(tc.chain)
 			if err != nil {
 				t.Fatal(err)
 			}
 
 			// Path 1: WithPrivateKey -> import -> re-derive.
 			var kw *HDWallet
-			if err := w.WithPrivateKey(tc.symbol, 0, func(priv []byte) error {
+			if err := w.WithPrivateKey(tc.chain, 0, func(priv []byte) error {
 				key := append([]byte(nil), priv...)
 				var e error
 				kw, e = FromPrivateKeyBytes(key, tc.curve)
@@ -159,16 +159,16 @@ func TestSeedWalletPrivateKeyRoundTrip(t *testing.T) {
 				t.Fatal(err)
 			}
 			defer kw.Destroy()
-			gotAddr, err := kw.Address(tc.symbol)
+			gotAddr, err := kw.Address(tc.chain)
 			if err != nil {
 				t.Fatal(err)
 			}
 			if gotAddr != wantAddr {
-				t.Errorf("WithPrivateKey round-trip %s = %s, want %s", tc.symbol, gotAddr, wantAddr)
+				t.Errorf("WithPrivateKey round-trip %s = %s, want %s", tc.chain, gotAddr, wantAddr)
 			}
 
 			// Path 2: PrivateKey buffer -> import -> re-derive.
-			pkBuf, err := w.PrivateKey(tc.symbol, 0)
+			pkBuf, err := w.PrivateKey(tc.chain, 0)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -180,12 +180,12 @@ func TestSeedWalletPrivateKeyRoundTrip(t *testing.T) {
 				t.Fatal(err)
 			}
 			defer kw2.Destroy()
-			gotAddr2, err := kw2.Address(tc.symbol)
+			gotAddr2, err := kw2.Address(tc.chain)
 			if err != nil {
 				t.Fatal(err)
 			}
 			if gotAddr2 != wantAddr {
-				t.Errorf("PrivateKey round-trip %s = %s, want %s", tc.symbol, gotAddr2, wantAddr)
+				t.Errorf("PrivateKey round-trip %s = %s, want %s", tc.chain, gotAddr2, wantAddr)
 			}
 		})
 	}

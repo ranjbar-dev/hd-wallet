@@ -34,13 +34,13 @@ func TestTxFamilyRouting(t *testing.T) {
 		}
 	}
 	// EVMOS and INJ are the vector-verified ethermint-keyed Cosmos chains.
-	for _, s := range []Symbol{EVMOS, INJ} {
+	for _, s := range []Chain{EVMOS, INJ} {
 		if got := txFamilyOf(s); got != familyCosmosEthermint {
 			t.Errorf("txFamilyOf(%s) = %v, want familyCosmosEthermint", s, got)
 		}
 	}
 	// Single-chain families.
-	for s, want := range map[Symbol]txFamily{TRX: familyTron, XRP: familyRipple, SOL: familySolana, BTC: familyBitcoin, LTC: familyBitcoin, XLM: familyStellar} {
+	for s, want := range map[Chain]txFamily{TRX: familyTron, XRP: familyRipple, SOL: familySolana, BTC: familyBitcoin, LTC: familyBitcoin, XLM: familyStellar} {
 		if got := txFamilyOf(s); got != want {
 			t.Errorf("txFamilyOf(%s) = %v, want %v", s, got, want)
 		}
@@ -49,7 +49,7 @@ func TestTxFamilyRouting(t *testing.T) {
 
 // TestEVMRoutingProducesIdenticalBytes proves a newly-routed EVM chain (ZKSYNC,
 // same m/44'/60' path as ETH) signs to exactly the same bytes as ETH for an
-// identical input — i.e. the builder is correct and symbol-agnostic.
+// identical input — i.e. the builder is correct and chain-agnostic.
 func TestEVMRoutingProducesIdenticalBytes(t *testing.T) {
 	w := canonicalSeedWallet(t)
 	defer w.Destroy()

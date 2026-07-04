@@ -359,7 +359,7 @@ func TestBroadcastPayload(t *testing.T) {
 }
 
 // TestBroadcastPayloadErrors verifies that BroadcastPayload returns ErrTxInput
-// for wrong/nil output types, mismatched symbol/family, and empty required fields.
+// for wrong/nil output types, mismatched chain/family, and empty required fields.
 func TestBroadcastPayloadErrors(t *testing.T) {
 	t.Run("nil_message", func(t *testing.T) {
 		if _, err := BroadcastPayload(ETH, nil); !errors.Is(err, ErrTxInput) {
@@ -423,11 +423,11 @@ func TestBroadcastPayloadErrors(t *testing.T) {
 		}
 	})
 
-	t.Run("unsupported_symbol", func(t *testing.T) {
-		// An unregistered symbol has no transaction family; the ethereum output type
+	t.Run("unsupported_chain", func(t *testing.T) {
+		// An unregistered chain has no transaction family; the ethereum output type
 		// does not match it either, so the default branch fires and returns ErrTxInput.
-		if _, err := BroadcastPayload(Symbol("NOPE"), &txeth.SigningOutput{}); !errors.Is(err, ErrTxInput) {
-			t.Fatalf("unsupported symbol: want ErrTxInput, got %v", err)
+		if _, err := BroadcastPayload(Chain("NOPE"), &txeth.SigningOutput{}); !errors.Is(err, ErrTxInput) {
+			t.Fatalf("unsupported chain: want ErrTxInput, got %v", err)
 		}
 	})
 

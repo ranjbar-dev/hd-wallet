@@ -14,7 +14,7 @@ package hdwallet
 // It reuses, not reimplements, the existing primitives:
 //   - tx_bitcoin.go script classifiers isP2PKH / isP2SHP2WPKH / isP2WPKH / isP2TR
 //     to classify each output script;
-//   - address_types.go btcAddrParams (per-symbol HRP + base58 version bytes) plus
+//   - address_types.go btcAddrParams (per-chain HRP + base58 version bytes) plus
 //     the btcd base58/bech32 encoders to re-encode an output script's hash back
 //     into a renderable address (the reverse of bitcoinDecodeScript).
 //
@@ -164,13 +164,13 @@ func (c *btcCursor) readVarBytes() ([]byte, error) {
 }
 
 // DecodeBitcoinTx decodes a raw Bitcoin-family transaction (signed or unsigned)
-// for symbol, whose btcAddrParams select the HRP / version bytes used to render
+// for chain, whose btcAddrParams select the HRP / version bytes used to render
 // output addresses. Malformed or truncated input returns ErrTxDecode; the
 // function never panics and never reads past `raw`.
-func DecodeBitcoinTx(symbol Symbol, raw []byte) (*BtcTxFields, error) {
-	p, ok := btcAddrParams[symbol]
+func DecodeBitcoinTx(chain Chain, raw []byte) (*BtcTxFields, error) {
+	p, ok := btcAddrParams[chain]
 	if !ok {
-		return nil, fmt.Errorf("%w: %s has no Bitcoin address-type support", ErrUnsupportedCoin, symbol)
+		return nil, fmt.Errorf("%w: %s has no Bitcoin address-type support", ErrUnsupportedCoin, chain)
 	}
 	c := &btcCursor{b: raw}
 

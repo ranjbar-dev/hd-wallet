@@ -47,12 +47,12 @@ func solanaDeriveATAGuarded(wallet, mint, supplied string) ([]byte, error) {
 
 // signSolanaCreateTokenAccount builds and signs a CreateAssociatedTokenAccount
 // transaction. The signing wallet funds the account; main_address owns it.
-func (w *HDWallet) signSolanaCreateTokenAccount(symbol Symbol, index uint32, in *txsolana.SigningInput) (*txsolana.SigningOutput, error) {
+func (w *HDWallet) signSolanaCreateTokenAccount(chain Chain, index uint32, in *txsolana.SigningInput) (*txsolana.SigningOutput, error) {
 	cta := in.GetCreateTokenAccountTransaction()
 	if in.GetNonceAccount() != "" {
 		return nil, fmt.Errorf("%w: solana: durable nonce is not supported for CreateTokenAccount (no authoritative vector)", ErrTxInput)
 	}
-	funder, err := w.PublicKeyIndex(symbol, index)
+	funder, err := w.PublicKeyIndex(chain, index)
 	if err != nil {
 		return nil, err
 	}
@@ -83,14 +83,14 @@ func (w *HDWallet) signSolanaCreateTokenAccount(symbol Symbol, index uint32, in 
 	message := solanaCompileMessage(funder, []solanaInstruction{
 		solanaInstrCreateATA(funder, ata, wallet, mint, solanaSystemProgramID, tokenProgram, rent, ataProgram),
 	}, blockhash)
-	return w.solanaFinishTx(symbol, index, message)
+	return w.solanaFinishTx(chain, index, message)
 }
 
 // signSolanaCreateAndTransferToken creates the recipient's ATA and transfers
 // SPL tokens into it in one transaction; supports an optional durable nonce.
-func (w *HDWallet) signSolanaCreateAndTransferToken(symbol Symbol, index uint32, in *txsolana.SigningInput) (*txsolana.SigningOutput, error) {
+func (w *HDWallet) signSolanaCreateAndTransferToken(chain Chain, index uint32, in *txsolana.SigningInput) (*txsolana.SigningOutput, error) {
 	ct := in.GetCreateAndTransferTokenTransaction()
-	owner, err := w.PublicKeyIndex(symbol, index)
+	owner, err := w.PublicKeyIndex(chain, index)
 	if err != nil {
 		return nil, err
 	}
@@ -139,5 +139,5 @@ func (w *HDWallet) signSolanaCreateAndTransferToken(symbol Symbol, index uint32,
 		solanaInstrTransferChecked(source, mint, recipientATA, owner, tokenProgram, ct.GetAmount(), decimals),
 	)
 	message := solanaCompileMessage(owner, instrs, blockhash)
-	return w.solanaFinishTx(symbol, index, message)
+	return w.solanaFinishTx(chain, index, message)
 }

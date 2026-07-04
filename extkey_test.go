@@ -19,41 +19,41 @@ func TestWatchOnlyMatchesSeedWallet(t *testing.T) {
 	}
 	defer w.Destroy()
 
-	for _, symbol := range []Symbol{ETH, BTC} {
-		t.Run(string(symbol), func(t *testing.T) {
-			xpub, err := w.AccountXPub(symbol, 0)
+	for _, chain := range []Chain{ETH, BTC} {
+		t.Run(string(chain), func(t *testing.T) {
+			xpub, err := w.AccountXPub(chain, 0)
 			if err != nil {
 				t.Fatalf("AccountXPub: %v", err)
 			}
-			ww, err := WatchOnlyFromXPub(xpub, symbol)
+			ww, err := WatchOnlyFromXPub(xpub, chain)
 			if err != nil {
 				t.Fatalf("WatchOnlyFromXPub: %v", err)
 			}
 
 			// change=0 (receive) index 0 == the wallet's default address.
-			want0, _ := w.Address(symbol)
+			want0, _ := w.Address(chain)
 			got0, err := ww.Address(0, 0)
 			if err != nil {
 				t.Fatalf("watch Address(0,0): %v", err)
 			}
 			if got0 != want0 {
-				t.Fatalf("%s watch (0,0)=%s != seed Address=%s", symbol, got0, want0)
+				t.Fatalf("%s watch (0,0)=%s != seed Address=%s", chain, got0, want0)
 			}
 
 			// index 1 == AddressIndex(1).
-			want1, _ := w.AddressIndex(symbol, 1)
+			want1, _ := w.AddressIndex(chain, 1)
 			got1, err := ww.Address(0, 1)
 			if err != nil {
 				t.Fatalf("watch Address(0,1): %v", err)
 			}
 			if got1 != want1 {
-				t.Fatalf("%s watch (0,1)=%s != AddressIndex(1)=%s", symbol, got1, want1)
+				t.Fatalf("%s watch (0,1)=%s != AddressIndex(1)=%s", chain, got1, want1)
 			}
 
 			// arbitrary index 5 via the path API.
-			wantTemplate, _ := CoinInfo(symbol)
+			wantTemplate, _ := CoinInfo(chain)
 			full := accountReceivePath(wantTemplate.Path, 5)
-			want5, err := w.AddressPath(symbol, full)
+			want5, err := w.AddressPath(chain, full)
 			if err != nil {
 				t.Fatalf("AddressPath: %v", err)
 			}
@@ -62,7 +62,7 @@ func TestWatchOnlyMatchesSeedWallet(t *testing.T) {
 				t.Fatalf("watch Address(0,5): %v", err)
 			}
 			if got5 != want5 {
-				t.Fatalf("%s watch (0,5)=%s != AddressPath=%s", symbol, got5, want5)
+				t.Fatalf("%s watch (0,5)=%s != AddressPath=%s", chain, got5, want5)
 			}
 		})
 	}

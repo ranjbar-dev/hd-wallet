@@ -9,7 +9,7 @@ package hdwallet
 // the ready-to-submit RPC value for that family.
 //
 // Dispatch style mirrors TransactionID (tx_txid.go): switch on the concrete
-// output type, then validate the symbol's family for mismatch detection.
+// output type, then validate the chain's family for mismatch detection.
 //
 // No re-signing, no network I/O — pure formatting over existing output fields.
 
@@ -31,8 +31,8 @@ import (
 // transaction produced by (*HDWallet).SignTransaction, hiding the per-family
 // differences in encoding and field naming behind a single accessor.
 //
-// symbol selects the expected output type; if the concrete type of out does not
-// correspond to symbol's transaction family, ErrTxInput is returned.
+// chain selects the expected output type; if the concrete type of out does not
+// correspond to chain's transaction family, ErrTxInput is returned.
 //
 // The returned value, by family:
 //
@@ -61,13 +61,13 @@ import (
 //
 // Pure formatting over existing output fields — no re-signing, no network I/O.
 // A nil or unrecognised out type returns ErrTxInput.
-func BroadcastPayload(symbol Symbol, out proto.Message) (string, error) {
-	family := txFamilyOf(symbol)
+func BroadcastPayload(chain Chain, out proto.Message) (string, error) {
+	family := txFamilyOf(chain)
 
 	switch o := out.(type) {
 	case *txeth.SigningOutput:
 		if family != familyEthereum {
-			return "", fmt.Errorf("%w: %s does not produce *ethereum.SigningOutput", ErrTxInput, symbol)
+			return "", fmt.Errorf("%w: %s does not produce *ethereum.SigningOutput", ErrTxInput, chain)
 		}
 		encoded := o.GetEncoded()
 		if len(encoded) == 0 {
@@ -77,7 +77,7 @@ func BroadcastPayload(symbol Symbol, out proto.Message) (string, error) {
 
 	case *txbtc.SigningOutput:
 		if family != familyBitcoin {
-			return "", fmt.Errorf("%w: %s does not produce *bitcoin.SigningOutput", ErrTxInput, symbol)
+			return "", fmt.Errorf("%w: %s does not produce *bitcoin.SigningOutput", ErrTxInput, chain)
 		}
 		encoded := o.GetEncoded()
 		if len(encoded) == 0 {
@@ -87,7 +87,7 @@ func BroadcastPayload(symbol Symbol, out proto.Message) (string, error) {
 
 	case *txsolana.SigningOutput:
 		if family != familySolana {
-			return "", fmt.Errorf("%w: %s does not produce *solana.SigningOutput", ErrTxInput, symbol)
+			return "", fmt.Errorf("%w: %s does not produce *solana.SigningOutput", ErrTxInput, chain)
 		}
 		raw := o.GetRaw()
 		if len(raw) == 0 {
@@ -97,7 +97,7 @@ func BroadcastPayload(symbol Symbol, out proto.Message) (string, error) {
 
 	case *txcosmos.SigningOutput:
 		if family != familyCosmos && family != familyCosmosEthermint {
-			return "", fmt.Errorf("%w: %s does not produce *cosmos.SigningOutput", ErrTxInput, symbol)
+			return "", fmt.Errorf("%w: %s does not produce *cosmos.SigningOutput", ErrTxInput, chain)
 		}
 		txBytes := o.GetTxBytes()
 		if txBytes == "" {
@@ -107,7 +107,7 @@ func BroadcastPayload(symbol Symbol, out proto.Message) (string, error) {
 
 	case *txtron.SigningOutput:
 		if family != familyTron {
-			return "", fmt.Errorf("%w: %s does not produce *tron.SigningOutput", ErrTxInput, symbol)
+			return "", fmt.Errorf("%w: %s does not produce *tron.SigningOutput", ErrTxInput, chain)
 		}
 		id := o.GetId()
 		rawData := o.GetRawData()
@@ -122,7 +122,7 @@ func BroadcastPayload(symbol Symbol, out proto.Message) (string, error) {
 
 	case *txripple.SigningOutput:
 		if family != familyRipple {
-			return "", fmt.Errorf("%w: %s does not produce *ripple.SigningOutput", ErrTxInput, symbol)
+			return "", fmt.Errorf("%w: %s does not produce *ripple.SigningOutput", ErrTxInput, chain)
 		}
 		encoded := o.GetEncoded()
 		if len(encoded) == 0 {
@@ -133,6 +133,6 @@ func BroadcastPayload(symbol Symbol, out proto.Message) (string, error) {
 		return strings.ToUpper(bytesToHex(encoded)), nil
 
 	default:
-		return "", fmt.Errorf("%w: unrecognised SigningOutput type for %s", ErrTxInput, symbol)
+		return "", fmt.Errorf("%w: unrecognised SigningOutput type for %s", ErrTxInput, chain)
 	}
 }

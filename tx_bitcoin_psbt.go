@@ -9,7 +9,7 @@ package hdwallet
 //   - BuildPSBT     constructs an unsigned psbt.Packet from a bitcoin.SigningInput
 //                   (its already-selected UTXOs as inputs, to/change as outputs)
 //                   and returns the serialized packet.
-//   - SignPSBT      derives the (symbol,index) leaf key under the package's usual
+//   - SignPSBT      derives the (chain,index) leaf key under the package's usual
 //                   wiped-on-return discipline, signs every input with the same
 //                   sighash/curve primitives as the direct signer, attaches the
 //                   results to the packet and returns the updated serialization.
@@ -42,15 +42,15 @@ import (
 	txbtc "github.com/ranjbar-dev/hd-wallet/txproto/bitcoin"
 )
 
-// BuildPSBT builds an unsigned PSBT (BIP-174) for symbol from in, returning the
+// BuildPSBT builds an unsigned PSBT (BIP-174) for chain from in, returning the
 // serialized packet. Coin selection (planBitcoinTx) chooses which UTXOs become
 // inputs and computes the recipient/change outputs exactly as the direct signer
 // would, so a subsequent SignPSBT/FinalizePSBT/ExtractPSBTTx produces the same
 // transaction. Supported input types: P2WPKH, P2SH-P2WPKH, P2TR, and legacy
 // P2PKH (via a synthetic NonWitnessUtxo using multisigFakePrevTx).
-func BuildPSBT(symbol Symbol, in *txbtc.SigningInput) ([]byte, error) {
-	if _, ok := btcAddrParams[symbol]; !ok {
-		return nil, fmt.Errorf("%w: %s", ErrTxUnsupported, symbol)
+func BuildPSBT(chain Chain, in *txbtc.SigningInput) ([]byte, error) {
+	if _, ok := btcAddrParams[chain]; !ok {
+		return nil, fmt.Errorf("%w: %s", ErrTxUnsupported, chain)
 	}
 	if len(in.GetUtxo()) == 0 {
 		return nil, fmt.Errorf("%w: bitcoin: no utxo provided", ErrTxInput)
@@ -59,11 +59,11 @@ func BuildPSBT(symbol Symbol, in *txbtc.SigningInput) ([]byte, error) {
 		return nil, fmt.Errorf("%w: bitcoin: missing to_address", ErrTxInput)
 	}
 
-	toScript, err := bitcoinDecodeScript(symbol, in.GetToAddress())
+	toScript, err := bitcoinDecodeScript(chain, in.GetToAddress())
 	if err != nil {
 		return nil, fmt.Errorf("%w: bitcoin: to_address: %v", ErrTxInput, err)
 	}
-	plan, err := planBitcoinTx(symbol, in, toScript)
+	plan, err := planBitcoinTx(chain, in, toScript)
 	if err != nil {
 		return nil, err
 	}
@@ -123,18 +123,18 @@ func newUnsignedPacket(plan *btcPlan) (*psbt.Packet, error) {
 	return packet, nil
 }
 
-// SignPSBT parses psbtBytes, signs every input controlled by the (symbol,index)
+// SignPSBT parses psbtBytes, signs every input controlled by the (chain,index)
 // key, attaches the signatures, and returns the updated serialized PSBT. The leaf
 // key is derived under the package's seed discipline and wiped on return.
-func (w *HDWallet) SignPSBT(symbol Symbol, index uint32, psbtBytes []byte) ([]byte, error) {
-	if _, ok := btcAddrParams[symbol]; !ok {
-		return nil, fmt.Errorf("%w: %s", ErrTxUnsupported, symbol)
+func (w *HDWallet) SignPSBT(chain Chain, index uint32, psbtBytes []byte) ([]byte, error) {
+	if _, ok := btcAddrParams[chain]; !ok {
+		return nil, fmt.Errorf("%w: %s", ErrTxUnsupported, chain)
 	}
 	packet, err := parsePacket(psbtBytes)
 	if err != nil {
 		return nil, err
 	}
-	pub, err := w.PublicKeyIndex(symbol, index)
+	pub, err := w.PublicKeyIndex(chain, index)
 	if err != nil {
 		return nil, err
 	}
@@ -142,7 +142,7 @@ func (w *HDWallet) SignPSBT(symbol Symbol, index uint32, psbtBytes []byte) ([]by
 		return nil, fmt.Errorf("%w: bitcoin: expected 33-byte compressed key", ErrTxInput)
 	}
 
-	if err := w.signPacketInputs(symbol, index, packet, pub); err != nil {
+	if err := w.signPacketInputs(chain, index, packet, pub); err != nil {
 		return nil, err
 	}
 	return serializePacket(packet)
@@ -151,7 +151,7 @@ func (w *HDWallet) SignPSBT(symbol Symbol, index uint32, psbtBytes []byte) ([]by
 // signPacketInputs signs each input of packet per its scriptPubKey type, using
 // btcd's sighash primitives over our derived key so the partial signatures match
 // the direct signer byte-for-byte.
-func (w *HDWallet) signPacketInputs(symbol Symbol, index uint32, packet *psbt.Packet, pub []byte) error {
+func (w *HDWallet) signPacketInputs(chain Chain, index uint32, packet *psbt.Packet, pub []byte) error {
 	prevFetcher, err := psbtPrevOutFetcher(packet)
 	if err != nil {
 		return err
@@ -197,7 +197,7 @@ func (w *HDWallet) signPacketInputs(symbol Symbol, index uint32, packet *psbt.Pa
 			if err != nil {
 				return fmt.Errorf("hdwallet: bitcoin: psbt p2pkh sighash: %w", err)
 			}
-			derSig, err := w.btcDERSig(symbol, index, legacyHash, SigHashAll)
+			derSig, err := w.btcDERSig(chain, index, legacyHash, SigHashAll)
 			if err != nil {
 				return err
 			}
@@ -210,7 +210,7 @@ func (w *HDWallet) signPacketInputs(symbol Symbol, index uint32, packet *psbt.Pa
 			if !bytesEqual(hash160(pub), script[2:]) {
 				return fmt.Errorf("%w: bitcoin: psbt input %d not controlled by key", ErrTxInput, i)
 			}
-			if err := w.psbtSignWitnessV0(symbol, index, updater, sigHashes, packet.UnsignedTx, i, pIn.WitnessUtxo.Value, nil, pub); err != nil {
+			if err := w.psbtSignWitnessV0(chain, index, updater, sigHashes, packet.UnsignedTx, i, pIn.WitnessUtxo.Value, nil, pub); err != nil {
 				return err
 			}
 		case isP2SHP2WPKH(script):
@@ -218,14 +218,14 @@ func (w *HDWallet) signPacketInputs(symbol Symbol, index uint32, packet *psbt.Pa
 			if !bytesEqual(hash160(redeem), script[2:22]) {
 				return fmt.Errorf("%w: bitcoin: psbt input %d is not a standard P2SH-P2WPKH for key", ErrTxInput, i)
 			}
-			if err := w.psbtSignWitnessV0(symbol, index, updater, sigHashes, packet.UnsignedTx, i, pIn.WitnessUtxo.Value, redeem, pub); err != nil {
+			if err := w.psbtSignWitnessV0(chain, index, updater, sigHashes, packet.UnsignedTx, i, pIn.WitnessUtxo.Value, redeem, pub); err != nil {
 				return err
 			}
 		case isP2TR(script):
 			if err := checkTaprootKey(pub, script[2:], i); err != nil {
 				return err
 			}
-			if err := w.psbtSignTaproot(symbol, index, packet, sigHashes, prevFetcher, i); err != nil {
+			if err := w.psbtSignTaproot(chain, index, packet, sigHashes, prevFetcher, i); err != nil {
 				return err
 			}
 		default:
@@ -238,13 +238,13 @@ func (w *HDWallet) signPacketInputs(symbol Symbol, index uint32, packet *psbt.Pa
 // psbtSignWitnessV0 produces a BIP-143 witness-v0 (P2WPKH / nested P2SH-P2WPKH)
 // signature for input i and attaches it as a partial signature. For the nested
 // case the redeem script (00 14 <keyhash>) is passed so the Updater records it.
-func (w *HDWallet) psbtSignWitnessV0(symbol Symbol, index uint32, updater *psbt.Updater, sigHashes *txscript.TxSigHashes, tx *wire.MsgTx, i int, amount int64, redeem, pub []byte) error {
+func (w *HDWallet) psbtSignWitnessV0(chain Chain, index uint32, updater *psbt.Updater, sigHashes *txscript.TxSigHashes, tx *wire.MsgTx, i int, amount int64, redeem, pub []byte) error {
 	pkScript := scriptForSighash(updater.Upsbt.Inputs[i].WitnessUtxo.PkScript, redeem)
 	digest, err := txscript.CalcWitnessSigHash(pkScript, sigHashes, txscript.SigHashAll, tx, i, amount)
 	if err != nil {
 		return fmt.Errorf("hdwallet: bitcoin: psbt witness sighash: %w", err)
 	}
-	sigWithType, err := w.btcDERSig(symbol, index, digest, uint32(txscript.SigHashAll))
+	sigWithType, err := w.btcDERSig(chain, index, digest, uint32(txscript.SigHashAll))
 	if err != nil {
 		return err
 	}
@@ -278,12 +278,12 @@ func scriptForSighash(pkScript, redeem []byte) []byte {
 
 // psbtSignTaproot produces a BIP-341 key-path Schnorr signature for input i and
 // records it as the taproot key-spend signature.
-func (w *HDWallet) psbtSignTaproot(symbol Symbol, index uint32, packet *psbt.Packet, sigHashes *txscript.TxSigHashes, fetcher txscript.PrevOutputFetcher, i int) error {
+func (w *HDWallet) psbtSignTaproot(chain Chain, index uint32, packet *psbt.Packet, sigHashes *txscript.TxSigHashes, fetcher txscript.PrevOutputFetcher, i int) error {
 	digest, err := txscript.CalcTaprootSignatureHash(sigHashes, txscript.SigHashDefault, packet.UnsignedTx, i, fetcher)
 	if err != nil {
 		return fmt.Errorf("hdwallet: bitcoin: psbt taproot sighash: %w", err)
 	}
-	sig, err := w.signTaprootKeyPath(symbol, index, digest)
+	sig, err := w.signTaprootKeyPath(chain, index, digest)
 	if err != nil {
 		return err
 	}

@@ -9,8 +9,8 @@ import (
 // validAddrVectors are the Trust Wallet Core CoinAddressDerivationTests outputs
 // (the canonical addresses for the dummy key, identical to the encoder vectors
 // in encoders_test.go) — the known-good address every validator must ACCEPT.
-// Every registered symbol appears here so the table covers the whole registry.
-var validAddrVectors = map[Symbol]string{
+// Every registered chain appears here so the table covers the whole registry.
+var validAddrVectors = map[Chain]string{
 	// secp256k1 — UTXO
 	BTC:  "bc1qhkfq3zahaqkkzx5mjnamwjsfpq2jk7z00ppggv",
 	LTC:  "ltc1qhkfq3zahaqkkzx5mjnamwjsfpq2jk7z0tamvsu",
@@ -121,15 +121,15 @@ var validAddrVectors = map[Symbol]string{
 }
 
 // TestValidVectorsCoverRegistry guards that the valid-vector table stays in sync
-// with the registry: every registered symbol must have a known-good address and
+// with the registry: every registered chain must have a known-good address and
 // a registered validator, so the table-driven tests truly cover all 33 chains.
 func TestValidVectorsCoverRegistry(t *testing.T) {
 	for sym := range coins {
 		if _, ok := validAddrVectors[sym]; !ok {
-			t.Errorf("symbol %s missing from validAddrVectors", sym)
+			t.Errorf("chain %s missing from validAddrVectors", sym)
 		}
 		if _, ok := validators[sym]; !ok {
-			t.Errorf("symbol %s missing a validator", sym)
+			t.Errorf("chain %s missing a validator", sym)
 		}
 	}
 	for sym := range validators {
@@ -170,7 +170,7 @@ func corruptChecksum(addr string) string {
 		return addr
 	}
 	b := []byte(addr)
-	// Use the second-to-last character: the final base32/base58 symbol can encode
+	// Use the second-to-last character: the final base32/base58 chain can encode
 	// only padding bits that are discarded on decode, so flipping it may be a
 	// no-op for some encodings; one position in is always significant here.
 	i := len(b) - 2
@@ -208,7 +208,7 @@ func TestValidateAddressRejectsCorruptedChecksum(t *testing.T) {
 	// Chains with no internal checksum: a single-char flip yields a different but
 	// still well-formed payload, so corruption is undetectable by design. They
 	// are exercised by the length/prefix negative tests instead.
-	noChecksum := map[Symbol]bool{SOL: true, APTOS: true}
+	noChecksum := map[Chain]bool{SOL: true, APTOS: true}
 	for sym, addr := range validAddrVectors {
 		if noChecksum[sym] {
 			continue
@@ -225,17 +225,17 @@ func TestValidateAddressRejectsCorruptedChecksum(t *testing.T) {
 	}
 }
 
-// TestValidateAddressUnknownSymbol asserts an unregistered symbol is reported
+// TestValidateAddressUnknownChain asserts an unregistered chain is reported
 // distinctly via ErrUnsupportedCoin (not ErrInvalidAddress).
-func TestValidateAddressUnknownSymbol(t *testing.T) {
-	err := ValidateAddress(Symbol("NOPE"), "whatever")
+func TestValidateAddressUnknownChain(t *testing.T) {
+	err := ValidateAddress(Chain("NOPE"), "whatever")
 	if !errors.Is(err, ErrUnsupportedCoin) {
 		t.Fatalf("ValidateAddress(unknown) = %v, want ErrUnsupportedCoin", err)
 	}
-	if _, err := ParseAddress(Symbol("NOPE"), "x"); !errors.Is(err, ErrUnsupportedCoin) {
+	if _, err := ParseAddress(Chain("NOPE"), "x"); !errors.Is(err, ErrUnsupportedCoin) {
 		t.Fatalf("ParseAddress(unknown) = %v, want ErrUnsupportedCoin", err)
 	}
-	if _, err := AddressFromPublicKey(Symbol("NOPE"), make([]byte, 33)); !errors.Is(err, ErrUnsupportedCoin) {
+	if _, err := AddressFromPublicKey(Chain("NOPE"), make([]byte, 33)); !errors.Is(err, ErrUnsupportedCoin) {
 		t.Fatalf("AddressFromPublicKey(unknown) = %v, want ErrUnsupportedCoin", err)
 	}
 }
@@ -252,7 +252,7 @@ func TestInvalidAddressesWrapSentinel(t *testing.T) {
 // negativeCase is one targeted invalid address with the reason it must fail.
 type negativeCase struct {
 	name string
-	sym  Symbol
+	sym  Chain
 	addr string
 }
 
@@ -393,7 +393,7 @@ func TestAddressFromPublicKeyBadKey(t *testing.T) {
 // This is verified indirectly by AddressFromPublicKey round-trip above; here we
 // assert payload lengths per family as a structural guard.
 func TestParsePayloadLengths(t *testing.T) {
-	want32 := map[Symbol]bool{
+	want32 := map[Chain]bool{
 		SOL: true, XLM: true, ALGO: true, APTOS: true,
 	}
 	for sym, addr := range validAddrVectors {

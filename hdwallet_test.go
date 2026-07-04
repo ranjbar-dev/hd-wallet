@@ -23,17 +23,17 @@ func TestEndToEndKnownAddresses(t *testing.T) {
 	}
 	defer w.Destroy()
 
-	cases := map[Symbol]string{
+	cases := map[Chain]string{
 		BTC: "bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu",
 		ETH: "0x9858EfFD232B4033E47d90003D41EC34EcaEda94",
 	}
-	for symbol, want := range cases {
-		got, err := w.Address(symbol)
+	for chain, want := range cases {
+		got, err := w.Address(chain)
 		if err != nil {
-			t.Fatalf("%s: %v", symbol, err)
+			t.Fatalf("%s: %v", chain, err)
 		}
 		if got != want {
-			t.Errorf("%s = %s, want %s", symbol, got, want)
+			t.Errorf("%s = %s, want %s", chain, got, want)
 		}
 	}
 }
@@ -85,9 +85,9 @@ func TestAllAddressesCoversRegistry(t *testing.T) {
 	if len(all) != len(SupportedCoins()) {
 		t.Fatalf("AllAddresses returned %d coins, want %d", len(all), len(SupportedCoins()))
 	}
-	for _, symbol := range SupportedCoins() {
-		if all[symbol] == "" {
-			t.Errorf("no address for %s", symbol)
+	for _, chain := range SupportedCoins() {
+		if all[chain] == "" {
+			t.Errorf("no address for %s", chain)
 		}
 	}
 }

@@ -45,12 +45,12 @@ var xrpSingleSignPrefix = []byte{0x53, 0x54, 0x58, 0x00}
 const xrpNativeAmountFlag uint64 = 0x4000000000000000
 
 // signRippleTx dispatches to the correct per-type signer based on the oneof.
-func (w *HDWallet) signRippleTx(symbol Symbol, index uint32, in *txripple.SigningInput) (*txripple.SigningOutput, error) {
+func (w *HDWallet) signRippleTx(chain Chain, index uint32, in *txripple.SigningInput) (*txripple.SigningOutput, error) {
 	account, err := ParseAddress(XRP, in.GetAccount())
 	if err != nil {
 		return nil, fmt.Errorf("%w: ripple: account: %v", ErrTxInput, err)
 	}
-	pub, err := w.PublicKeyIndex(symbol, index)
+	pub, err := w.PublicKeyIndex(chain, index)
 	if err != nil {
 		return nil, err
 	}
@@ -99,22 +99,22 @@ func (w *HDWallet) signRippleTx(symbol Symbol, index uint32, in *txripple.Signin
 		return nil, fmt.Errorf("%w: ripple: no transaction type set", ErrTxInput)
 	}
 
-	return xrpSignAndEncode(w, symbol, index, fields)
+	return xrpSignAndEncode(w, chain, index, fields)
 }
 
 // xrpSignAndEncode computes the signing preimage, signs, inserts TxnSignature,
 // and returns the final encoded output.
-func xrpSignAndEncode(w *HDWallet, symbol Symbol, index uint32, fields []xrpField) (*txripple.SigningOutput, error) {
+func xrpSignAndEncode(w *HDWallet, chain Chain, index uint32, fields []xrpField) (*txripple.SigningOutput, error) {
 	preimage := append(append([]byte(nil), xrpSingleSignPrefix...), xrpSerialize(fields)...)
 	digest := sha512Half(preimage)
 
-	sig, err := w.SignIndex(symbol, index, digest)
+	sig, err := w.SignIndex(chain, index, digest)
 	if err != nil {
 		return nil, err
 	}
 	der := sig.DER()
 	if der == nil {
-		return nil, fmt.Errorf("%w: ripple: %s is not an ECDSA coin", ErrTxInput, symbol)
+		return nil, fmt.Errorf("%w: ripple: %s is not an ECDSA coin", ErrTxInput, chain)
 	}
 
 	fields = append(fields, xrpField{typeCode: 7, fieldCode: 4, value: xrpBlob(der)})

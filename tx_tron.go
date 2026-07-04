@@ -81,9 +81,9 @@ const (
 
 // signTronTx builds, signs and serializes a Tron transaction (TRX transfer or
 // TRC-20 token transfer).
-func (w *HDWallet) signTronTx(symbol Symbol, index uint32, in *txtron.SigningInput) (*txtron.SigningOutput, error) {
+func (w *HDWallet) signTronTx(chain Chain, index uint32, in *txtron.SigningInput) (*txtron.SigningOutput, error) {
 	if in.GetRawJson() != "" {
-		return w.signTronRawJSON(symbol, index, in.GetRawJson())
+		return w.signTronRawJSON(chain, index, in.GetRawJson())
 	}
 
 	tx := in.GetTransaction()
@@ -110,13 +110,13 @@ func (w *HDWallet) signTronTx(symbol Symbol, index uint32, in *txtron.SigningInp
 
 	// txID = sha256(raw_data); the signature is over this digest.
 	id := sha256Sum(rawData)
-	sig, err := w.SignIndex(symbol, index, id)
+	sig, err := w.SignIndex(chain, index, id)
 	if err != nil {
 		return nil, err
 	}
 	rec := sig.Recoverable() // 65 bytes r||s||v with v in {0,1}; Tron uses it as-is
 	if rec == nil {
-		return nil, fmt.Errorf("%w: %s is not a secp256k1 coin", ErrTxInput, symbol)
+		return nil, fmt.Errorf("%w: %s is not a secp256k1 coin", ErrTxInput, chain)
 	}
 
 	return &txtron.SigningOutput{
@@ -697,7 +697,7 @@ func tronAddressBytes(s string) ([]byte, error) {
 // (the wallet-connect flow). It extracts raw_data_hex, computes txID =
 // sha256(raw_data), optionally verifies that txID matches the supplied txID
 // field, then signs and returns the output.
-func (w *HDWallet) signTronRawJSON(symbol Symbol, index uint32, jsonStr string) (*txtron.SigningOutput, error) {
+func (w *HDWallet) signTronRawJSON(chain Chain, index uint32, jsonStr string) (*txtron.SigningOutput, error) {
 	// Unmarshal only the fields we need.
 	var parsed struct {
 		TxID       string `json:"txID"`
@@ -718,13 +718,13 @@ func (w *HDWallet) signTronRawJSON(symbol Symbol, index uint32, jsonStr string) 
 	if parsed.TxID != "" && hex.EncodeToString(id) != strings.ToLower(parsed.TxID) {
 		return nil, fmt.Errorf("%w: tron: raw_json: txID mismatch", ErrTxInput)
 	}
-	sig, err := w.SignIndex(symbol, index, id)
+	sig, err := w.SignIndex(chain, index, id)
 	if err != nil {
 		return nil, fmt.Errorf("%w: tron: %v", ErrTxInput, err)
 	}
 	rec := sig.Recoverable()
 	if rec == nil {
-		return nil, fmt.Errorf("%w: %s is not a secp256k1 coin", ErrTxInput, symbol)
+		return nil, fmt.Errorf("%w: %s is not a secp256k1 coin", ErrTxInput, chain)
 	}
 	return &txtron.SigningOutput{Id: id, Signature: rec, RawData: rawData}, nil
 }

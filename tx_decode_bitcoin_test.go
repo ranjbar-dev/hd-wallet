@@ -231,10 +231,10 @@ func TestDecodeBitcoinNonstandard(t *testing.T) {
 	}
 }
 
-// TestDecodeBitcoinUnsupportedSymbol asserts a non-Bitcoin symbol is rejected.
-func TestDecodeBitcoinUnsupportedSymbol(t *testing.T) {
+// TestDecodeBitcoinUnsupportedChain asserts a non-Bitcoin chain is rejected.
+func TestDecodeBitcoinUnsupportedChain(t *testing.T) {
 	if _, err := DecodeBitcoinTx(ETH, []byte{0x02, 0x00, 0x00, 0x00}); err == nil {
-		t.Fatalf("expected error for unsupported symbol")
+		t.Fatalf("expected error for unsupported chain")
 	}
 }
 

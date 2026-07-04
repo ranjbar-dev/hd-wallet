@@ -68,14 +68,14 @@ func main() {
 	// ...or import one:
 	// w, _ := hdwallet.FromMnemonic("abandon abandon ... about")
 
-	// Symbols are a typed enum (hdwallet.Symbol) — use the exported constants
+	// Chains are a typed enum (hdwallet.Chain) — use the exported constants
 	// for compile-time checking and autocomplete.
 	btc, _ := w.Address(hdwallet.BTC)
 	eth, _ := w.Address(hdwallet.ETH)
 	sol, _ := w.Address(hdwallet.SOL)
 	fmt.Println(btc, eth, sol)
 
-	all, _ := w.AllAddresses() // map[hdwallet.Symbol]string for every network
+	all, _ := w.AllAddresses() // map[hdwallet.Chain]string for every network
 	fmt.Println(all[hdwallet.ATOM])
 }
 ```
@@ -126,7 +126,7 @@ The package exports sentinel errors for use with `errors.Is`:
 
 ```go
 if _, err := w.Address("NOPE"); errors.Is(err, hdwallet.ErrUnsupportedCoin) {
-	// unknown symbol
+	// unknown chain
 }
 ```
 
@@ -157,7 +157,7 @@ pub, _ := w.PublicKey(hdwallet.BTC)
 ok := hdwallet.Verify(hdwallet.Secp256k1, pub, digest[:], sig)
 ```
 
-`SignIndex(symbol, index, data)` and `PublicKeyIndex(symbol, index)` work with
+`SignIndex(chain, index, data)` and `PublicKeyIndex(chain, index)` work with
 non-zero address indices. ECDSA inputs that are not 32 bytes return
 `ErrInvalidDigest`.
 
@@ -282,7 +282,7 @@ tok     := hdwallet.VerifyTronMessage(tronAddr, []byte("Hello World"), tsig)
 ### Chain-neutral raw message signing
 
 For advanced use cases, `SignRawMessage` / `VerifyRawMessage` route through the
-correct curve for any registered symbol without a chain-specific envelope:
+correct curve for any registered chain without a chain-specific envelope:
 
 ```go
 // secp256k1 chains: pass the 32-byte digest you pre-hashed.
@@ -312,7 +312,7 @@ usdc := hdwallet.FormatUnits(rawBigInt, 6)               // "12.34"
 raw, _ := hdwallet.ParseUnits("12.34", 6)
 ```
 
-> Native decimals come from `CoinInfo(symbol).Decimals`; **token** decimals are
+> Native decimals come from `CoinInfo(chain).Decimals`; **token** decimals are
 > the client's responsibility (token lists are out of scope).
 
 ### Address validation & parsing
@@ -411,12 +411,12 @@ for i := range raw {                     // wipe any trimmed remainder
 ## Supported networks
 
 **98 networks** across 2 curves. `SupportedCoins()` returns the live,
-authoritative list; `CoinInfo(symbol)` gives each coin's curve and path. Every
+authoritative list; `CoinInfo(chain)` gives each coin's curve and path. Every
 chain below is verified against a Trust Wallet Core address vector.
 
 #### secp256k1 (94)
 
-| Group | Symbols | Path |
+| Group | Chains | Path |
 |---|---|---|
 | Bitcoin-family / UTXO | BTC, LTC, DOGE, BCH, DASH, ZEC, DGB, SYS, VIA, QTUM, RVN, FIRO, MONA, PIVX, STRAX | per-chain (e.g. `m/84'/0'/0'/0/0`) |
 | Ethereum / EVM (same key & address) | ETH, BNB, MATIC, AVAX, ARB, OP, FTM, BASE, CRO, GNO, CELO, ETC, RBTC, KAIA, AURORA, GLMR, MOVR, BOBA, METIS, OPBNB, POLZKEVM, MANTA, ZKSYNC, LINEA, SCROLL, MANTLE, BLAST, RONIN, HECO, OKT, KCS, WAN, POA, CLO, GO, TT, VET, IOTX, THETA, NEON, MERLIN, LIGHT, SONIC, ZENEON, EVMOS, INJ, ZETAEVM | `m/44'/60'/0'/0/0` |
@@ -426,7 +426,7 @@ chain below is verified against a Trust Wallet Core address vector.
 
 #### ed25519 (4)
 
-| Symbol | Network | Path |
+| Chain | Network | Path |
 |---|---|---|
 | SOL | Solana | `m/44'/501'/0'` |
 | XLM | Stellar | `m/44'/148'/0'` |
@@ -497,21 +497,21 @@ go test -race -cover ./...
 | `FromMnemonicWithPassphrase([]byte, []byte) (*HDWallet, error)` | Import with a BIP-39 passphrase (the "25th word"). |
 | `FromMnemonicBufferWithPassphrase(buf, pass *memguard.LockedBuffer) (*HDWallet, error)` | Passphrase import, both secrets in memguard buffers. |
 | `GenerateMnemonic() (string, error)` | Generate a mnemonic without building a wallet. Also `GenerateMnemonicWithWordCount(words)`. |
-| `(*HDWallet) Address(symbol Symbol) (string, error)` | First receive address for one network. |
-| `(*HDWallet) AddressIndex(symbol Symbol, index uint32) (string, error)` | Nth address/account for one network. |
-| `(*HDWallet) AddressPath(symbol Symbol, path string) (string, error)` | Address at an arbitrary absolute BIP-32 path. Also `SignPath`/`PublicKeyPath`/`WithPrivateKeyPath`/`PrivateKeyPath`. |
-| `(*HDWallet) AddressAt(symbol Symbol, account, change, index uint32) (string, error)` | Address by BIP-44 account/change/index. Also `SignAt`/`PublicKeyAt`. |
-| `(*HDWallet) AllAddresses() (map[Symbol]string, error)` | Addresses for all networks. Also `AllAddressesAt(index)` for any index. |
-| `(*HDWallet) Sign(symbol Symbol, data []byte) (*Signature, error)` | Sign a digest (ECDSA) / message (ed25519) at index 0. |
-| `(*HDWallet) SignIndex(symbol Symbol, index uint32, data []byte) (*Signature, error)` | Sign with the key at a given index. |
-| `(*HDWallet) PublicKey(symbol Symbol) ([]byte, error)` | Public key at index 0. |
-| `(*HDWallet) PublicKeyIndex(symbol Symbol, index uint32) ([]byte, error)` | Public key at a given index. |
+| `(*HDWallet) Address(chain Chain) (string, error)` | First receive address for one network. |
+| `(*HDWallet) AddressIndex(chain Chain, index uint32) (string, error)` | Nth address/account for one network. |
+| `(*HDWallet) AddressPath(chain Chain, path string) (string, error)` | Address at an arbitrary absolute BIP-32 path. Also `SignPath`/`PublicKeyPath`/`WithPrivateKeyPath`/`PrivateKeyPath`. |
+| `(*HDWallet) AddressAt(chain Chain, account, change, index uint32) (string, error)` | Address by BIP-44 account/change/index. Also `SignAt`/`PublicKeyAt`. |
+| `(*HDWallet) AllAddresses() (map[Chain]string, error)` | Addresses for all networks. Also `AllAddressesAt(index)` for any index. |
+| `(*HDWallet) Sign(chain Chain, data []byte) (*Signature, error)` | Sign a digest (ECDSA) / message (ed25519) at index 0. |
+| `(*HDWallet) SignIndex(chain Chain, index uint32, data []byte) (*Signature, error)` | Sign with the key at a given index. |
+| `(*HDWallet) PublicKey(chain Chain) ([]byte, error)` | Public key at index 0. |
+| `(*HDWallet) PublicKeyIndex(chain Chain, index uint32) ([]byte, error)` | Public key at a given index. |
 | `Verify(curve Curve, pub, data []byte, sig *Signature) bool` | Verify a signature. |
 | `(*HDWallet) WithMnemonic(func([]byte) error) error` | Use the mnemonic, auto-wiped. |
 | `(*HDWallet) Mnemonic() (*memguard.LockedBuffer, error)` | Mnemonic buffer (caller `Destroy`s). |
 | `(*HDWallet) Destroy()` | Wipe the wallet's secrets. |
-| `SupportedCoins() []Symbol` | Sorted list of symbols. |
-| `CoinInfo(symbol Symbol) (Coin, bool)` | Registry entry for a symbol. |
+| `SupportedCoins() []Chain` | Sorted list of chains. |
+| `CoinInfo(chain Chain) (Coin, bool)` | Registry entry for a chain. |
 
 **Private-key import / export** (same memguard discipline as the mnemonic):
 
@@ -519,26 +519,26 @@ go test -race -cover ./...
 |---|---|
 | `FromPrivateKeyBytes([]byte, Curve) (*HDWallet, error)` | Key-only wallet from a byte slice (wiped on use). Any 32-byte-scalar curve. |
 | `FromPrivateKeyBuffer(*memguard.LockedBuffer, Curve) (*HDWallet, error)` | Key-only wallet from a memguard buffer (zero-copy). |
-| `(*HDWallet) WithPrivateKey(symbol, index, func([]byte) error) error` | Use the leaf private key, auto-wiped. |
-| `(*HDWallet) PrivateKey(symbol, index) (*memguard.LockedBuffer, error)` | Leaf key buffer (caller `Destroy`s). |
+| `(*HDWallet) WithPrivateKey(chain, index, func([]byte) error) error` | Use the leaf private key, auto-wiped. |
+| `(*HDWallet) PrivateKey(chain, index) (*memguard.LockedBuffer, error)` | Leaf key buffer (caller `Destroy`s). |
 | `FromWIF([]byte) (*HDWallet, error)` · `(*HDWallet) WithWIF` / `WIF` | Import/export a Bitcoin WIF (secp256k1). |
-| `(*HDWallet) AccountXPub(symbol, account) (string, error)` · `WithAccountXPrv` | Export account-level BIP-32 extended keys (secp256k1). |
-| `WatchOnlyFromXPub(xpub string, symbol) (*WatchWallet, error)` | Watch-only address derivation from an xpub — no seed. |
+| `(*HDWallet) AccountXPub(chain, account) (string, error)` · `WithAccountXPrv` | Export account-level BIP-32 extended keys (secp256k1). |
+| `WatchOnlyFromXPub(xpub string, chain) (*WatchWallet, error)` | Watch-only address derivation from an xpub — no seed. |
 
 **Transaction & Ethereum message signing:**
 
 | Function / method | Purpose |
 |---|---|
-| `(*HDWallet) SignTransaction(symbol, index, proto.Message) (proto.Message, error)` | Build+sign a raw tx (EVM/Tron/XRP/Cosmos/Solana/Bitcoin-UTXO/Stellar/Algorand/Aptos; no broadcast). |
-| `BroadcastPayload(symbol, proto.Message) (string, error)` | Convert a `SignTransaction` output to the exact string each chain's RPC endpoint expects: `"0x"+hex` for EVM, bare hex for Bitcoin/UTXO, base64 for Solana and Cosmos, a TronGrid JSON object for Tron, uppercase hex for XRP. |
+| `(*HDWallet) SignTransaction(chain, index, proto.Message) (proto.Message, error)` | Build+sign a raw tx (EVM/Tron/XRP/Cosmos/Solana/Bitcoin-UTXO/Stellar/Algorand/Aptos; no broadcast). |
+| `BroadcastPayload(chain, proto.Message) (string, error)` | Convert a `SignTransaction` output to the exact string each chain's RPC endpoint expects: `"0x"+hex` for EVM, bare hex for Bitcoin/UTXO, base64 for Solana and Cosmos, a TronGrid JSON object for Tron, uppercase hex for XRP. |
 | `TransactionID(proto.Message) (string, error)` | Extract the canonical transaction id from any `SignTransaction` output, normalised to lower-case hex (or base58 for Solana). |
-| `(*HDWallet) SignMessage(symbol, index, []byte) ([]byte, error)` | EIP-191 `personal_sign` → 65-byte r‖s‖v. |
-| `(*HDWallet) SignTypedData(symbol, index, []byte) ([]byte, error)` | EIP-712 typed-data signature. |
-| `(*HDWallet) SignBitcoinMessage(symbol, index, []byte) (string, error)` | Bitcoin `signmessage` → base64. With `VerifyBitcoinMessage`. |
-| `(*HDWallet) SignSolanaMessage(symbol, index, []byte) (string, error)` | Solana off-chain message → base58. With `VerifySolanaMessage`. |
-| `(*HDWallet) SignCosmosADR36(symbol, index, signer, []byte) (string, error)` | Cosmos ADR-36 arbitrary-message → base64 (65-byte recoverable). With `VerifyCosmosADR36`. |
-| `(*HDWallet) SignTronMessage(symbol, index, []byte) (string, error)` | Tron TIP-191 message → `0x…` hex (V ∈ {27,28}). With `VerifyTronMessage`. |
-| `(*HDWallet) SignRawMessage(symbol, index, []byte) (*Signature, error)` | Chain-neutral: ECDSA 32-byte digest or ed25519 raw message. With `VerifyRawMessage`. |
+| `(*HDWallet) SignMessage(chain, index, []byte) ([]byte, error)` | EIP-191 `personal_sign` → 65-byte r‖s‖v. |
+| `(*HDWallet) SignTypedData(chain, index, []byte) ([]byte, error)` | EIP-712 typed-data signature. |
+| `(*HDWallet) SignBitcoinMessage(chain, index, []byte) (string, error)` | Bitcoin `signmessage` → base64. With `VerifyBitcoinMessage`. |
+| `(*HDWallet) SignSolanaMessage(chain, index, []byte) (string, error)` | Solana off-chain message → base58. With `VerifySolanaMessage`. |
+| `(*HDWallet) SignCosmosADR36(chain, index, signer, []byte) (string, error)` | Cosmos ADR-36 arbitrary-message → base64 (65-byte recoverable). With `VerifyCosmosADR36`. |
+| `(*HDWallet) SignTronMessage(chain, index, []byte) (string, error)` | Tron TIP-191 message → `0x…` hex (V ∈ {27,28}). With `VerifyTronMessage`. |
+| `(*HDWallet) SignRawMessage(chain, index, []byte) (*Signature, error)` | Chain-neutral: ECDSA 32-byte digest or ed25519 raw message. With `VerifyRawMessage`. |
 | `RecoverEthereumAddress([]byte, []byte) (string, error)` · `VerifyEthereumMessage` / `…TypedData` | Recover/verify EIP-191/712 signers. |
 | `EncodeRLP`/`DecodeRLP` · `ABIEncode`/`ABIDecode` · `ABIFunctionSelector` · `EIP712Hash` | Standalone EVM encoding utilities. |
 | `ParseContractABI(jsonABI string) (ContractABIMap, error)` · `DecodeContractCall(abi, calldata)` · `GetFunctionSignature(fn)` | JSON-ABI-driven contract-call decoding: parse a JSON ABI array into a selector-keyed map, then decode raw calldata into a function name and typed named parameters. |
@@ -547,9 +547,9 @@ go test -race -cover ./...
 
 | Function | Purpose |
 |---|---|
-| `IsValidAddress(symbol, addr) bool` · `ValidateAddress(symbol, addr) error` | Validate an address for a network. |
-| `ParseAddress(symbol, addr) ([]byte, error)` | Decode an address to its payload. |
-| `AddressFromPublicKey(symbol, pub) (string, error)` | Derive an address from an external public key. |
+| `IsValidAddress(chain, addr) bool` · `ValidateAddress(chain, addr) error` | Validate an address for a network. |
+| `ParseAddress(chain, addr) ([]byte, error)` | Decode an address to its payload. |
+| `AddressFromPublicKey(chain, pub) (string, error)` | Derive an address from an external public key. |
 
 **Mnemonic entry-screen helpers (pure functions, no secrets):**
 
@@ -561,9 +561,9 @@ go test -race -cover ./...
 | `MnemonicStrength(mnemonic string) (bits, words int, err error)` | Validates a mnemonic and reports its entropy size and word count. |
 | `ValidateMnemonic(string) error` · `ValidateMnemonicBytes([]byte) error` | Validate without building a wallet. |
 
-`Symbol` is a typed string enum; the package exports a constant for every
+`Chain` is a typed string enum; the package exports a constant for every
 supported network (`hdwallet.BTC`, `hdwallet.ETH`, `hdwallet.SOL`, …). Pass these
-constants instead of raw strings for compile-time safety. `Symbol` also has
+constants instead of raw strings for compile-time safety. `Chain` also has
 `String() string` and `IsValid() bool` helpers.
 
 ---

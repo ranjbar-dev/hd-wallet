@@ -99,9 +99,9 @@ func taprootControlBlock(internalKeyBytes []byte, parity byte, merkleProof [][]b
 // and would produce a signature that cannot be verified by the consensus rules.
 //
 // sighash must be exactly 32 bytes (the output of tapscriptSighash).
-func (w *HDWallet) signTaprootScriptPath(symbol Symbol, index uint32, sighash []byte) ([]byte, error) {
+func (w *HDWallet) signTaprootScriptPath(chain Chain, index uint32, sighash []byte) ([]byte, error) {
 	var out []byte
-	err := w.withLeafPrivateKey(symbol, index, func(raw []byte, _ Coin) error {
+	err := w.withLeafPrivateKey(chain, index, func(raw []byte, _ Coin) error {
 		priv, _ := btcec.PrivKeyFromBytes(raw)
 		// priv is a *btcec.PrivateKey; raw is wiped on callback return by withLeafPrivateKey.
 		sig, err := schnorr.Sign(priv, sighash)

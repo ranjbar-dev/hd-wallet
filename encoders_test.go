@@ -84,11 +84,11 @@ var trustWalletVectors = map[string]string{
 
 func TestEncodersAgainstTrustWalletVectors(t *testing.T) {
 	priv := dummyKey()
-	for symbol, want := range trustWalletVectors {
-		t.Run(symbol, func(t *testing.T) {
-			coin, ok := coins[Symbol(symbol)]
+	for chain, want := range trustWalletVectors {
+		t.Run(chain, func(t *testing.T) {
+			coin, ok := coins[Chain(chain)]
 			if !ok {
-				t.Fatalf("coin %s not in registry", symbol)
+				t.Fatalf("coin %s not in registry", chain)
 			}
 			pub, err := publicKeyFromPriv(coin.Curve, priv)
 			if err != nil {
@@ -99,7 +99,7 @@ func TestEncodersAgainstTrustWalletVectors(t *testing.T) {
 				t.Fatal(err)
 			}
 			if got != want {
-				t.Errorf("%s address = %s, want %s", symbol, got, want)
+				t.Errorf("%s address = %s, want %s", chain, got, want)
 			}
 		})
 	}
@@ -110,14 +110,14 @@ func TestEncodersAgainstTrustWalletVectors(t *testing.T) {
 func TestEVMChainsMatchEthereum(t *testing.T) {
 	priv := dummyKey()
 	const wantETH = "0x9d8A62f656a8d1615C1294fd71e9CFb3E4855A4F"
-	for _, symbol := range []Symbol{
+	for _, chain := range []Chain{
 		BNB, MATIC, AVAX, ARB, OP, FTM, BASE, CRO, GNO, CELO,
 		ETC, ZKSYNC, LINEA, SCROLL, MANTLE, BLAST, KAIA, AURORA, GLMR, MOVR,
 		BOBA, METIS, OPBNB, POLZKEVM, MANTA, RBTC, HECO, OKT, KCS, WAN,
 		POA, CLO, GO, TT, VET, IOTX, THETA, NEON, MERLIN, LIGHT,
 		SONIC, ZENEON, ZETAEVM,
 	} {
-		coin := coins[symbol]
+		coin := coins[chain]
 		pub, err := publicKeyFromPriv(coin.Curve, priv)
 		if err != nil {
 			t.Fatal(err)
@@ -127,7 +127,7 @@ func TestEVMChainsMatchEthereum(t *testing.T) {
 			t.Fatal(err)
 		}
 		if got != wantETH {
-			t.Errorf("%s = %s, want %s", symbol, got, wantETH)
+			t.Errorf("%s = %s, want %s", chain, got, wantETH)
 		}
 	}
 }
@@ -140,8 +140,8 @@ func TestCosmosFamilyHRP(t *testing.T) {
 		"JUNO": "juno1",
 		"TIA":  "celestia1",
 	}
-	for symbol, wantPrefix := range prefixes {
-		coin := coins[Symbol(symbol)]
+	for chain, wantPrefix := range prefixes {
+		coin := coins[Chain(chain)]
 		pub, err := publicKeyFromPriv(coin.Curve, priv)
 		if err != nil {
 			t.Fatal(err)
@@ -151,7 +151,7 @@ func TestCosmosFamilyHRP(t *testing.T) {
 			t.Fatal(err)
 		}
 		if !bytes.HasPrefix([]byte(got), []byte(wantPrefix)) {
-			t.Errorf("%s = %s, want prefix %s", symbol, got, wantPrefix)
+			t.Errorf("%s = %s, want prefix %s", chain, got, wantPrefix)
 		}
 	}
 }

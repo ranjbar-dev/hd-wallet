@@ -3,7 +3,7 @@ package hdwallet
 // Track 5: protobuf transaction signing.
 //
 // SignTransaction is a Trust Wallet Core `AnySigner` equivalent: given a chain
-// symbol and a per-chain protobuf SigningInput, it builds the unsigned
+// chain and a per-chain protobuf SigningInput, it builds the unsigned
 // transaction, computes the chain's sighash/preimage, signs it with the existing
 // derived-key signer (the private key is materialised, used and wiped inside the
 // package — never returned), and returns a per-chain SigningOutput holding the
@@ -41,10 +41,10 @@ import (
 // Transaction-signing errors.
 var (
 	// ErrTxUnsupported is returned when SignTransaction is asked to sign for a
-	// symbol whose family has no transaction builder.
+	// chain whose family has no transaction builder.
 	ErrTxUnsupported = errors.New("hdwallet: transaction signing not supported for coin")
 	// ErrTxInput is returned when the SigningInput proto type does not match the
-	// family selected by symbol, or a required field is missing/invalid.
+	// family selected by chain, or a required field is missing/invalid.
 	ErrTxInput = errors.New("hdwallet: invalid transaction signing input")
 )
 
@@ -65,24 +65,24 @@ const (
 	familyStellar // XLM: XDR TransactionV0 + SHA256(networkId||ENVELOPE_TYPE_TX||xdr)
 )
 
-// txFamilyOf maps a symbol to its transaction-building family. EVM and standard
+// txFamilyOf maps a chain to its transaction-building family. EVM and standard
 // Cosmos chains are resolved from the data-driven evmTxChains / cosmosTxChains
 // sets (see tx_families.go) so transaction support stays in lockstep with the
 // address registry; the single-chain families are matched directly.
-func txFamilyOf(symbol Symbol) txFamily {
-	if _, ok := evmTxChains[symbol]; ok {
+func txFamilyOf(chain Chain) txFamily {
+	if _, ok := evmTxChains[chain]; ok {
 		return familyEthereum
 	}
-	if _, ok := cosmosTxChains[symbol]; ok {
+	if _, ok := cosmosTxChains[chain]; ok {
 		return familyCosmos
 	}
-	if _, ok := ethermintTxChains[symbol]; ok {
+	if _, ok := ethermintTxChains[chain]; ok {
 		return familyCosmosEthermint
 	}
-	if _, ok := utxoTxChains[symbol]; ok {
+	if _, ok := utxoTxChains[chain]; ok {
 		return familyBitcoin
 	}
-	switch symbol {
+	switch chain {
 	case TRX:
 		return familyTron
 	case XRP:
@@ -102,200 +102,200 @@ func txFamilyOf(symbol Symbol) txFamily {
 	}
 }
 
-// SignTransaction signs a transaction for symbol using the key derived at the
+// SignTransaction signs a transaction for chain using the key derived at the
 // given address index and returns a per-chain protobuf SigningOutput.
 //
-// input must be the SigningInput proto for symbol's family (e.g.
+// input must be the SigningInput proto for chain's family (e.g.
 // *ethereum.SigningInput for ETH/EVM, *tron.SigningInput for TRX, …). The
 // returned proto.Message is the matching SigningOutput, holding the signed
 // serialized raw-transaction bytes plus a hex/base58/base64 convenience form. No
 // network calls are made.
 //
 // The derived private key is wiped immediately after signing and never leaves the
-// package. An unknown symbol returns ErrTxUnsupported; a wrong input type returns
+// package. An unknown chain returns ErrTxUnsupported; a wrong input type returns
 // ErrTxInput.
-func (w *HDWallet) SignTransaction(symbol Symbol, index uint32, input proto.Message) (proto.Message, error) {
-	switch txFamilyOf(symbol) {
+func (w *HDWallet) SignTransaction(chain Chain, index uint32, input proto.Message) (proto.Message, error) {
+	switch txFamilyOf(chain) {
 	case familyEthereum:
 		in, ok := input.(*txeth.SigningInput)
 		if !ok {
-			return nil, fmt.Errorf("%w: %s expects *ethereum.SigningInput", ErrTxInput, symbol)
+			return nil, fmt.Errorf("%w: %s expects *ethereum.SigningInput", ErrTxInput, chain)
 		}
-		return w.signEthereumTx(symbol, index, in)
+		return w.signEthereumTx(chain, index, in)
 	case familyTron:
 		in, ok := input.(*txtron.SigningInput)
 		if !ok {
-			return nil, fmt.Errorf("%w: %s expects *tron.SigningInput", ErrTxInput, symbol)
+			return nil, fmt.Errorf("%w: %s expects *tron.SigningInput", ErrTxInput, chain)
 		}
-		return w.signTronTx(symbol, index, in)
+		return w.signTronTx(chain, index, in)
 	case familyRipple:
 		in, ok := input.(*txripple.SigningInput)
 		if !ok {
-			return nil, fmt.Errorf("%w: %s expects *ripple.SigningInput", ErrTxInput, symbol)
+			return nil, fmt.Errorf("%w: %s expects *ripple.SigningInput", ErrTxInput, chain)
 		}
-		return w.signRippleTx(symbol, index, in)
+		return w.signRippleTx(chain, index, in)
 	case familyCosmos:
 		in, ok := input.(*txcosmos.SigningInput)
 		if !ok {
-			return nil, fmt.Errorf("%w: %s expects *cosmos.SigningInput", ErrTxInput, symbol)
+			return nil, fmt.Errorf("%w: %s expects *cosmos.SigningInput", ErrTxInput, chain)
 		}
-		return w.signCosmosTx(symbol, index, in)
+		return w.signCosmosTx(chain, index, in)
 	case familyCosmosEthermint:
 		in, ok := input.(*txcosmos.SigningInput)
 		if !ok {
-			return nil, fmt.Errorf("%w: %s expects *cosmos.SigningInput", ErrTxInput, symbol)
+			return nil, fmt.Errorf("%w: %s expects *cosmos.SigningInput", ErrTxInput, chain)
 		}
-		return w.signCosmosEthermintTx(symbol, index, in)
+		return w.signCosmosEthermintTx(chain, index, in)
 	case familySolana:
 		in, ok := input.(*txsolana.SigningInput)
 		if !ok {
-			return nil, fmt.Errorf("%w: %s expects *solana.SigningInput", ErrTxInput, symbol)
+			return nil, fmt.Errorf("%w: %s expects *solana.SigningInput", ErrTxInput, chain)
 		}
-		return w.signSolanaTx(symbol, index, in)
+		return w.signSolanaTx(chain, index, in)
 	case familyBitcoin:
 		in, ok := input.(*txbtc.SigningInput)
 		if !ok {
-			return nil, fmt.Errorf("%w: %s expects *bitcoin.SigningInput", ErrTxInput, symbol)
+			return nil, fmt.Errorf("%w: %s expects *bitcoin.SigningInput", ErrTxInput, chain)
 		}
-		return w.signBitcoinTx(symbol, index, in)
+		return w.signBitcoinTx(chain, index, in)
 	case familyAlgorand:
 		in, ok := input.(*txalgo.SigningInput)
 		if !ok {
-			return nil, fmt.Errorf("%w: %s expects *algorand.SigningInput", ErrTxInput, symbol)
+			return nil, fmt.Errorf("%w: %s expects *algorand.SigningInput", ErrTxInput, chain)
 		}
-		return w.signALGOTx(symbol, index, in)
+		return w.signALGOTx(chain, index, in)
 	case familyAptos:
 		in, ok := input.(*txaptos.SigningInput)
 		if !ok {
-			return nil, fmt.Errorf("%w: %s expects *aptos.SigningInput", ErrTxInput, symbol)
+			return nil, fmt.Errorf("%w: %s expects *aptos.SigningInput", ErrTxInput, chain)
 		}
-		return w.signAptosTx(symbol, index, in)
+		return w.signAptosTx(chain, index, in)
 	case familyStellar:
 		in, ok := input.(*txstellar.SigningInput)
 		if !ok {
-			return nil, fmt.Errorf("%w: %s expects *stellar.SigningInput", ErrTxInput, symbol)
+			return nil, fmt.Errorf("%w: %s expects *stellar.SigningInput", ErrTxInput, chain)
 		}
-		return w.signXLMTx(symbol, index, in)
+		return w.signXLMTx(chain, index, in)
 	default:
-		return nil, fmt.Errorf("%w: %s", ErrTxUnsupported, symbol)
+		return nil, fmt.Errorf("%w: %s", ErrTxUnsupported, chain)
 	}
 }
 
 // ValidateSigningInput performs a quick sanity check on the signing input for
-// symbol. Returns ErrTxInput with a descriptive message if a required field
+// chain. Returns ErrTxInput with a descriptive message if a required field
 // appears missing. This does NOT validate chain-level correctness (nonce
 // sequence, balance) — only that structurally required proto fields are
 // non-zero.
-func ValidateSigningInput(symbol Symbol, input proto.Message) error {
-	switch txFamilyOf(symbol) {
+func ValidateSigningInput(chain Chain, input proto.Message) error {
+	switch txFamilyOf(chain) {
 	case familyEthereum:
 		in, ok := input.(*txeth.SigningInput)
 		if !ok {
-			return fmt.Errorf("%w: %s expects *ethereum.SigningInput", ErrTxInput, symbol)
+			return fmt.Errorf("%w: %s expects *ethereum.SigningInput", ErrTxInput, chain)
 		}
 		if len(in.GasLimit) == 0 || allZero(in.GasLimit) {
-			return fmt.Errorf("%w: %s: gas_limit is required", ErrTxInput, symbol)
+			return fmt.Errorf("%w: %s: gas_limit is required", ErrTxInput, chain)
 		}
 		hasFee := (len(in.GasPrice) > 0 && !allZero(in.GasPrice)) ||
 			(len(in.MaxFeePerGas) > 0 && !allZero(in.MaxFeePerGas))
 		if !hasFee {
-			return fmt.Errorf("%w: %s: gas_price or max_fee_per_gas is required", ErrTxInput, symbol)
+			return fmt.Errorf("%w: %s: gas_price or max_fee_per_gas is required", ErrTxInput, chain)
 		}
 	case familyCosmos, familyCosmosEthermint:
 		in, ok := input.(*txcosmos.SigningInput)
 		if !ok {
-			return fmt.Errorf("%w: %s expects *cosmos.SigningInput", ErrTxInput, symbol)
+			return fmt.Errorf("%w: %s expects *cosmos.SigningInput", ErrTxInput, chain)
 		}
 		if in.AccountNumber == 0 {
-			return fmt.Errorf("%w: %s: account_number is required", ErrTxInput, symbol)
+			return fmt.Errorf("%w: %s: account_number is required", ErrTxInput, chain)
 		}
 		if in.Fee == nil {
-			return fmt.Errorf("%w: %s: fee is required", ErrTxInput, symbol)
+			return fmt.Errorf("%w: %s: fee is required", ErrTxInput, chain)
 		}
 	case familyBitcoin:
 		in, ok := input.(*txbtc.SigningInput)
 		if !ok {
-			return fmt.Errorf("%w: %s expects *bitcoin.SigningInput", ErrTxInput, symbol)
+			return fmt.Errorf("%w: %s expects *bitcoin.SigningInput", ErrTxInput, chain)
 		}
 		if len(in.Utxo) == 0 {
-			return fmt.Errorf("%w: %s: at least one utxo input is required", ErrTxInput, symbol)
+			return fmt.Errorf("%w: %s: at least one utxo input is required", ErrTxInput, chain)
 		}
 		if in.ByteFee <= 0 {
-			return fmt.Errorf("%w: %s: byte_fee is required", ErrTxInput, symbol)
+			return fmt.Errorf("%w: %s: byte_fee is required", ErrTxInput, chain)
 		}
 	case familySolana:
 		in, ok := input.(*txsolana.SigningInput)
 		if !ok {
-			return fmt.Errorf("%w: %s expects *solana.SigningInput", ErrTxInput, symbol)
+			return fmt.Errorf("%w: %s expects *solana.SigningInput", ErrTxInput, chain)
 		}
 		if in.RecentBlockhash == "" {
-			return fmt.Errorf("%w: %s: recent_blockhash is required", ErrTxInput, symbol)
+			return fmt.Errorf("%w: %s: recent_blockhash is required", ErrTxInput, chain)
 		}
 	case familyTron:
 		in, ok := input.(*txtron.SigningInput)
 		if !ok {
-			return fmt.Errorf("%w: %s expects *tron.SigningInput", ErrTxInput, symbol)
+			return fmt.Errorf("%w: %s expects *tron.SigningInput", ErrTxInput, chain)
 		}
 		if in.GetRawJson() == "" {
 			if in.Transaction == nil || in.Transaction.BlockHeader == nil || in.Transaction.BlockHeader.Number == 0 {
-				return fmt.Errorf("%w: %s: transaction.block_header.number is required", ErrTxInput, symbol)
+				return fmt.Errorf("%w: %s: transaction.block_header.number is required", ErrTxInput, chain)
 			}
 			if in.Transaction.Expiration == 0 {
-				return fmt.Errorf("%w: %s: transaction.expiration is required", ErrTxInput, symbol)
+				return fmt.Errorf("%w: %s: transaction.expiration is required", ErrTxInput, chain)
 			}
 		}
 	case familyRipple:
 		in, ok := input.(*txripple.SigningInput)
 		if !ok {
-			return fmt.Errorf("%w: %s expects *ripple.SigningInput", ErrTxInput, symbol)
+			return fmt.Errorf("%w: %s expects *ripple.SigningInput", ErrTxInput, chain)
 		}
 		if in.Sequence == 0 {
-			return fmt.Errorf("%w: %s: sequence is required", ErrTxInput, symbol)
+			return fmt.Errorf("%w: %s: sequence is required", ErrTxInput, chain)
 		}
 		if in.Fee == 0 {
-			return fmt.Errorf("%w: %s: fee is required", ErrTxInput, symbol)
+			return fmt.Errorf("%w: %s: fee is required", ErrTxInput, chain)
 		}
 	case familyAlgorand:
 		in, ok := input.(*txalgo.SigningInput)
 		if !ok {
-			return fmt.Errorf("%w: %s expects *algorand.SigningInput", ErrTxInput, symbol)
+			return fmt.Errorf("%w: %s expects *algorand.SigningInput", ErrTxInput, chain)
 		}
 		if len(in.GenesisHash) != 32 {
-			return fmt.Errorf("%w: %s: genesis_hash must be 32 bytes", ErrTxInput, symbol)
+			return fmt.Errorf("%w: %s: genesis_hash must be 32 bytes", ErrTxInput, chain)
 		}
 		if len(in.To) != 32 {
-			return fmt.Errorf("%w: %s: to must be 32 bytes", ErrTxInput, symbol)
+			return fmt.Errorf("%w: %s: to must be 32 bytes", ErrTxInput, chain)
 		}
 		if in.Fee == 0 {
-			return fmt.Errorf("%w: %s: fee is required", ErrTxInput, symbol)
+			return fmt.Errorf("%w: %s: fee is required", ErrTxInput, chain)
 		}
 	case familyAptos:
 		in, ok := input.(*txaptos.SigningInput)
 		if !ok {
-			return fmt.Errorf("%w: %s expects *aptos.SigningInput", ErrTxInput, symbol)
+			return fmt.Errorf("%w: %s expects *aptos.SigningInput", ErrTxInput, chain)
 		}
 		if in.GetEntryFunction() == nil {
-			return fmt.Errorf("%w: %s: entry_function is required", ErrTxInput, symbol)
+			return fmt.Errorf("%w: %s: entry_function is required", ErrTxInput, chain)
 		}
 	case familyStellar:
 		in, ok := input.(*txstellar.SigningInput)
 		if !ok {
-			return fmt.Errorf("%w: %s expects *stellar.SigningInput", ErrTxInput, symbol)
+			return fmt.Errorf("%w: %s expects *stellar.SigningInput", ErrTxInput, chain)
 		}
 		if in.Account == "" {
-			return fmt.Errorf("%w: %s: account is required", ErrTxInput, symbol)
+			return fmt.Errorf("%w: %s: account is required", ErrTxInput, chain)
 		}
 		if in.Sequence == 0 {
-			return fmt.Errorf("%w: %s: sequence is required", ErrTxInput, symbol)
+			return fmt.Errorf("%w: %s: sequence is required", ErrTxInput, chain)
 		}
 		if in.Fee <= 0 {
-			return fmt.Errorf("%w: %s: fee must be positive (got %d)", ErrTxInput, symbol, in.Fee)
+			return fmt.Errorf("%w: %s: fee must be positive (got %d)", ErrTxInput, chain, in.Fee)
 		}
 		if in.GetPayment() == nil {
-			return fmt.Errorf("%w: %s: payment operation is required", ErrTxInput, symbol)
+			return fmt.Errorf("%w: %s: payment operation is required", ErrTxInput, chain)
 		}
 	default:
-		return fmt.Errorf("%w: %s", ErrTxUnsupported, symbol)
+		return fmt.Errorf("%w: %s", ErrTxUnsupported, chain)
 	}
 	return nil
 }

@@ -15,7 +15,7 @@ import (
 
 const txTestMnemonic = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about"
 
-// TestSignTransactionUnsupportedCoin verifies that a symbol with no transaction
+// TestSignTransactionUnsupportedCoin verifies that a chain with no transaction
 // family returns ErrTxUnsupported.
 func TestSignTransactionUnsupportedCoin(t *testing.T) {
 	w, err := FromMnemonic(txTestMnemonic)
@@ -24,8 +24,8 @@ func TestSignTransactionUnsupportedCoin(t *testing.T) {
 	}
 	defer w.Destroy()
 
-	// An unregistered symbol has no transaction builder family.
-	_, err = w.SignTransaction(Symbol("NOPE"), 0, &txeth.SigningInput{})
+	// An unregistered chain has no transaction builder family.
+	_, err = w.SignTransaction(Chain("NOPE"), 0, &txeth.SigningInput{})
 	if !errors.Is(err, ErrTxUnsupported) {
 		t.Fatalf("SignTransaction(NOPE) error = %v, want ErrTxUnsupported", err)
 	}
@@ -112,9 +112,9 @@ func TestSignTransactionInputValidation(t *testing.T) {
 	defer w.Destroy()
 
 	cases := []struct {
-		name   string
-		symbol Symbol
-		input  proto.Message
+		name  string
+		chain Chain
+		input proto.Message
 	}{
 		{"eth missing transaction", ETH, &txeth.SigningInput{ToAddress: "0x3535353535353535353535353535353535353535"}},
 		{"eth bad to_address", ETH, &txeth.SigningInput{
@@ -158,7 +158,7 @@ func TestSignTransactionInputValidation(t *testing.T) {
 			// rejected on curve mismatch for non-secp256k1 coins, so build a fresh
 			// seed wallet for those.
 			tw := w
-			if tc.symbol == SOL {
+			if tc.chain == SOL {
 				sw, err := FromMnemonic(txTestMnemonic)
 				if err != nil {
 					t.Fatalf("FromMnemonic: %v", err)
@@ -166,7 +166,7 @@ func TestSignTransactionInputValidation(t *testing.T) {
 				defer sw.Destroy()
 				tw = sw
 			}
-			_, err := tw.SignTransaction(tc.symbol, 0, tc.input)
+			_, err := tw.SignTransaction(tc.chain, 0, tc.input)
 			if !errors.Is(err, ErrTxInput) {
 				t.Fatalf("%s: error = %v, want ErrTxInput", tc.name, err)
 			}

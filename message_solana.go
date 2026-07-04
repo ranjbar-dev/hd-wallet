@@ -8,13 +8,13 @@ import "crypto/ed25519"
 // envelope), and the 64-byte signature is returned base58-encoded — the same
 // form `solana sign-offchain-message` and TWC report.
 
-// SignSolanaMessage signs message with the ed25519 key derived for symbol at the
+// SignSolanaMessage signs message with the ed25519 key derived for chain at the
 // given address index and returns the base58-encoded 64-byte signature.
 //
-// symbol must be a Solana / ed25519 coin (e.g. SOL). The derived private key is
+// chain must be a Solana / ed25519 coin (e.g. SOL). The derived private key is
 // wiped immediately after signing and never leaves the package.
-func (w *HDWallet) SignSolanaMessage(symbol Symbol, index uint32, message []byte) (string, error) {
-	sig, err := w.SignIndex(symbol, index, message)
+func (w *HDWallet) SignSolanaMessage(chain Chain, index uint32, message []byte) (string, error) {
+	sig, err := w.SignIndex(chain, index, message)
 	if err != nil {
 		return "", err
 	}

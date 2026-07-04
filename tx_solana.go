@@ -52,22 +52,22 @@ const solanaTransferInstruction uint32 = 2
 const solanaTokenTransferCheckedInstruction byte = 12
 
 // signSolanaTx dispatches on the SigningInput's transaction type.
-func (w *HDWallet) signSolanaTx(symbol Symbol, index uint32, in *txsolana.SigningInput) (*txsolana.SigningOutput, error) {
+func (w *HDWallet) signSolanaTx(chain Chain, index uint32, in *txsolana.SigningInput) (*txsolana.SigningOutput, error) {
 	switch {
 	case in.GetTransferTransaction() != nil:
-		return w.signSolanaSystemTransfer(symbol, index, in)
+		return w.signSolanaSystemTransfer(chain, index, in)
 	case in.GetTokenTransferTransaction() != nil:
-		return w.signSolanaTokenTransfer(symbol, index, in)
+		return w.signSolanaTokenTransfer(chain, index, in)
 	case in.GetCreateTokenAccountTransaction() != nil:
-		return w.signSolanaCreateTokenAccount(symbol, index, in)
+		return w.signSolanaCreateTokenAccount(chain, index, in)
 	case in.GetCreateAndTransferTokenTransaction() != nil:
-		return w.signSolanaCreateAndTransferToken(symbol, index, in)
+		return w.signSolanaCreateAndTransferToken(chain, index, in)
 	case in.GetCreateNonceAccount() != nil:
-		return w.signSolanaCreateNonceAccount(symbol, index, in)
+		return w.signSolanaCreateNonceAccount(chain, index, in)
 	case in.GetWithdrawNonceAccount() != nil:
-		return w.signSolanaWithdrawNonceAccount(symbol, index, in)
+		return w.signSolanaWithdrawNonceAccount(chain, index, in)
 	case in.GetAdvanceNonceAccount() != nil:
-		return w.signSolanaAdvanceNonceAccount(symbol, index, in)
+		return w.signSolanaAdvanceNonceAccount(chain, index, in)
 	default:
 		return nil, fmt.Errorf("%w: solana: no supported transaction set", ErrTxInput)
 	}
@@ -94,8 +94,8 @@ func solanaNonceParams(in *txsolana.SigningInput) (nonce, sysvarRBH []byte, err 
 
 // solanaFinishTx signs message with the wallet key (single required signature)
 // and assembles [compact-u16 1][signature][message].
-func (w *HDWallet) solanaFinishTx(symbol Symbol, index uint32, message []byte) (*txsolana.SigningOutput, error) {
-	sig, err := w.SignIndex(symbol, index, message)
+func (w *HDWallet) solanaFinishTx(chain Chain, index uint32, message []byte) (*txsolana.SigningOutput, error) {
+	sig, err := w.SignIndex(chain, index, message)
 	if err != nil {
 		return nil, err
 	}
@@ -117,10 +117,10 @@ func (w *HDWallet) solanaFinishTx(symbol Symbol, index uint32, message []byte) (
 
 // signSolanaSystemTransfer builds, signs and base58-encodes a Solana system
 // (native SOL) transfer.
-func (w *HDWallet) signSolanaSystemTransfer(symbol Symbol, index uint32, in *txsolana.SigningInput) (*txsolana.SigningOutput, error) {
+func (w *HDWallet) signSolanaSystemTransfer(chain Chain, index uint32, in *txsolana.SigningInput) (*txsolana.SigningOutput, error) {
 	transfer := in.GetTransferTransaction()
 
-	from, err := w.PublicKeyIndex(symbol, index)
+	from, err := w.PublicKeyIndex(chain, index)
 	if err != nil {
 		return nil, err
 	}
@@ -149,7 +149,7 @@ func (w *HDWallet) signSolanaSystemTransfer(symbol Symbol, index uint32, in *txs
 	} else {
 		message = solanaTransferMessage(from, to, blockhash, transfer.GetValue())
 	}
-	return w.solanaFinishTx(symbol, index, message)
+	return w.solanaFinishTx(chain, index, message)
 }
 
 // signSolanaTokenTransfer builds, signs and base58-encodes an SPL token
@@ -157,10 +157,10 @@ func (w *HDWallet) signSolanaSystemTransfer(symbol Symbol, index uint32, in *txs
 // source/destination token accounts and the mint directly (no associated-token-
 // account derivation). The signer (owner of the source account) is also the fee
 // payer.
-func (w *HDWallet) signSolanaTokenTransfer(symbol Symbol, index uint32, in *txsolana.SigningInput) (*txsolana.SigningOutput, error) {
+func (w *HDWallet) signSolanaTokenTransfer(chain Chain, index uint32, in *txsolana.SigningInput) (*txsolana.SigningOutput, error) {
 	tt := in.GetTokenTransferTransaction()
 
-	owner, err := w.PublicKeyIndex(symbol, index)
+	owner, err := w.PublicKeyIndex(chain, index)
 	if err != nil {
 		return nil, err
 	}
@@ -206,7 +206,7 @@ func (w *HDWallet) signSolanaTokenTransfer(symbol Symbol, index uint32, in *txso
 	} else {
 		message = solanaTokenTransferMessage(owner, source, dest, mint, tokenProgram, blockhash, tt.GetAmount(), decimals)
 	}
-	return w.solanaFinishTx(symbol, index, message)
+	return w.solanaFinishTx(chain, index, message)
 }
 
 // solanaTokenTransferMessage serializes the legacy message for an SPL

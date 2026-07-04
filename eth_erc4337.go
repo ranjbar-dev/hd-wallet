@@ -49,14 +49,14 @@ func UserOperationHash(op *UserOperation, entryPoint []byte, chainID *big.Int) [
 // SignUserOperation signs op via EIP-191 personal_sign over its hash, sets
 // op.Signature, and returns the 65-byte r‖s‖v recoverable signature.
 func (w *HDWallet) SignUserOperation(
-	symbol Symbol,
+	chain Chain,
 	index uint32,
 	op *UserOperation,
 	entryPoint []byte,
 	chainID *big.Int,
 ) ([]byte, error) {
 	hash := UserOperationHash(op, entryPoint, chainID)
-	sig, err := w.SignMessage(symbol, index, hash)
+	sig, err := w.SignMessage(chain, index, hash)
 	if err != nil {
 		return nil, err
 	}

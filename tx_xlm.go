@@ -75,7 +75,7 @@ const xlmAssetTypeNative uint32 = 0
 // signXLMTx signs a Stellar payment transaction and returns base64(XDR(TransactionEnvelope)).
 // The XLM key is ed25519; the preimage is SHA256(preimage) which is passed as the
 // raw message to ed25519.Sign (ed25519 hashes it internally with SHA-512).
-func (w *HDWallet) signXLMTx(_ Symbol, index uint32, in *txstellar.SigningInput) (proto.Message, error) {
+func (w *HDWallet) signXLMTx(_ Chain, index uint32, in *txstellar.SigningInput) (proto.Message, error) {
 	// Decode source account G-address → 32-byte ed25519 public key.
 	sourcePub, err := validators[XLM](in.Account)
 	if err != nil {

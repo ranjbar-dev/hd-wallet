@@ -119,11 +119,11 @@ type InscriptionCommit struct {
 //
 // in.ToAddress is overwritten with the derived commit address before signing; the
 // caller should treat the SigningInput as consumed after this call.
-func (w *HDWallet) BuildBRC20Commit(symbol Symbol, index uint32, ticker, amount string,
+func (w *HDWallet) BuildBRC20Commit(chain Chain, index uint32, ticker, amount string,
 	in *txbtc.SigningInput) (commitTxHex string, reveal *InscriptionCommit, err error) {
 
-	// a. Derive the 33-byte compressed public key for (symbol, index).
-	pub33, err := w.PublicKeyIndex(symbol, index)
+	// a. Derive the 33-byte compressed public key for (chain, index).
+	pub33, err := w.PublicKeyIndex(chain, index)
 	if err != nil {
 		return "", nil, fmt.Errorf("hdwallet: inscription: public key: %w", err)
 	}
@@ -176,7 +176,7 @@ func (w *HDWallet) BuildBRC20Commit(symbol Symbol, index uint32, ticker, amount 
 
 	// k. Sign the commit tx (routes the payment to the inscription output address).
 	in.ToAddress = commitAddr
-	out, err := w.signBitcoinTx(symbol, index, in)
+	out, err := w.signBitcoinTx(chain, index, in)
 	if err != nil {
 		return "", nil, fmt.Errorf("hdwallet: inscription: sign commit: %w", err)
 	}
@@ -213,12 +213,12 @@ func (w *HDWallet) BuildBRC20Commit(symbol Symbol, index uint32, ticker, amount 
 //
 // revealFee = feeRate * 200 (fixed 200-vbyte estimate).
 // The net output value (commitAmount − revealFee) must exceed btcDustThreshold.
-func (w *HDWallet) SignBRC20Reveal(symbol Symbol, index uint32, reveal *InscriptionCommit,
+func (w *HDWallet) SignBRC20Reveal(chain Chain, index uint32, reveal *InscriptionCommit,
 	commitTxID []byte, commitVout uint32, commitAmount int64,
 	toAddress string, feeRate int64) (revealTxHex string, err error) {
 
 	// a. Decode the destination output script.
-	toScript, err := bitcoinDecodeScript(symbol, toAddress)
+	toScript, err := bitcoinDecodeScript(chain, toAddress)
 	if err != nil {
 		return "", fmt.Errorf("hdwallet: inscription: reveal: to_address: %w", err)
 	}
@@ -247,7 +247,7 @@ func (w *HDWallet) SignBRC20Reveal(symbol Symbol, index uint32, reveal *Inscript
 	outputs := []btcOutput{{value: outputValue, script: toScript}}
 
 	// f. Transaction version and locktime.
-	version := btcTxVersion(symbol)
+	version := btcTxVersion(chain)
 	locktime := uint32(0)
 
 	// g. Compute the BIP-342 tapscript sighash for the script-path spend.
@@ -257,7 +257,7 @@ func (w *HDWallet) SignBRC20Reveal(symbol Symbol, index uint32, reveal *Inscript
 	}
 
 	// h. Sign with the UNTWEAKED internal key (script-path signing rule).
-	sig64, err := w.signTaprootScriptPath(symbol, index, sighash)
+	sig64, err := w.signTaprootScriptPath(chain, index, sighash)
 	if err != nil {
 		return "", fmt.Errorf("hdwallet: inscription: reveal: sign: %w", err)
 	}

@@ -63,7 +63,7 @@ type UTXOProvider interface {
 // For Cosmos chains, use CosmosGasLimit and CosmosMinFee with the chain's
 // minimum gas price from CosmosMinGasPrices instead of calling FeeOracle.
 type FeeOracle interface {
-	FeeRate(symbol Symbol) (uint64, error)
+	FeeRate(chain Chain) (uint64, error)
 }
 
 // RecentBlockhashProvider returns the latest confirmed blockhash for a Solana
@@ -80,10 +80,10 @@ type RecentBlockhashProvider interface {
 // raw transaction to the network. The library produces signed bytes in
 // SigningOutput.Encoded and never broadcasts itself.
 //
-// symbol identifies the target chain. rawTx is the value of
+// chain identifies the target chain. rawTx is the value of
 // SigningOutput.Encoded (binary) — use the corresponding _hex or TxBytes field
 // if the endpoint expects hex or base64. Returns the transaction identifier
 // (hash/txid) as reported by the node, or an error if submission fails.
 type Broadcaster interface {
-	Broadcast(symbol Symbol, rawTx []byte) (txID string, err error)
+	Broadcast(chain Chain, rawTx []byte) (txID string, err error)
 }

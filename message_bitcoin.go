@@ -62,22 +62,22 @@ func bitcoinVarInt(n uint64) []byte {
 }
 
 // SignBitcoinMessage signs message under the Bitcoin signed-message standard with
-// the key derived for symbol at the given address index, returning the base64
-// compact signature. symbol must be a secp256k1 coin (e.g. BTC, LTC); the derived
+// the key derived for chain at the given address index, returning the base64
+// compact signature. chain must be a secp256k1 coin (e.g. BTC, LTC); the derived
 // private key is wiped immediately after signing and never leaves the package.
 //
 // The signature commits only to the message and key, so it is independent of the
 // address format; this library derives compressed keys, so the header byte marks
 // the key compressed (verifiers recover the compressed key / its legacy address).
-func (w *HDWallet) SignBitcoinMessage(symbol Symbol, index uint32, message []byte) (string, error) {
+func (w *HDWallet) SignBitcoinMessage(chain Chain, index uint32, message []byte) (string, error) {
 	digest := bitcoinMessageDigest(message)
-	sig, err := w.SignIndex(symbol, index, digest)
+	sig, err := w.SignIndex(chain, index, digest)
 	if err != nil {
 		return "", err
 	}
 	rec := sig.Recoverable() // 65 bytes R||S||V, V in {0,1}
 	if rec == nil {
-		return "", fmt.Errorf("%w: %s", ErrNotRecoverable, symbol)
+		return "", fmt.Errorf("%w: %s", ErrNotRecoverable, chain)
 	}
 	out := make([]byte, 65)
 	out[0] = 27 + rec[64] + 4 // compressed key

@@ -37,10 +37,10 @@ func ERC20PermitCalldata(owner, spender []byte, value, deadline *big.Int, v uint
 
 // SignERC20Permit signs an EIP-2612 permit for tokenAddr on chainID.
 // tokenName is the token contract's name() used in the EIP-712 domain separator.
-// The owner is derived from the wallet's key at symbol/index.
+// The owner is derived from the wallet's key at chain/index.
 // Returns (v, r, s) ready for ERC20PermitCalldata.
 func (w *HDWallet) SignERC20Permit(
-	symbol Symbol,
+	chain Chain,
 	index uint32,
 	chainID *big.Int,
 	tokenAddr []byte,
@@ -48,7 +48,7 @@ func (w *HDWallet) SignERC20Permit(
 	spender []byte,
 	value, nonce, deadline *big.Int,
 ) (v uint8, r, s [32]byte, err error) {
-	owner, err := w.AddressIndex(symbol, index)
+	owner, err := w.AddressIndex(chain, index)
 	if err != nil {
 		return
 	}
@@ -56,7 +56,7 @@ func (w *HDWallet) SignERC20Permit(
 	if err != nil {
 		return
 	}
-	sig, err := w.SignTypedData(symbol, index, td)
+	sig, err := w.SignTypedData(chain, index, td)
 	if err != nil {
 		return
 	}

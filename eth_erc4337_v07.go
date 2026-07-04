@@ -97,32 +97,32 @@ func uint128Bytes(n *big.Int) []byte {
 // callData is built from the inner Transaction payload via SimpleAccount's
 // execute(address,uint256,bytes). The v0.7 packed hash is signed with EIP-191.
 // SigningOutput.Encoded = 65-byte signature; TxId = "0x" + v0.7 userOpHash hex.
-func (w *HDWallet) signEthereumUserOpV07(symbol Symbol, index uint32, in *txeth.SigningInput) (*txeth.SigningOutput, error) {
+func (w *HDWallet) signEthereumUserOpV07(chain Chain, index uint32, in *txeth.SigningInput) (*txeth.SigningOutput, error) {
 	meta := in.GetUserOperationV0_7()
 	if meta == nil {
-		return nil, fmt.Errorf("%w: %s: user_operation_v0_7 required for tx_mode 6", ErrTxInput, symbol)
+		return nil, fmt.Errorf("%w: %s: user_operation_v0_7 required for tx_mode 6", ErrTxInput, chain)
 	}
 	sender, err := hexToBytes(meta.GetSender())
 	if err != nil || len(sender) != 20 {
-		return nil, fmt.Errorf("%w: %s: bad user_operation_v0_7.sender", ErrTxInput, symbol)
+		return nil, fmt.Errorf("%w: %s: bad user_operation_v0_7.sender", ErrTxInput, chain)
 	}
 	entryPoint, err := hexToBytes(meta.GetEntryPoint())
 	if err != nil || len(entryPoint) != 20 {
-		return nil, fmt.Errorf("%w: %s: bad user_operation_v0_7.entry_point", ErrTxInput, symbol)
+		return nil, fmt.Errorf("%w: %s: bad user_operation_v0_7.entry_point", ErrTxInput, chain)
 	}
 	// factory is optional (empty string = not deploying).
 	var factory []byte
 	if f := meta.GetFactory(); f != "" {
 		factory, err = hexToBytes(f)
 		if err != nil || len(factory) != 20 {
-			return nil, fmt.Errorf("%w: %s: bad user_operation_v0_7.factory", ErrTxInput, symbol)
+			return nil, fmt.Errorf("%w: %s: bad user_operation_v0_7.factory", ErrTxInput, chain)
 		}
 	}
 	var paymaster []byte
 	if p := meta.GetPaymaster(); p != "" {
 		paymaster, err = hexToBytes(p)
 		if err != nil || len(paymaster) != 20 {
-			return nil, fmt.Errorf("%w: %s: bad user_operation_v0_7.paymaster", ErrTxInput, symbol)
+			return nil, fmt.Errorf("%w: %s: bad user_operation_v0_7.paymaster", ErrTxInput, chain)
 		}
 	}
 
@@ -160,7 +160,7 @@ func (w *HDWallet) signEthereumUserOpV07(symbol Symbol, index uint32, in *txeth.
 		chainID,
 	)
 
-	sig, err := w.SignMessage(symbol, index, hash)
+	sig, err := w.SignMessage(chain, index, hash)
 	if err != nil {
 		return nil, err
 	}

@@ -25,15 +25,15 @@ const (
 	bip38FlagCompressed byte = 0x20 // bit 5: use compressed public key
 )
 
-// EncryptWIF encrypts the private key for symbol at index using BIP-38
+// EncryptWIF encrypts the private key for chain at index using BIP-38
 // non-EC-multiply mode and returns the '6P…' base58check-encoded ciphertext.
-// symbol must be a secp256k1 coin. The address hash is computed from the
+// chain must be a secp256k1 coin. The address hash is computed from the
 // Bitcoin P2PKH representation of the key (BIP-38 is inherently Bitcoin-format).
-func (w *HDWallet) EncryptWIF(symbol Symbol, index uint32, passphrase []byte) (string, error) {
+func (w *HDWallet) EncryptWIF(chain Chain, index uint32, passphrase []byte) (string, error) {
 	var result string
-	err := w.withLeafPrivateKey(symbol, index, func(priv []byte, coin Coin) error {
+	err := w.withLeafPrivateKey(chain, index, func(priv []byte, coin Coin) error {
 		if coin.Curve != Secp256k1 {
-			return fmt.Errorf("%w: BIP-38 requires secp256k1; %s uses %s", ErrInvalidWIF, symbol, coin.Curve)
+			return fmt.Errorf("%w: BIP-38 requires secp256k1; %s uses %s", ErrInvalidWIF, chain, coin.Curve)
 		}
 		enc, encErr := bip38Encrypt(priv, passphrase)
 		if encErr != nil {

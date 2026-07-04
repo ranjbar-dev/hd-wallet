@@ -2,7 +2,7 @@ package hdwallet
 
 import "testing"
 
-// AllAddressesAt(index) must agree with AddressIndex(symbol, index) for every
+// AllAddressesAt(index) must agree with AddressIndex(chain, index) for every
 // supported coin, and AllAddresses() must equal AllAddressesAt(0).
 func TestAllAddressesAtMatchesAddressIndex(t *testing.T) {
 	w, err := FromMnemonic(canonicalMnemonic)
