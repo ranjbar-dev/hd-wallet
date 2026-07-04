@@ -123,4 +123,19 @@
 // derived private key is materialised once per signing call inside the package
 // and wiped on return; it is never returned to the caller. All signing inputs
 // and outputs are plain structs with no secret material.
+//
+// # Deposit-address topology (watch-only limits)
+//
+// Secp256k1 chains (BTC, ETH, ATOM, …) support seedless deposit-address
+// generation via [WatchOnlyFromXPub]: an extended public key (xpub) is
+// sufficient to derive all addresses, enabling a fully offline watch-only
+// wallet on a key-less machine.
+//
+// Ed25519 chains (SOL, XLM, ALGO, APTOS, TON) use SLIP-0010 hardened-only
+// derivation — no public-key derivation path exists in the standard. As a
+// result, the machine minting deposit addresses must hold the seed. To isolate
+// signing from address generation, use an isolated signer service: the seed
+// wallet opens the seed once per bulk address operation ([AddressRange],
+// [AllAddressesAt]) and exposes a stateless interface for address queries and
+// signing requests, never returning the seed or intermediate keys.
 package hdwallet
