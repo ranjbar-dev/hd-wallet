@@ -493,6 +493,13 @@ type SigningInput struct {
 	// create_and_transfer_token transactions (plus create/withdraw nonce
 	// account); not supported for create_token_account.
 	NonceAccount string `protobuf:"bytes,4,opt,name=nonce_account,json=nonceAccount,proto3" json:"nonce_account,omitempty"`
+	// When true, compile a v0 (versioned) message instead of a legacy message:
+	// the same header/keys/blockhash/instructions body, prefixed with the 0x80
+	// version-prefix byte and suffixed with a compact-u16 address-table-lookup
+	// count (always 0 — this library never emits populated lookup tables).
+	// Supported for transfer, token_transfer and create_and_transfer_token
+	// transactions (including their durable-nonce combinations).
+	V0Msg bool `protobuf:"varint,10,opt,name=v0_msg,json=v0Msg,proto3" json:"v0_msg,omitempty"`
 	// Types that are valid to be assigned to TransactionType:
 	//
 	//	*SigningInput_TransferTransaction
@@ -549,6 +556,13 @@ func (x *SigningInput) GetNonceAccount() string {
 		return x.NonceAccount
 	}
 	return ""
+}
+
+func (x *SigningInput) GetV0Msg() bool {
+	if x != nil {
+		return x.V0Msg
+	}
+	return false
 }
 
 func (x *SigningInput) GetTransactionType() isSigningInput_TransactionType {
@@ -776,10 +790,12 @@ const file_txproto_solana_solana_proto_rawDesc = "" +
 	"\trecipient\x18\x02 \x01(\tR\trecipient\x12\x14\n" +
 	"\x05value\x18\x03 \x01(\x04R\x05value\":\n" +
 	"\x13AdvanceNonceAccount\x12#\n" +
-	"\rnonce_account\x18\x01 \x01(\tR\fnonceAccount\"\xce\x06\n" +
+	"\rnonce_account\x18\x01 \x01(\tR\fnonceAccount\"\xe5\x06\n" +
 	"\fSigningInput\x12)\n" +
 	"\x10recent_blockhash\x18\x01 \x01(\tR\x0frecentBlockhash\x12#\n" +
-	"\rnonce_account\x18\x04 \x01(\tR\fnonceAccount\x12T\n" +
+	"\rnonce_account\x18\x04 \x01(\tR\fnonceAccount\x12\x15\n" +
+	"\x06v0_msg\x18\n" +
+	" \x01(\bR\x05v0Msg\x12T\n" +
 	"\x14transfer_transaction\x18\x02 \x01(\v2\x1f.hdwallet.solana.proto.TransferH\x00R\x13transferTransaction\x12d\n" +
 	"\x1atoken_transfer_transaction\x18\x03 \x01(\v2$.hdwallet.solana.proto.TokenTransferH\x00R\x18tokenTransferTransaction\x12t\n" +
 	" create_token_account_transaction\x18\x05 \x01(\v2).hdwallet.solana.proto.CreateTokenAccountH\x00R\x1dcreateTokenAccountTransaction\x12\x81\x01\n" +

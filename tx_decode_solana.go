@@ -7,6 +7,7 @@ package hdwallet
 // key or any secret. It is the inverse of the tx_solana.go serialization:
 //
 //	[compact-u16 sigCount][64-byte signatures...]
+//	[optional 0x80|version byte -- only present on a v0+ (versioned) message]
 //	[header: numRequiredSignatures, numReadonlySigned, numReadonlyUnsigned]
 //	[compact-u16 keyCount][32-byte account keys...]
 //	[32-byte recent blockhash]
@@ -14,6 +15,19 @@ package hdwallet
 //	  instruction: [programIdIndex u8]
 //	               [compact-u16 accCount][account indices...]
 //	               [compact-u16 dataLen][data...]
+//	[versioned only: compact-u16 lookupCount][address-table lookups...]
+//	  lookup: [32-byte account key]
+//	          [compact-u16 writableCount][writable indices...]
+//	          [compact-u16 readonlyCount][readonly indices...]
+//
+// The header/keys/blockhash/instructions body is byte-for-byte identical
+// between a legacy message and a v0 message (tx_solana_msg.go's
+// solanaWrapV0 only adds the surrounding prefix/suffix), so the same parsing
+// code below handles both; only the version-marker peek and the trailing
+// lookup-array parse are conditional on `versioned`. This library never signs
+// a message with populated address-table lookups (see solanaWrapV0), but a
+// decode may encounter one built by another signer, so the lookup array is
+// still parsed in full to stay in sync with the byte stream.
 //
 // It reuses the base58 helpers (codec.go / address_validate.go) to render
 // account keys, the blockhash and program ids, and recognises the System Program
@@ -73,6 +87,11 @@ type SolanaDecodedInstruction struct {
 
 // SolanaTxFields holds the decoded, display-ready fields of a Solana transaction.
 type SolanaTxFields struct {
+	// Version is -1 for a legacy (non-versioned) message, or the message
+	// version (0 for the only version this library compiles/decodes lookups
+	// for) when the message carries the 0x80-prefixed versioned-message
+	// marker.
+	Version               int
 	Signatures            [][]byte
 	NumRequiredSignatures byte
 	NumReadonlySigned     byte
@@ -80,6 +99,12 @@ type SolanaTxFields struct {
 	AccountKeys           []string // base58
 	RecentBlockhash       string   // base58
 	Instructions          []SolanaDecodedInstruction
+	// AddressTableLookups is the count of address-table lookups trailing a
+	// versioned (v0+) message; always 0 for a legacy message. This library
+	// never SIGNS a message with populated lookups, but a decode may
+	// encounter one built by someone else, so each lookup entry is parsed
+	// (and discarded beyond the count) to stay in sync with the byte stream.
+	AddressTableLookups int
 }
 
 // solanaComputeBudgetProgramID is the well-known Compute Budget program address.
@@ -146,7 +171,7 @@ func DecodeSolanaTx(raw []byte) (*SolanaTxFields, error) {
 	if err != nil {
 		return nil, err
 	}
-	f := &SolanaTxFields{}
+	f := &SolanaTxFields{Version: -1}
 	f.Signatures = make([][]byte, 0, sigCount)
 	for i := 0; i < sigCount; i++ {
 		sig, err := c.readBytes(64)
@@ -154,6 +179,22 @@ func DecodeSolanaTx(raw []byte) (*SolanaTxFields, error) {
 			return nil, err
 		}
 		f.Signatures = append(f.Signatures, append([]byte(nil), sig...))
+	}
+
+	// Versioned-message marker: the high bit of the byte immediately
+	// following the signatures is set for a v0+ message (the low 7 bits are
+	// the version number); a legacy message goes straight into the header,
+	// whose first byte (numRequiredSignatures) never has the high bit set in
+	// practice (signature counts are tiny). Peek without consuming unless it
+	// is actually the marker.
+	versioned := false
+	if c.remaining() > 0 && c.b[c.pos]&0x80 != 0 {
+		versioned = true
+		vb, err := c.readByte()
+		if err != nil {
+			return nil, err
+		}
+		f.Version = int(vb & 0x7f)
 	}
 
 	// Message header.
@@ -201,6 +242,33 @@ func DecodeSolanaTx(raw []byte) (*SolanaTxFields, error) {
 			return nil, err
 		}
 		f.Instructions = append(f.Instructions, ins)
+	}
+
+	if versioned {
+		lookupCount, err := c.readCompactU16()
+		if err != nil {
+			return nil, err
+		}
+		f.AddressTableLookups = lookupCount
+		for i := 0; i < lookupCount; i++ {
+			if _, err := c.readBytes(32); err != nil { // account key
+				return nil, err
+			}
+			writableCount, err := c.readCompactU16()
+			if err != nil {
+				return nil, err
+			}
+			if _, err := c.readBytes(writableCount); err != nil {
+				return nil, err
+			}
+			readonlyCount, err := c.readCompactU16()
+			if err != nil {
+				return nil, err
+			}
+			if _, err := c.readBytes(readonlyCount); err != nil {
+				return nil, err
+			}
+		}
 	}
 
 	if c.remaining() != 0 {

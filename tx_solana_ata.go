@@ -149,5 +149,8 @@ func (w *HDWallet) signSolanaCreateAndTransferToken(chain Chain, index uint32, i
 		solanaInstrTransferChecked(source, mint, recipientATA, owner, tokenProgram, ct.GetAmount(), decimals),
 	)
 	message := solanaCompileMessage(owner, instrs, blockhash)
+	if in.GetV0Msg() {
+		message = solanaWrapV0(message)
+	}
 	return w.solanaFinishTx(chain, index, message)
 }

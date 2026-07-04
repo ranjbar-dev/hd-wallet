@@ -20,6 +20,20 @@ import "encoding/binary"
 // builders in tx_solana.go predate this compiler and stay untouched; every
 // message produced here is pinned by its own vector test.
 
+// solanaWrapV0 turns a legacy-compiled message body into a v0 (versioned)
+// message: a 0x80 version-prefix byte (high bit set | version 0 in the low 7
+// bits), the IDENTICAL legacy body (header, account keys, recent blockhash,
+// instructions), then a trailing compact-u16 count of address-table lookups.
+// This library never emits populated lookup tables when signing, so that
+// count is always 0 — compact-u16 for 0 is a single zero byte.
+func solanaWrapV0(body []byte) []byte {
+	msg := make([]byte, 0, len(body)+2)
+	msg = append(msg, 0x80)
+	msg = append(msg, body...)
+	msg = append(msg, 0x00) // compact-u16(0) address-table lookups
+	return msg
+}
+
 // solanaAccountMeta is one account reference inside an instruction.
 type solanaAccountMeta struct {
 	pubkey   []byte

@@ -174,7 +174,17 @@ func (w *HDWallet) signSolanaSystemTransfer(chain Chain, index uint32, in *txsol
 			solanaInstrSystemTransfer(from, to, transfer.GetValue()),
 		}, blockhash)
 	} else {
-		message = solanaTransferMessage(from, to, blockhash, transfer.GetValue())
+		// solanaCompileMessage (not the fixed-3-key solanaTransferMessage)
+		// so a self-transfer (from == to, e.g. the v0 vector below) dedupes
+		// to two account keys rather than three; byte-identical to
+		// solanaTransferMessage whenever from != to (both order
+		// from/to/system the same way).
+		message = solanaCompileMessage(from, []solanaInstruction{
+			solanaInstrSystemTransfer(from, to, transfer.GetValue()),
+		}, blockhash)
+	}
+	if in.GetV0Msg() {
+		message = solanaWrapV0(message)
 	}
 	return w.solanaFinishTx(chain, index, message)
 }
@@ -237,6 +247,9 @@ func (w *HDWallet) signSolanaTokenTransfer(chain Chain, index uint32, in *txsola
 	} else {
 		message = solanaTokenTransferMessage(owner, source, dest, mint, tokenProgram, blockhash, tt.GetAmount(), decimals)
 	}
+	if in.GetV0Msg() {
+		message = solanaWrapV0(message)
+	}
 	return w.solanaFinishTx(chain, index, message)
 }
 
@@ -284,43 +297,6 @@ func solanaTokenTransferMessage(owner, source, dest, mint, tokenProgram, blockha
 	msg = append(msg, 4)                      // programIdIndex (token program)
 	msg = append(msg, solanaCompactU16(4)...) // account index count
 	msg = append(msg, 1, 3, 2, 0)             // [source, mint, dest, owner]
-	msg = append(msg, solanaCompactU16(len(data))...)
-	msg = append(msg, data...)
-
-	return msg
-}
-
-// solanaTransferMessage serializes the (legacy) transaction message for a system
-// transfer of value lamports from -> to.
-func solanaTransferMessage(from, to, blockhash []byte, value uint64) []byte {
-	// Account keys in canonical order: from(signer,writable), to(writable),
-	// system program(readonly). Indices: from=0, to=1, system=2.
-	keys := [][]byte{from, to, solanaSystemProgramID}
-
-	var msg []byte
-	// Header: numRequiredSignatures, numReadonlySignedAccounts,
-	// numReadonlyUnsignedAccounts.
-	msg = append(msg, 1, 0, 1)
-
-	// Account keys.
-	msg = append(msg, solanaCompactU16(len(keys))...)
-	for _, k := range keys {
-		msg = append(msg, k...)
-	}
-
-	// Recent blockhash.
-	msg = append(msg, blockhash...)
-
-	// Instruction data: LE-u32(Transfer) || LE-u64(lamports).
-	data := make([]byte, 12)
-	binary.LittleEndian.PutUint32(data[0:4], solanaTransferInstruction)
-	binary.LittleEndian.PutUint64(data[4:12], value)
-
-	// One instruction: program=system(idx 2), accounts=[from(0), to(1)].
-	msg = append(msg, solanaCompactU16(1)...) // instruction count
-	msg = append(msg, 2)                      // programIdIndex (system program)
-	msg = append(msg, solanaCompactU16(2)...) // account index count
-	msg = append(msg, 0, 1)                   // [from, to]
 	msg = append(msg, solanaCompactU16(len(data))...)
 	msg = append(msg, data...)
 
