@@ -80,6 +80,8 @@ var trustWalletVectors = map[string]string{
 	"XLM":   "GDXJHJHWN6GRNOAZXON6XH74ZX6NYFAS5B7642RSJQVJTIPA4ZYUQLEB",
 	"ALGO":  "52J2J5TPRULLQGN3TPVZ77GN7TOBIEXIP7XGUMSMFKM2DYHGOFEOGBP2T4",
 	"APTOS": "0xce2fd04ac9efa74f17595e5785e847a2399d7e637f5e8179244f76191f653276",
+	// TON: wallet-v4r2 StateInit hash → non-bounceable (UQ) user-friendly address.
+	"TON": "UQAoYT8nMLfeNh6h0uIoK_wLm9JkvxiGxJDr6GRXJGu2Zked",
 }
 
 func TestEncodersAgainstTrustWalletVectors(t *testing.T) {

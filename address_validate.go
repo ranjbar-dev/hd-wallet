@@ -85,6 +85,7 @@ var validators = map[Chain]addressValidator{
 	XLM:   strkeyValidator(6<<3, XLM),
 	ALGO:  algoValidator(ALGO),
 	APTOS: hexHashValidator(APTOS),
+	TON:   tonValidator(TON),
 }
 
 // IsValidAddress reports whether addr is a syntactically and checksum-valid

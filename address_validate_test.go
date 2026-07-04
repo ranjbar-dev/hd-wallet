@@ -118,6 +118,7 @@ var validAddrVectors = map[Chain]string{
 	XLM:   "GDXJHJHWN6GRNOAZXON6XH74ZX6NYFAS5B7642RSJQVJTIPA4ZYUQLEB",
 	ALGO:  "52J2J5TPRULLQGN3TPVZ77GN7TOBIEXIP7XGUMSMFKM2DYHGOFEOGBP2T4",
 	APTOS: "0xce2fd04ac9efa74f17595e5785e847a2399d7e637f5e8179244f76191f653276",
+	TON:   "UQAoYT8nMLfeNh6h0uIoK_wLm9JkvxiGxJDr6GRXJGu2Zked",
 }
 
 // TestValidVectorsCoverRegistry guards that the valid-vector table stays in sync
@@ -394,7 +395,7 @@ func TestAddressFromPublicKeyBadKey(t *testing.T) {
 // assert payload lengths per family as a structural guard.
 func TestParsePayloadLengths(t *testing.T) {
 	want32 := map[Chain]bool{
-		SOL: true, XLM: true, ALGO: true, APTOS: true,
+		SOL: true, XLM: true, ALGO: true, APTOS: true, TON: true,
 	}
 	for sym, addr := range validAddrVectors {
 		payload, err := ParseAddress(sym, addr)

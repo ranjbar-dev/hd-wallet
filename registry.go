@@ -159,12 +159,11 @@ const (
 	XLM   Chain = "XLM"
 	ALGO  Chain = "ALGO"
 	APTOS Chain = "APTOS"
+	TON   Chain = "TON"
 
 	// Roadmap — Trust Wallet Core networks intentionally NOT registered yet (each
 	// needs more than a vector-verified encoder over the standard seed path, so
 	// adding one now would break AllAddresses or ship an unverified address):
-	//   - TON: address is the hash of a v4r2 wallet StateInit cell (BoC); too
-	//     chain-specific to reproduce and vector-match safely here.
 	//   - NULS, Nebulas, Nimiq, Polymesh, Pactus, Internet Computer,
 	//     Everscale, Aion: address scheme not yet reproduced against the TWC
 	//     expected vector; omitted until vector-verified.
@@ -346,6 +345,7 @@ var coins = map[Chain]Coin{
 	"XLM":   {"Stellar", "XLM", Ed25519, "m/44'/148'/0'", encodeXLM, 7, 0},
 	"ALGO":  {"Algorand", "ALGO", Ed25519, "m/44'/283'/0'/0'/0'", encodeALGO, 6, 0},
 	"APTOS": {"Aptos", "APTOS", Ed25519, "m/44'/637'/0'/0'/0'", encodeAPTOS, 8, 0},
+	"TON":   {"TON", "TON", Ed25519, "m/44'/607'/0'", encodeTONAddress, 9, 0},
 }
 
 // init registers address validators for the networks added beyond the original
