@@ -204,7 +204,7 @@ func fuzzApproveCalldata() []byte {
 func FuzzDecodeEthereumTx(f *testing.F) {
 	f.Add(fuzzSeedEthereumLegacy())
 	f.Add(fuzzSeedEthereumERC20())
-	f.Fuzz(func(t *testing.T, data []byte) {
+	f.Fuzz(func(_ *testing.T, data []byte) {
 		if len(data) > fuzzMaxInput {
 			return
 		}
@@ -216,7 +216,7 @@ func FuzzDecodeBitcoinTx(f *testing.F) {
 	if seed := fuzzSeedBitcoinTx(); seed != nil {
 		f.Add(seed)
 	}
-	f.Fuzz(func(t *testing.T, data []byte) {
+	f.Fuzz(func(_ *testing.T, data []byte) {
 		if len(data) > fuzzMaxInput {
 			return
 		}
@@ -228,7 +228,7 @@ func FuzzDecodeSolanaTx(f *testing.F) {
 	if seed := fuzzSeedSolanaTx(); seed != nil {
 		f.Add(seed)
 	}
-	f.Fuzz(func(t *testing.T, data []byte) {
+	f.Fuzz(func(_ *testing.T, data []byte) {
 		if len(data) > fuzzMaxInput {
 			return
 		}
@@ -240,7 +240,7 @@ func FuzzDecodeCosmosTx(f *testing.F) {
 	if seed := fuzzSeedCosmosTx(); seed != nil {
 		f.Add(seed)
 	}
-	f.Fuzz(func(t *testing.T, data []byte) {
+	f.Fuzz(func(_ *testing.T, data []byte) {
 		if len(data) > fuzzMaxInput {
 			return
 		}
@@ -252,7 +252,7 @@ func FuzzDecodeTronTx(f *testing.F) {
 	if seed := fuzzSeedTronTx(); seed != nil {
 		f.Add(seed)
 	}
-	f.Fuzz(func(t *testing.T, data []byte) {
+	f.Fuzz(func(_ *testing.T, data []byte) {
 		if len(data) > fuzzMaxInput {
 			return
 		}
@@ -262,7 +262,7 @@ func FuzzDecodeTronTx(f *testing.F) {
 
 func FuzzDecodeRippleTx(f *testing.F) {
 	f.Add(fuzzSeedRippleTx())
-	f.Fuzz(func(t *testing.T, data []byte) {
+	f.Fuzz(func(_ *testing.T, data []byte) {
 		if len(data) > fuzzMaxInput {
 			return
 		}
@@ -275,7 +275,7 @@ func FuzzDecodeRippleTx(f *testing.F) {
 // selector-building loop over decoded entries is library code worth fuzzing).
 func FuzzParseContractABI(f *testing.F) {
 	f.Add([]byte(fuzzApproveJSONABI))
-	f.Fuzz(func(t *testing.T, data []byte) {
+	f.Fuzz(func(_ *testing.T, data []byte) {
 		if len(data) > fuzzMaxInput {
 			return
 		}
@@ -293,7 +293,7 @@ func FuzzDecodeContractCall(f *testing.F) {
 		f.Fatalf("ParseContractABI: %v", err)
 	}
 	f.Add(fuzzApproveCalldata())
-	f.Fuzz(func(t *testing.T, data []byte) {
+	f.Fuzz(func(_ *testing.T, data []byte) {
 		if len(data) > fuzzMaxInput {
 			return
 		}
@@ -329,7 +329,7 @@ func FuzzDecodeEthLog(f *testing.F) {
 	// this is the seed that actually reaches ERC721TransferLog's body.
 	f.Add(transferSig, zeroPad, zeroPad, tokenIDTopicHex, uint8(4), []byte{})
 
-	f.Fuzz(func(t *testing.T, topic0, topic1, topic2, topic3 string, topicCount uint8, data []byte) {
+	f.Fuzz(func(_ *testing.T, topic0, topic1, topic2, topic3 string, topicCount uint8, data []byte) {
 		if len(data) > fuzzMaxInput {
 			return
 		}

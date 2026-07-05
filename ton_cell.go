@@ -104,9 +104,11 @@ func (c *tonCell) depth() int {
 //	d1 = refCount (+ 8*isExotic + 32*level; both 0 here)
 //	d2 = floor(bitLen/8) + ceil(bitLen/8)
 func (c *tonCell) descriptors() (byte, byte) {
+	// #nosec G115 -- refs is capped at 4 per the TON cell spec, well within byte range.
 	d1 := byte(len(c.refs))
 	full := c.bitLen / 8
 	ceil := (c.bitLen + 7) / 8
+	// #nosec G115 -- bitLen is capped at 1023 per the TON cell spec, so full+ceil < 256.
 	d2 := byte(full + ceil)
 	return d1, d2
 }
@@ -123,6 +125,7 @@ func (c *tonCell) reprHash() []byte {
 	buf = append(buf, c.paddedData()...)
 	for _, r := range c.refs {
 		d := r.depth()
+		// #nosec G115 -- cell tree depth never approaches uint16 range in practice; this is the spec's fixed uint16 BE depth encoding.
 		buf = append(buf, byte(d>>8), byte(d&0xff))
 	}
 	for _, r := range c.refs {
