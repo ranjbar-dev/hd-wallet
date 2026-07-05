@@ -316,6 +316,23 @@ raw, _ := hdwallet.ParseUnits("12.34", 6)
 > Native decimals come from `CoinInfo(chain).Decimals`; **token** decimals are
 > the client's responsibility (token lists are out of scope).
 
+### Chain-constraint helpers
+
+Pre-flight informational sanity floors — not fund-critical signing data, no
+network I/O — so a caller can warn before broadcasting a transfer that would
+leave an account/UTXO below the network's floor:
+
+```go
+min, ok := hdwallet.MinimumBalance(hdwallet.XRP)     // 1_000_000 drops (base reserve)
+dust, ok := hdwallet.DustThreshold(hdwallet.BTC)     // 546 sats (standard relay dust)
+fee, ok := hdwallet.ActivationCost(hdwallet.TRX)     // 1_100_000 sun (new-account fee)
+```
+
+`MinimumBalance` covers XRP/XLM/SOL (ongoing reserve/rent floor); `DustThreshold`
+covers every UTXO chain (reuses the signer's own dust constant); `ActivationCost`
+covers TRX (a one-off account-creation fee, distinct from an ongoing reserve).
+`ok` is `false` for chains with no such constraint.
+
 ### Address validation & parsing
 
 ```go
@@ -544,6 +561,14 @@ go test -race -cover ./...
 | `RecoverEthereumAddress([]byte, []byte) (string, error)` · `VerifyEthereumMessage` / `…TypedData` | Recover/verify EIP-191/712 signers. |
 | `EncodeRLP`/`DecodeRLP` · `ABIEncode`/`ABIDecode` · `ABIFunctionSelector` · `EIP712Hash` | Standalone EVM encoding utilities. |
 | `ParseContractABI(jsonABI string) (ContractABIMap, error)` · `DecodeContractCall(abi, calldata)` · `GetFunctionSignature(fn)` | JSON-ABI-driven contract-call decoding: parse a JSON ABI array into a selector-keyed map, then decode raw calldata into a function name and typed named parameters. |
+
+**Chain-constraint helpers (informational, no network I/O):**
+
+| Function | Purpose |
+|---|---|
+| `MinimumBalance(chain) (*big.Int, bool)` | Minimum on-chain reserve/rent floor (XRP/XLM/SOL). |
+| `DustThreshold(chain) (*big.Int, bool)` | Standard-relay dust limit in sats (every UTXO chain). |
+| `ActivationCost(chain) (*big.Int, bool)` | One-off account-activation fee (TRX). |
 
 **Address validation / parsing (`AnyAddress`-style):**
 
