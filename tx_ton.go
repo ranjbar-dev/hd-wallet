@@ -56,15 +56,19 @@ func (w *HDWallet) signTONTx(chain Chain, index uint32, in *txton.SigningInput) 
 	if transfer == nil {
 		return nil, fmt.Errorf("%w: TON: transfer is required", ErrTxInput)
 	}
-	if transfer.Comment != "" {
-		// Comments (op=0 text payload) are Task 13; ordinary transfers only here.
-		return nil, fmt.Errorf("%w: TON: comment payload not supported", ErrTxInput)
-	}
 
-	// Destination workchain + 32-byte account hash.
+	// Destination workchain + 32-byte account hash. For a jetton transfer this is
+	// the SENDER's jetton wallet contract (where the TEP-74 transfer body is sent).
 	destWC, destHash, err := tonParseAddressFull(transfer.Dest)
 	if err != nil {
 		return nil, fmt.Errorf("%w: TON: invalid dest %q: %v", ErrTxInput, transfer.Dest, err)
+	}
+
+	// Internal-message body: a jetton TEP-74 transfer body, a plain text-comment
+	// payload (op=0), or an empty cell for a bare value transfer.
+	body, err := tonBuildTransferBody(transfer)
+	if err != nil {
+		return nil, err
 	}
 
 	// The account's ed25519 public key gives the wallet's own address (external
@@ -79,7 +83,7 @@ func (w *HDWallet) signTONTx(chain Chain, index uint32, in *txton.SigningInput) 
 	}
 
 	// (1) Internal message cell.
-	internal := tonBuildInternalMessage(destWC, destHash, transfer.Amount, transfer.Bounceable)
+	internal := tonBuildInternalMessage(destWC, destHash, transfer.Amount, transfer.Bounceable, body)
 
 	// (2) Unsigned body cell → repr hash → ed25519 signature.
 	mode := transfer.Mode
@@ -116,10 +120,11 @@ func (w *HDWallet) signTONTx(chain Chain, index uint32, in *txton.SigningInput) 
 	}, nil
 }
 
-// tonBuildInternalMessage builds the int_msg_info cell carrying a plain value
-// transfer to (destWC, destHash) of `amount` nanotons. The body is an
-// Either-ref to an empty payload cell (no comment).
-func tonBuildInternalMessage(destWC int32, destHash []byte, amount uint64, bounce bool) *tonCell {
+// tonBuildInternalMessage builds the int_msg_info cell carrying a value transfer
+// to (destWC, destHash) of `amount` nanotons. `body` is stored as the message
+// body via an Either-ref (an empty cell for a bare transfer, the op=0 comment
+// payload for a text comment, or the TEP-74 body for a jetton transfer).
+func tonBuildInternalMessage(destWC int32, destHash []byte, amount uint64, bounce bool, body *tonCell) *tonCell {
 	c := &tonCell{}
 	c.appendBit(0) // int_msg_info$0
 	c.appendBit(1) // ihr_disabled = 1
@@ -131,13 +136,7 @@ func tonBuildInternalMessage(destWC int32, destHash []byte, amount uint64, bounc
 	c.appendBit(0)     // bounced = 0
 	c.appendUint(0, 2) // src = addr_none$00
 
-	// dest = addr_std$10, anycast=nothing, workchain int8, hash 256.
-	c.appendBit(1)
-	c.appendBit(0)
-	c.appendBit(0) // anycast = nothing
-	// workchain int8: low 8 bits (0x00 basechain / 0xff masterchain).
-	c.appendUint(uint64(byte(int8(destWC))), 8) // #nosec G115 -- workchain is 0 or -1; encoding its 8-bit two's-complement form
-	c.appendBytes(destHash)
+	tonAppendAddrStd(c, destWC, destHash) // dest = addr_std
 
 	tonAppendGrams(c, amount) // value: grams
 	c.appendBit(0)            // other (extra-currency dict) = empty
@@ -147,10 +146,106 @@ func tonBuildInternalMessage(destWC int32, destHash []byte, amount uint64, bounc
 	c.appendUint(0, 32)       // created_at
 	c.appendBit(0)            // init: Maybe = nothing
 
-	// body: Either — stored in a ref to an (empty) payload cell.
+	// body: Either — stored in a ref to the body cell.
 	c.appendBit(1)
-	c.appendRef(&tonCell{})
+	c.appendRef(body)
 	return c
+}
+
+// tonAppendAddrStd appends a MsgAddressInt addr_std$10 (no anycast) with the
+// given signed workchain and 32-byte account hash.
+func tonAppendAddrStd(c *tonCell, wc int32, hash []byte) {
+	c.appendBit(1)
+	c.appendBit(0)
+	c.appendBit(0)                          // anycast = nothing
+	c.appendUint(uint64(byte(int8(wc))), 8) // #nosec G115 -- workchain is 0 or -1; encoding its 8-bit two's-complement form
+	c.appendBytes(hash)
+}
+
+// tonJettonTransferOp is the TEP-74 jetton `transfer` op code.
+const tonJettonTransferOp = 0x0f8a7ea5
+
+// tonBuildTransferBody selects and builds the internal-message body cell for a
+// transfer: a TEP-74 jetton transfer body when JettonTransfer is set, an op=0
+// text-comment payload when only a comment is present, or an empty cell for a
+// bare value transfer.
+func tonBuildTransferBody(transfer *txton.Transfer) (*tonCell, error) {
+	if jt := transfer.GetJettonTransfer(); jt != nil {
+		return tonBuildJettonBody(jt, transfer.Comment)
+	}
+	if transfer.Comment != "" {
+		return tonCommentCell(transfer.Comment), nil
+	}
+	return &tonCell{}, nil
+}
+
+// tonCommentCell builds an op=0 text-comment payload cell: a 32-bit zero op
+// followed by the UTF-8 comment bytes, snake-chained across ref cells when the
+// comment exceeds one cell (127 bytes including the 4-byte op prefix).
+func tonCommentCell(comment string) *tonCell {
+	data := append([]byte{0, 0, 0, 0}, []byte(comment)...)
+	return tonSnakeCell(data)
+}
+
+// tonSnakeCell stores data as a TON "snake": up to 127 bytes in this cell, the
+// remainder in a single ref child, recursively.
+func tonSnakeCell(data []byte) *tonCell {
+	const maxBytes = 127 // 1023-bit cell capacity, byte-aligned
+	c := &tonCell{}
+	n := len(data)
+	if n > maxBytes {
+		n = maxBytes
+	}
+	c.appendBytes(data[:n])
+	if len(data) > maxBytes {
+		c.appendRef(tonSnakeCell(data[maxBytes:]))
+	}
+	return c
+}
+
+// tonBuildJettonBody builds a TEP-74 jetton `transfer` message body:
+//
+//	op=0x0f8a7ea5 u32 ‖ query_id u64 ‖ amount (grams) ‖ destination addr_std ‖
+//	response_destination addr_std ‖ custom_payload=Maybe(nothing) ‖
+//	forward_ton_amount (grams) ‖ forward_payload (Either inline/ref)
+//
+// A non-empty comment becomes an op=0 text forward payload — stored inline when
+// it fits in the current cell, otherwise in a ref (snake) cell.
+func tonBuildJettonBody(jt *txton.JettonTransfer, comment string) (*tonCell, error) {
+	toWC, toHash, err := tonParseAddressFull(jt.ToOwner)
+	if err != nil {
+		return nil, fmt.Errorf("%w: TON jetton: invalid to_owner %q: %v", ErrTxInput, jt.ToOwner, err)
+	}
+	respWC, respHash, err := tonParseAddressFull(jt.ResponseAddress)
+	if err != nil {
+		return nil, fmt.Errorf("%w: TON jetton: invalid response_address %q: %v", ErrTxInput, jt.ResponseAddress, err)
+	}
+
+	c := &tonCell{}
+	c.appendUint(tonJettonTransferOp, 32)
+	c.appendUint(jt.QueryId, 64)
+	tonAppendGrams(c, jt.JettonAmount)
+	tonAppendAddrStd(c, toWC, toHash)     // destination (recipient owner)
+	tonAppendAddrStd(c, respWC, respHash) // response_destination
+	c.appendBit(0)                        // custom_payload: Maybe = nothing
+	tonAppendGrams(c, jt.ForwardAmount)   // forward_ton_amount
+
+	// forward_payload: Either Cell ^Cell. Empty (inline) when no comment; a text
+	// op=0 comment inline if it fits in the remaining cell bits, else a ref.
+	if comment == "" {
+		c.appendBit(0) // Either = inline, empty
+		return c, nil
+	}
+	payload := append([]byte{0, 0, 0, 0}, []byte(comment)...)
+	// 1 Either bit + payload bits must fit the 1023-bit cell for inline storage.
+	if c.bitLen+1+len(payload)*8 <= 1023 {
+		c.appendBit(0) // Either = inline
+		c.appendBytes(payload)
+	} else {
+		c.appendBit(1) // Either = ref
+		c.appendRef(tonSnakeCell(payload))
+	}
+	return c, nil
 }
 
 // tonWriteWalletV4Body writes the wallet-v4 signing body (without the leading

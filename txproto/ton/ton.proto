@@ -2,12 +2,24 @@ syntax = "proto3";
 package hdwallet.ton.proto;
 option go_package = "github.com/ranjbar-dev/hd-wallet/txproto/ton";
 
+// JettonTransfer is a TEP-74 jetton (fungible token) transfer body. When set on
+// a Transfer, the Transfer's `dest` is the SENDER's jetton wallet address (the
+// contract the internal message is sent to), `amount` is the TON attached to
+// carry the transfer, and `comment` (if any) becomes the jetton forward payload.
+message JettonTransfer {
+  uint64 query_id = 1;          // TEP-74 query id (echoed in notifications)
+  uint64 jetton_amount = 2;     // jetton units to transfer (VarUInteger 16)
+  string to_owner = 3;          // recipient owner address (jetton destination)
+  string response_address = 4;  // excess-TON response destination
+  uint64 forward_amount = 5;    // TON forwarded to to_owner with the notification
+}
 message Transfer {
   string dest = 1;         // any accepted TON address form
   uint64 amount = 2;       // nanotons
   uint32 mode = 3;         // send-mode flags; default 3 = PAY_FEES_SEPARATELY|IGNORE_ACTION_PHASE_ERRORS
-  string comment = 4;      // optional text comment (op=0 payload)
+  string comment = 4;      // optional text comment (op=0 payload / jetton forward payload)
   bool   bounceable = 5;   // internal-message bounce flag
+  JettonTransfer jetton_transfer = 6; // if set: dest is the sender's jetton wallet, body is a TEP-74 transfer
 }
 message SigningInput {
   uint32 sequence_number = 1;  // wallet seqno; 0 => attach StateInit (deploy)

@@ -21,20 +21,101 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+// JettonTransfer is a TEP-74 jetton (fungible token) transfer body. When set on
+// a Transfer, the Transfer's `dest` is the SENDER's jetton wallet address (the
+// contract the internal message is sent to), `amount` is the TON attached to
+// carry the transfer, and `comment` (if any) becomes the jetton forward payload.
+type JettonTransfer struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	QueryId         uint64                 `protobuf:"varint,1,opt,name=query_id,json=queryId,proto3" json:"query_id,omitempty"`                        // TEP-74 query id (echoed in notifications)
+	JettonAmount    uint64                 `protobuf:"varint,2,opt,name=jetton_amount,json=jettonAmount,proto3" json:"jetton_amount,omitempty"`         // jetton units to transfer (VarUInteger 16)
+	ToOwner         string                 `protobuf:"bytes,3,opt,name=to_owner,json=toOwner,proto3" json:"to_owner,omitempty"`                         // recipient owner address (jetton destination)
+	ResponseAddress string                 `protobuf:"bytes,4,opt,name=response_address,json=responseAddress,proto3" json:"response_address,omitempty"` // excess-TON response destination
+	ForwardAmount   uint64                 `protobuf:"varint,5,opt,name=forward_amount,json=forwardAmount,proto3" json:"forward_amount,omitempty"`      // TON forwarded to to_owner with the notification
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *JettonTransfer) Reset() {
+	*x = JettonTransfer{}
+	mi := &file_txproto_ton_ton_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *JettonTransfer) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*JettonTransfer) ProtoMessage() {}
+
+func (x *JettonTransfer) ProtoReflect() protoreflect.Message {
+	mi := &file_txproto_ton_ton_proto_msgTypes[0]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use JettonTransfer.ProtoReflect.Descriptor instead.
+func (*JettonTransfer) Descriptor() ([]byte, []int) {
+	return file_txproto_ton_ton_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *JettonTransfer) GetQueryId() uint64 {
+	if x != nil {
+		return x.QueryId
+	}
+	return 0
+}
+
+func (x *JettonTransfer) GetJettonAmount() uint64 {
+	if x != nil {
+		return x.JettonAmount
+	}
+	return 0
+}
+
+func (x *JettonTransfer) GetToOwner() string {
+	if x != nil {
+		return x.ToOwner
+	}
+	return ""
+}
+
+func (x *JettonTransfer) GetResponseAddress() string {
+	if x != nil {
+		return x.ResponseAddress
+	}
+	return ""
+}
+
+func (x *JettonTransfer) GetForwardAmount() uint64 {
+	if x != nil {
+		return x.ForwardAmount
+	}
+	return 0
+}
+
 type Transfer struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Dest          string                 `protobuf:"bytes,1,opt,name=dest,proto3" json:"dest,omitempty"`              // any accepted TON address form
-	Amount        uint64                 `protobuf:"varint,2,opt,name=amount,proto3" json:"amount,omitempty"`         // nanotons
-	Mode          uint32                 `protobuf:"varint,3,opt,name=mode,proto3" json:"mode,omitempty"`             // send-mode flags; default 3 = PAY_FEES_SEPARATELY|IGNORE_ACTION_PHASE_ERRORS
-	Comment       string                 `protobuf:"bytes,4,opt,name=comment,proto3" json:"comment,omitempty"`        // optional text comment (op=0 payload)
-	Bounceable    bool                   `protobuf:"varint,5,opt,name=bounceable,proto3" json:"bounceable,omitempty"` // internal-message bounce flag
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Dest           string                 `protobuf:"bytes,1,opt,name=dest,proto3" json:"dest,omitempty"`                                           // any accepted TON address form
+	Amount         uint64                 `protobuf:"varint,2,opt,name=amount,proto3" json:"amount,omitempty"`                                      // nanotons
+	Mode           uint32                 `protobuf:"varint,3,opt,name=mode,proto3" json:"mode,omitempty"`                                          // send-mode flags; default 3 = PAY_FEES_SEPARATELY|IGNORE_ACTION_PHASE_ERRORS
+	Comment        string                 `protobuf:"bytes,4,opt,name=comment,proto3" json:"comment,omitempty"`                                     // optional text comment (op=0 payload / jetton forward payload)
+	Bounceable     bool                   `protobuf:"varint,5,opt,name=bounceable,proto3" json:"bounceable,omitempty"`                              // internal-message bounce flag
+	JettonTransfer *JettonTransfer        `protobuf:"bytes,6,opt,name=jetton_transfer,json=jettonTransfer,proto3" json:"jetton_transfer,omitempty"` // if set: dest is the sender's jetton wallet, body is a TEP-74 transfer
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *Transfer) Reset() {
 	*x = Transfer{}
-	mi := &file_txproto_ton_ton_proto_msgTypes[0]
+	mi := &file_txproto_ton_ton_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -46,7 +127,7 @@ func (x *Transfer) String() string {
 func (*Transfer) ProtoMessage() {}
 
 func (x *Transfer) ProtoReflect() protoreflect.Message {
-	mi := &file_txproto_ton_ton_proto_msgTypes[0]
+	mi := &file_txproto_ton_ton_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -59,7 +140,7 @@ func (x *Transfer) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Transfer.ProtoReflect.Descriptor instead.
 func (*Transfer) Descriptor() ([]byte, []int) {
-	return file_txproto_ton_ton_proto_rawDescGZIP(), []int{0}
+	return file_txproto_ton_ton_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *Transfer) GetDest() string {
@@ -97,6 +178,13 @@ func (x *Transfer) GetBounceable() bool {
 	return false
 }
 
+func (x *Transfer) GetJettonTransfer() *JettonTransfer {
+	if x != nil {
+		return x.JettonTransfer
+	}
+	return nil
+}
+
 type SigningInput struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	SequenceNumber uint32                 `protobuf:"varint,1,opt,name=sequence_number,json=sequenceNumber,proto3" json:"sequence_number,omitempty"` // wallet seqno; 0 => attach StateInit (deploy)
@@ -108,7 +196,7 @@ type SigningInput struct {
 
 func (x *SigningInput) Reset() {
 	*x = SigningInput{}
-	mi := &file_txproto_ton_ton_proto_msgTypes[1]
+	mi := &file_txproto_ton_ton_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -120,7 +208,7 @@ func (x *SigningInput) String() string {
 func (*SigningInput) ProtoMessage() {}
 
 func (x *SigningInput) ProtoReflect() protoreflect.Message {
-	mi := &file_txproto_ton_ton_proto_msgTypes[1]
+	mi := &file_txproto_ton_ton_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -133,7 +221,7 @@ func (x *SigningInput) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SigningInput.ProtoReflect.Descriptor instead.
 func (*SigningInput) Descriptor() ([]byte, []int) {
-	return file_txproto_ton_ton_proto_rawDescGZIP(), []int{1}
+	return file_txproto_ton_ton_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *SigningInput) GetSequenceNumber() uint32 {
@@ -169,7 +257,7 @@ type SigningOutput struct {
 
 func (x *SigningOutput) Reset() {
 	*x = SigningOutput{}
-	mi := &file_txproto_ton_ton_proto_msgTypes[2]
+	mi := &file_txproto_ton_ton_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -181,7 +269,7 @@ func (x *SigningOutput) String() string {
 func (*SigningOutput) ProtoMessage() {}
 
 func (x *SigningOutput) ProtoReflect() protoreflect.Message {
-	mi := &file_txproto_ton_ton_proto_msgTypes[2]
+	mi := &file_txproto_ton_ton_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -194,7 +282,7 @@ func (x *SigningOutput) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SigningOutput.ProtoReflect.Descriptor instead.
 func (*SigningOutput) Descriptor() ([]byte, []int) {
-	return file_txproto_ton_ton_proto_rawDescGZIP(), []int{2}
+	return file_txproto_ton_ton_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *SigningOutput) GetEncoded() string {
@@ -229,7 +317,13 @@ var File_txproto_ton_ton_proto protoreflect.FileDescriptor
 
 const file_txproto_ton_ton_proto_rawDesc = "" +
 	"\n" +
-	"\x15txproto/ton/ton.proto\x12\x12hdwallet.ton.proto\"\x84\x01\n" +
+	"\x15txproto/ton/ton.proto\x12\x12hdwallet.ton.proto\"\xbd\x01\n" +
+	"\x0eJettonTransfer\x12\x19\n" +
+	"\bquery_id\x18\x01 \x01(\x04R\aqueryId\x12#\n" +
+	"\rjetton_amount\x18\x02 \x01(\x04R\fjettonAmount\x12\x19\n" +
+	"\bto_owner\x18\x03 \x01(\tR\atoOwner\x12)\n" +
+	"\x10response_address\x18\x04 \x01(\tR\x0fresponseAddress\x12%\n" +
+	"\x0eforward_amount\x18\x05 \x01(\x04R\rforwardAmount\"\xd1\x01\n" +
 	"\bTransfer\x12\x12\n" +
 	"\x04dest\x18\x01 \x01(\tR\x04dest\x12\x16\n" +
 	"\x06amount\x18\x02 \x01(\x04R\x06amount\x12\x12\n" +
@@ -237,7 +331,8 @@ const file_txproto_ton_ton_proto_rawDesc = "" +
 	"\acomment\x18\x04 \x01(\tR\acomment\x12\x1e\n" +
 	"\n" +
 	"bounceable\x18\x05 \x01(\bR\n" +
-	"bounceable\"\x8e\x01\n" +
+	"bounceable\x12K\n" +
+	"\x0fjetton_transfer\x18\x06 \x01(\v2\".hdwallet.ton.proto.JettonTransferR\x0ejettonTransfer\"\x8e\x01\n" +
 	"\fSigningInput\x12'\n" +
 	"\x0fsequence_number\x18\x01 \x01(\rR\x0esequenceNumber\x12\x1b\n" +
 	"\texpire_at\x18\x02 \x01(\rR\bexpireAt\x128\n" +
@@ -260,19 +355,21 @@ func file_txproto_ton_ton_proto_rawDescGZIP() []byte {
 	return file_txproto_ton_ton_proto_rawDescData
 }
 
-var file_txproto_ton_ton_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
+var file_txproto_ton_ton_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
 var file_txproto_ton_ton_proto_goTypes = []any{
-	(*Transfer)(nil),      // 0: hdwallet.ton.proto.Transfer
-	(*SigningInput)(nil),  // 1: hdwallet.ton.proto.SigningInput
-	(*SigningOutput)(nil), // 2: hdwallet.ton.proto.SigningOutput
+	(*JettonTransfer)(nil), // 0: hdwallet.ton.proto.JettonTransfer
+	(*Transfer)(nil),       // 1: hdwallet.ton.proto.Transfer
+	(*SigningInput)(nil),   // 2: hdwallet.ton.proto.SigningInput
+	(*SigningOutput)(nil),  // 3: hdwallet.ton.proto.SigningOutput
 }
 var file_txproto_ton_ton_proto_depIdxs = []int32{
-	0, // 0: hdwallet.ton.proto.SigningInput.transfer:type_name -> hdwallet.ton.proto.Transfer
-	1, // [1:1] is the sub-list for method output_type
-	1, // [1:1] is the sub-list for method input_type
-	1, // [1:1] is the sub-list for extension type_name
-	1, // [1:1] is the sub-list for extension extendee
-	0, // [0:1] is the sub-list for field type_name
+	0, // 0: hdwallet.ton.proto.Transfer.jetton_transfer:type_name -> hdwallet.ton.proto.JettonTransfer
+	1, // 1: hdwallet.ton.proto.SigningInput.transfer:type_name -> hdwallet.ton.proto.Transfer
+	2, // [2:2] is the sub-list for method output_type
+	2, // [2:2] is the sub-list for method input_type
+	2, // [2:2] is the sub-list for extension type_name
+	2, // [2:2] is the sub-list for extension extendee
+	0, // [0:2] is the sub-list for field type_name
 }
 
 func init() { file_txproto_ton_ton_proto_init() }
@@ -286,7 +383,7 @@ func file_txproto_ton_ton_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_txproto_ton_ton_proto_rawDesc), len(file_txproto_ton_ton_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   3,
+			NumMessages:   4,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

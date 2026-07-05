@@ -298,9 +298,11 @@ const tonBoCRefSize = 2
 // Trust Wallet Core's TON serializer.
 func tonCellToBoC(root *tonCell) []byte {
 	// Topologically order cells: root first, each cell before its refs, deduped
-	// by repr hash so shared subcells are emitted once. For the linear wallet-v4
-	// transfer tree this yields [external, signed-body, internal, payload], which
-	// matches TWC's ordering.
+	// by repr hash so shared subcells are emitted once. TWC's serializer visits a
+	// cell's references in REVERSE order, so a two-ref cell (e.g. a deploy
+	// external message with refs [state_init, signed_body]) emits the signed-body
+	// subtree before the state_init subtree — matching TWC byte-for-byte. For the
+	// linear single-ref transfer tree, forward and reverse order coincide.
 	order := []*tonCell{}
 	indexOf := map[string]int{}
 	var visit func(c *tonCell)
@@ -311,8 +313,8 @@ func tonCellToBoC(root *tonCell) []byte {
 		}
 		indexOf[key] = len(order)
 		order = append(order, c)
-		for _, r := range c.refs {
-			visit(r)
+		for i := len(c.refs) - 1; i >= 0; i-- {
+			visit(c.refs[i])
 		}
 	}
 	visit(root)

@@ -76,6 +76,85 @@ func TestSignTxTON(t *testing.T) {
 	}
 }
 
+// TestSignTxTONTransferAndDeploy pins the deploy-on-first-send path (seqno==0,
+// StateInit attached) byte-for-byte to TWC "test_ton_sign_transfer_and_deploy".
+// This closes the gap flagged in Task 12: the deploy StateInit ref path had no
+// authoritative vector until now.
+func TestSignTxTONTransferAndDeploy(t *testing.T) {
+	key, _ := hex.DecodeString("63474e5fe9511f1526a50567ce142befc343e71a49b865ac3908f58667319cb8")
+	w, err := FromPrivateKeyBytes(key, Ed25519)
+	if err != nil {
+		t.Fatalf("FromPrivateKeyBytes: %v", err)
+	}
+	defer w.Destroy()
+
+	input := &txton.SigningInput{
+		SequenceNumber: 0,
+		// TWC vector signs with expire_at = 0xFFFFFFFF (the authoritative
+		// `encoded` BoC carries ffffffff after the subwallet_id constant).
+		ExpireAt: 0xFFFFFFFF,
+		Transfer: &txton.Transfer{
+			Dest:       "EQDYW_1eScJVxtitoBRksvoV9cCYo4uKGWLVNIHB1JqRR3n0",
+			Amount:     10,
+			Mode:       3,
+			Bounceable: true,
+		},
+	}
+
+	const wantEncoded = "te6ccgICABoAAQAAA8sAAAJFiADN98eLgHfrkE8l8gmT8X5REpTVR6QnqDhArTbKlVvbZh4ABAABAZznxvGBhoRXhPogxNY8QmHlihJWxg5t6KptqcAIZlVks1r+Z+r1avCWNCeqeLC/oaiVN4mDx/E1+Zhi33G25rcIKamjF/////8AAAAAAAMAAgFiYgBsLf6vJOEq42xW0AoyWX0K+uBMUcXFDLFqmkDg6k1Io4hQAAAAAAAAAAAAAAAAAQADAAACATQABgAFAFEAAAAAKamjF/Qsd/kxvqIOxdAVBzEna7suKGCUdmEkWyMZ74Ez7o1BQAEU/wD0pBP0vPLICwAHAgEgAA0ACAT48oMI1xgg0x/TH9MfAvgju/Jk7UTQ0x/TH9P/9ATRUUO68qFRUbryogX5AVQQZPkQ8qP4ACSkyMsfUkDLH1Iwy/9SEPQAye1U+A8B0wchwACfbFGTINdKltMH1AL7AOgw4CHAAeMAIcAC4wABwAORMOMNA6TIyx8Syx/L/wAMAAsACgAJAAr0AMntVABsgQEI1xj6ANM/MFIkgQEI9Fnyp4IQZHN0cnB0gBjIywXLAlAFzxZQA/oCE8tqyx8Syz/Jc/sAAHCBAQjXGPoA0z/IVCBHgQEI9FHyp4IQbm90ZXB0gBjIywXLAlAGzxZQBPoCFMtqEssfyz/Jc/sAAgBu0gf6ANTUIvkABcjKBxXL/8nQd3SAGMjLBcsCIs8WUAX6AhTLaxLMzMlz+wDIQBSBAQj0UfKnAgIBSAAXAA4CASAAEAAPAFm9JCtvaiaECAoGuQ+gIYRw1AgIR6STfSmRDOaQPp/5g3gSgBt4EBSJhxWfMYQCASAAEgARABG4yX7UTQ1wsfgCAVgAFgATAgEgABUAFAAZrx32omhAEGuQ64WPwAAZrc52omhAIGuQ64X/wAA9sp37UTQgQFA1yH0BDACyMoHy//J0AGBAQj0Cm+hMYALm0AHQ0wMhcbCSXwTgItdJwSCSXwTgAtMfIYIQcGx1Z70ighBkc3RyvbCSXwXgA/pAMCD6RAHIygfL/8nQ7UTQgQFA1yH0BDBcgQEI9ApvoTGzkl8H4AXTP8glghBwbHVnupI4MOMNA4IQZHN0crqSXwbjDQAZABgAilAEgQEI9Fkw7UTQgQFA1yDIAc8W9ADJ7VQBcrCOI4IQZHN0coMesXCAGFAFywVQA88WI/oCE8tqyx/LP8mAQPsAkl8D4gB4AfoA9AQw+CdvIjBQCqEhvvLgUIIQcGx1Z4MesXCAGFAEywUmzxZY+gIZ9ADLaRfLH1Jgyz8gyYBA+wAG"
+	const wantHash = "b3d9462c13a8c67e19b62002447839c386de51415ace3ff6473b1e6294299819"
+
+	out, err := w.SignTransaction(TON, 0, input)
+	if err != nil {
+		t.Fatalf("SignTransaction: %v", err)
+	}
+	got := out.(*txton.SigningOutput)
+	if got.Encoded != wantEncoded {
+		t.Errorf("encoded mismatch\n got: %s\nwant: %s", got.Encoded, wantEncoded)
+	}
+	if got.Hash != wantHash {
+		t.Errorf("hash mismatch\n got: %s\nwant: %s", got.Hash, wantHash)
+	}
+}
+
+// TestSignTxTONWithComment pins the op=0 text-comment payload byte-for-byte to
+// TWC "test_ton_sign_transfer_with_ascii_comment".
+func TestSignTxTONWithComment(t *testing.T) {
+	key, _ := hex.DecodeString("c38f49de2fb13223a9e7d37d5d0ffbdd89a5eb7c8b0ee4d1c299f2cefe7dc4a0")
+	w, err := FromPrivateKeyBytes(key, Ed25519)
+	if err != nil {
+		t.Fatalf("FromPrivateKeyBytes: %v", err)
+	}
+	defer w.Destroy()
+
+	input := &txton.SigningInput{
+		SequenceNumber: 10,
+		ExpireAt:       1681102222,
+		Transfer: &txton.Transfer{
+			Dest:       "EQBm--PFwDv1yCeS-QTJ-L8oiUpqo9IT1BwgVptlSq3ts90Q",
+			Amount:     10,
+			Mode:       3,
+			Bounceable: true,
+			Comment:    "test comment",
+		},
+	}
+
+	const wantEncoded = "te6ccgICAAQAAQAAAMAAAAFFiAGwt/q8k4SrjbFbQCjJZfQr64ExRxcUMsWqaQODqTUijgwAAQGcY4XlvKqu7spxyjL6vyBSKjbskDgqkHhqBsdTe900RGrzExtpvwc04j94v8HOczEWSMCXjTXk0z+CVUXSL54qCimpoxdkM5WOAAAACgADAAIBYmIAM33x4uAd+uQTyXyCZPxflESlNVHpCeoOECtNsqVW9tmIUAAAAAAAAAAAAAAAAAEAAwAgAAAAAHRlc3QgY29tbWVudA=="
+	const wantHash = "a8c6943d5587f590c43fcdb0e894046f1965c615e19bcaf0c8407e9ccb74518d"
+
+	out, err := w.SignTransaction(TON, 0, input)
+	if err != nil {
+		t.Fatalf("SignTransaction: %v", err)
+	}
+	got := out.(*txton.SigningOutput)
+	if got.Encoded != wantEncoded {
+		t.Errorf("encoded mismatch\n got: %s\nwant: %s", got.Encoded, wantEncoded)
+	}
+	if got.Hash != wantHash {
+		t.Errorf("hash mismatch\n got: %s\nwant: %s", got.Hash, wantHash)
+	}
+}
+
 // TestTONModeConstants pins the exported send-mode constant values.
 func TestTONModeConstants(t *testing.T) {
 	if TONModePayFeesSeparately != 1 {
