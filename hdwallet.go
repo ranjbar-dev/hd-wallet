@@ -25,11 +25,11 @@ import (
 )
 
 // Exported sentinel errors. Consumers can match them with errors.Is; errors that
-// add context (e.g. the offending symbol) wrap these with %w.
+// add context (e.g. the offending chain) wrap these with %w.
 var (
 	// ErrInvalidMnemonic is returned when a mnemonic fails BIP-39 validation.
 	ErrInvalidMnemonic = errors.New("hdwallet: invalid mnemonic")
-	// ErrUnsupportedCoin is returned for a symbol not in the registry.
+	// ErrUnsupportedCoin is returned for a chain not in the registry.
 	ErrUnsupportedCoin = errors.New("hdwallet: unsupported coin")
 	// ErrDestroyed is returned by operations on a wallet whose secrets were wiped.
 	ErrDestroyed = errors.New("hdwallet: wallet has been destroyed")
@@ -288,20 +288,20 @@ func generateMnemonicBytes(bits int) ([]byte, error) {
 	return []byte(mnemonic), nil
 }
 
-// Address returns the first receive address (index 0) for a coin symbol,
-// e.g. "BTC", "ETH", "SOL", "ATOM". Use SupportedCoins to list every symbol.
+// Address returns the first receive address (index 0) for a coin chain,
+// e.g. "BTC", "ETH", "SOL", "ATOM". Use SupportedCoins to list every chain.
 //
 // Privacy note: calling Address repeatedly returns the same address. For
 // privacy-sensitive applications (receiving from multiple sources) use
 // [AddressIndex] with incrementing indices or [AddressRange] for gap-limit
 // discovery.
 //
-// It is exactly equivalent to AddressIndex(symbol, 0).
-func (w *HDWallet) Address(symbol Symbol) (string, error) {
-	return w.AddressIndex(symbol, 0)
+// It is exactly equivalent to AddressIndex(chain, 0).
+func (w *HDWallet) Address(chain Chain) (string, error) {
+	return w.AddressIndex(chain, 0)
 }
 
-// AddressIndex returns the address for a coin symbol derived with the final
+// AddressIndex returns the address for a coin chain derived with the final
 // element of the coin's BIP-32 path replaced by index, preserving that
 // element's hardened flag (a trailing "'").
 //
@@ -313,13 +313,13 @@ func (w *HDWallet) Address(symbol Symbol) (string, error) {
 // m/44'/501'/1'.
 //
 // index must be below 2^31 (0x80000000); a larger value returns an error, as
-// does an unknown symbol (wrapping ErrUnsupportedCoin) or a destroyed wallet.
-func (w *HDWallet) AddressIndex(symbol Symbol, index uint32) (string, error) {
+// does an unknown chain (wrapping ErrUnsupportedCoin) or a destroyed wallet.
+func (w *HDWallet) AddressIndex(chain Chain, index uint32) (string, error) {
 	var addr string
-	err := w.withLeafPublicKey(symbol, index, func(pub []byte, coin Coin) error {
+	err := w.withLeafPublicKey(chain, index, func(pub []byte, coin Coin) error {
 		a, err := coin.Encode(pub)
 		if err != nil {
-			return fmt.Errorf("hdwallet: %s: %w", symbol, err)
+			return fmt.Errorf("hdwallet: %s: %w", chain, err)
 		}
 		addr = a
 		return nil
@@ -332,7 +332,7 @@ func (w *HDWallet) AddressIndex(symbol Symbol, index uint32) (string, error) {
 
 // AllAddresses derives the first address (index 0) for every supported coin. It
 // is exactly equivalent to AllAddressesAt(0).
-func (w *HDWallet) AllAddresses() (map[Symbol]string, error) {
+func (w *HDWallet) AllAddresses() (map[Chain]string, error) {
 	return w.AllAddressesAt(0)
 }
 
@@ -344,7 +344,7 @@ func (w *HDWallet) AllAddresses() (map[Symbol]string, error) {
 // index must be below 2^31 (0x80000000); a larger value returns an error. It is
 // only available on seed-based wallets; a key-only wallet (imported from a
 // single private key) has no seed to enumerate over and returns ErrKeyOnlyWallet.
-func (w *HDWallet) AllAddressesAt(index uint32) (map[Symbol]string, error) {
+func (w *HDWallet) AllAddressesAt(index uint32) (map[Chain]string, error) {
 	w.mu.RLock()
 	defer w.mu.RUnlock()
 	if w.secret == nil {
@@ -353,20 +353,20 @@ func (w *HDWallet) AllAddressesAt(index uint32) (map[Symbol]string, error) {
 	if w.secret.isKeyOnly() {
 		return nil, ErrKeyOnlyWallet
 	}
-	out := make(map[Symbol]string, len(coins))
+	out := make(map[Chain]string, len(coins))
 	err := w.secret.withSeed(func(seed []byte) error {
-		for _, symbol := range SupportedCoins() {
-			coin := coins[symbol] // copy; safe to rewrite its Path
+		for _, chain := range SupportedCoins() {
+			coin := coins[chain] // copy; safe to rewrite its Path
 			path, err := withIndex(coin.Path, index)
 			if err != nil {
-				return fmt.Errorf("hdwallet: %s: %w", symbol, err)
+				return fmt.Errorf("hdwallet: %s: %w", chain, err)
 			}
 			coin.Path = path
-			addr, err := addressFromSeed(seed, symbol, coin)
+			addr, err := addressFromSeed(seed, chain, coin)
 			if err != nil {
 				return err
 			}
-			out[symbol] = addr
+			out[chain] = addr
 		}
 		return nil
 	})
@@ -378,13 +378,13 @@ func (w *HDWallet) AllAddressesAt(index uint32) (map[Symbol]string, error) {
 
 // AllAddressesCtx is like AllAddresses but respects the context's cancellation.
 // Returns partial results and ctx.Err() if cancelled.
-func (w *HDWallet) AllAddressesCtx(ctx context.Context) (map[Symbol]string, error) {
+func (w *HDWallet) AllAddressesCtx(ctx context.Context) (map[Chain]string, error) {
 	return w.AllAddressesAtCtx(ctx, 0)
 }
 
 // AllAddressesAtCtx is like AllAddressesAt but respects cancellation.
 // Returns partial results and ctx.Err() if cancelled.
-func (w *HDWallet) AllAddressesAtCtx(ctx context.Context, index uint32) (map[Symbol]string, error) {
+func (w *HDWallet) AllAddressesAtCtx(ctx context.Context, index uint32) (map[Chain]string, error) {
 	w.mu.RLock()
 	defer w.mu.RUnlock()
 	if w.secret == nil {
@@ -393,25 +393,25 @@ func (w *HDWallet) AllAddressesAtCtx(ctx context.Context, index uint32) (map[Sym
 	if w.secret.isKeyOnly() {
 		return nil, ErrKeyOnlyWallet
 	}
-	out := make(map[Symbol]string, len(coins))
+	out := make(map[Chain]string, len(coins))
 	var ctxErr error
 	err := w.secret.withSeed(func(seed []byte) error {
-		for _, symbol := range SupportedCoins() {
+		for _, chain := range SupportedCoins() {
 			if err := ctx.Err(); err != nil {
 				ctxErr = err
 				return nil
 			}
-			coin := coins[symbol]
+			coin := coins[chain]
 			path, err := withIndex(coin.Path, index)
 			if err != nil {
-				return fmt.Errorf("hdwallet: %s: %w", symbol, err)
+				return fmt.Errorf("hdwallet: %s: %w", chain, err)
 			}
 			coin.Path = path
-			addr, err := addressFromSeed(seed, symbol, coin)
+			addr, err := addressFromSeed(seed, chain, coin)
 			if err != nil {
 				return err
 			}
-			out[symbol] = addr
+			out[chain] = addr
 		}
 		return nil
 	})
@@ -429,10 +429,10 @@ type AddressResult struct {
 
 // AllAddressResults derives all coins at index and returns per-coin results.
 // Does not stop on error — all coins are attempted.
-func (w *HDWallet) AllAddressResults(index uint32) map[Symbol]AddressResult {
+func (w *HDWallet) AllAddressResults(index uint32) map[Chain]AddressResult {
 	w.mu.RLock()
 	defer w.mu.RUnlock()
-	out := make(map[Symbol]AddressResult, len(coins))
+	out := make(map[Chain]AddressResult, len(coins))
 	if w.secret == nil {
 		for _, s := range SupportedCoins() {
 			out[s] = AddressResult{Err: ErrDestroyed}
@@ -441,46 +441,46 @@ func (w *HDWallet) AllAddressResults(index uint32) map[Symbol]AddressResult {
 	}
 	if w.secret.isKeyOnly() {
 		_ = w.secret.withImportedKey(func(priv []byte) error {
-			for _, symbol := range SupportedCoins() {
-				coin := coins[symbol]
+			for _, chain := range SupportedCoins() {
+				coin := coins[chain]
 				if coin.Curve != w.secret.curve {
-					out[symbol] = AddressResult{Err: fmt.Errorf("%w: coin %s is %s, key is %s", ErrCurveMismatch, symbol, coin.Curve, w.secret.curve)}
+					out[chain] = AddressResult{Err: fmt.Errorf("%w: coin %s is %s, key is %s", ErrCurveMismatch, chain, coin.Curve, w.secret.curve)}
 					continue
 				}
 				if index != 0 {
-					out[symbol] = AddressResult{Err: fmt.Errorf("%w: %s index %d", ErrKeyOnlyIndex, symbol, index)}
+					out[chain] = AddressResult{Err: fmt.Errorf("%w: %s index %d", ErrKeyOnlyIndex, chain, index)}
 					continue
 				}
 				pub, perr := publicKeyFromPriv(coin.Curve, priv)
 				if perr != nil {
-					out[symbol] = AddressResult{Err: fmt.Errorf("hdwallet: %s: %w", symbol, perr)}
+					out[chain] = AddressResult{Err: fmt.Errorf("hdwallet: %s: %w", chain, perr)}
 					continue
 				}
 				addr, aerr := coin.Encode(pub)
-				out[symbol] = AddressResult{Address: addr, Err: aerr}
+				out[chain] = AddressResult{Address: addr, Err: aerr}
 			}
 			return nil
 		})
 		return out
 	}
 	_ = w.secret.withSeed(func(seed []byte) error {
-		for _, symbol := range SupportedCoins() {
-			coin := coins[symbol]
+		for _, chain := range SupportedCoins() {
+			coin := coins[chain]
 			path, perr := withIndex(coin.Path, index)
 			if perr != nil {
-				out[symbol] = AddressResult{Err: fmt.Errorf("hdwallet: %s: %w", symbol, perr)}
+				out[chain] = AddressResult{Err: fmt.Errorf("hdwallet: %s: %w", chain, perr)}
 				continue
 			}
 			coin.Path = path
-			addr, aerr := addressFromSeed(seed, symbol, coin)
-			out[symbol] = AddressResult{Address: addr, Err: aerr}
+			addr, aerr := addressFromSeed(seed, chain, coin)
+			out[chain] = AddressResult{Address: addr, Err: aerr}
 		}
 		return nil
 	})
 	return out
 }
 
-// AddressRange derives count consecutive addresses for a single coin symbol
+// AddressRange derives count consecutive addresses for a single coin chain
 // starting at index start, varying the final element of the coin's BIP-32 path
 // (preserving its hardened flag) exactly as AddressIndex does. The returned
 // slice is in ascending index order: element i is the address at start+i. A
@@ -488,10 +488,10 @@ func (w *HDWallet) AllAddressResults(index uint32) map[Symbol]AddressResult {
 //
 // The seed enclave is opened exactly once and every address is derived inside
 // that single decryption window. start+count must not exceed 2^31 (0x80000000);
-// a larger range returns an out-of-range error, as does an unknown symbol
+// a larger range returns an out-of-range error, as does an unknown chain
 // (wrapping ErrUnsupportedCoin). It is only available on seed-based wallets; a
 // key-only wallet (imported from a single private key) returns ErrKeyOnlyWallet.
-func (w *HDWallet) AddressRange(symbol Symbol, start, count uint32) ([]string, error) {
+func (w *HDWallet) AddressRange(chain Chain, start, count uint32) ([]string, error) {
 	w.mu.RLock()
 	defer w.mu.RUnlock()
 	if w.secret == nil {
@@ -500,9 +500,9 @@ func (w *HDWallet) AddressRange(symbol Symbol, start, count uint32) ([]string, e
 	if w.secret.isKeyOnly() {
 		return nil, ErrKeyOnlyWallet
 	}
-	coin, ok := coins[symbol]
+	coin, ok := coins[chain]
 	if !ok {
-		return nil, fmt.Errorf("%w: %s", ErrUnsupportedCoin, symbol)
+		return nil, fmt.Errorf("%w: %s", ErrUnsupportedCoin, chain)
 	}
 	if uint64(start)+uint64(count) > uint64(hardenedOffset) {
 		return nil, fmt.Errorf("address range out of range: start %d + count %d (must end <= %d)", start, count, hardenedOffset)
@@ -513,10 +513,10 @@ func (w *HDWallet) AddressRange(symbol Symbol, start, count uint32) ([]string, e
 			coinCopy := coin // copy; safe to rewrite its Path
 			path, err := withIndex(coin.Path, i)
 			if err != nil {
-				return fmt.Errorf("hdwallet: %s: %w", symbol, err)
+				return fmt.Errorf("hdwallet: %s: %w", chain, err)
 			}
 			coinCopy.Path = path
-			addr, err := addressFromSeed(seed, symbol, coinCopy)
+			addr, err := addressFromSeed(seed, chain, coinCopy)
 			if err != nil {
 				return err
 			}
@@ -531,22 +531,22 @@ func (w *HDWallet) AddressRange(symbol Symbol, start, count uint32) ([]string, e
 }
 
 // addressFromSeed derives and encodes a single coin's address from an already
-// open seed. Errors are wrapped with the symbol for context. It performs no
+// open seed. Errors are wrapped with the chain for context. It performs no
 // locking and assumes the caller holds w.mu and the seed buffer is live.
-func addressFromSeed(seed []byte, symbol Symbol, coin Coin) (string, error) {
+func addressFromSeed(seed []byte, chain Chain, coin Coin) (string, error) {
 	pub, err := derivePublicKey(seed, coin)
 	if err != nil {
-		return "", fmt.Errorf("hdwallet: %s: %w", symbol, err)
+		return "", fmt.Errorf("hdwallet: %s: %w", chain, err)
 	}
 	addr, err := coin.Encode(pub)
 	if err != nil {
-		return "", fmt.Errorf("hdwallet: %s: %w", symbol, err)
+		return "", fmt.Errorf("hdwallet: %s: %w", chain, err)
 	}
 	return addr, nil
 }
 
 // withLeafPrivateKey is the single entry point that materialises the leaf private
-// key for symbol at index in BOTH wallet modes, passes the raw key plus the
+// key for chain at index in BOTH wallet modes, passes the raw key plus the
 // resolved coin to fn, and guarantees the key is wiped before returning.
 //
 //   - Seed wallets: derive the key from the seed via withPrivateKey (which wipes
@@ -558,30 +558,30 @@ func addressFromSeed(seed []byte, symbol Symbol, coin Coin) (string, error) {
 //
 // It holds the read lock and rejects a destroyed wallet. The registry entry is
 // never mutated (coin is a copy).
-func (w *HDWallet) withLeafPrivateKey(symbol Symbol, index uint32, fn func(priv []byte, coin Coin) error) error {
+func (w *HDWallet) withLeafPrivateKey(chain Chain, index uint32, fn func(priv []byte, coin Coin) error) error {
 	w.mu.RLock()
 	defer w.mu.RUnlock()
 	if w.secret == nil {
 		return ErrDestroyed
 	}
-	coin, ok := coins[symbol]
+	coin, ok := coins[chain]
 	if !ok {
-		return fmt.Errorf("%w: %s", ErrUnsupportedCoin, symbol)
+		return fmt.Errorf("%w: %s", ErrUnsupportedCoin, chain)
 	}
 
 	if w.secret.isKeyOnly() {
 		if coin.Curve != w.secret.curve {
-			return fmt.Errorf("%w: coin %s is %s, key is %s", ErrCurveMismatch, symbol, coin.Curve, w.secret.curve)
+			return fmt.Errorf("%w: coin %s is %s, key is %s", ErrCurveMismatch, chain, coin.Curve, w.secret.curve)
 		}
 		if index != 0 {
-			return fmt.Errorf("%w: %s index %d", ErrKeyOnlyIndex, symbol, index)
+			return fmt.Errorf("%w: %s index %d", ErrKeyOnlyIndex, chain, index)
 		}
 		return w.secret.withImportedKey(func(priv []byte) error { return fn(priv, coin) })
 	}
 
 	path, err := withIndex(coin.Path, index)
 	if err != nil {
-		return fmt.Errorf("hdwallet: %s: %w", symbol, err)
+		return fmt.Errorf("hdwallet: %s: %w", chain, err)
 	}
 	return w.deriveLeafSeedMode(coin, path, fn)
 }
@@ -599,25 +599,25 @@ func (w *HDWallet) deriveLeafSeedMode(coin Coin, path string, fn func(priv []byt
 }
 
 // withLeafPrivateKeyPath is the custom-path counterpart of withLeafPrivateKey: it
-// materialises the leaf key for symbol at an arbitrary absolute BIP-32 path
+// materialises the leaf key for chain at an arbitrary absolute BIP-32 path
 // instead of the coin's template-derived index. It is seed-only — a key-only
 // wallet has a single leaf and no HD path, so it returns ErrKeyOnlyWallet. The
 // path is validated with parsePath before any derivation.
-func (w *HDWallet) withLeafPrivateKeyPath(symbol Symbol, path string, fn func(priv []byte, coin Coin) error) error {
+func (w *HDWallet) withLeafPrivateKeyPath(chain Chain, path string, fn func(priv []byte, coin Coin) error) error {
 	w.mu.RLock()
 	defer w.mu.RUnlock()
 	if w.secret == nil {
 		return ErrDestroyed
 	}
-	coin, ok := coins[symbol]
+	coin, ok := coins[chain]
 	if !ok {
-		return fmt.Errorf("%w: %s", ErrUnsupportedCoin, symbol)
+		return fmt.Errorf("%w: %s", ErrUnsupportedCoin, chain)
 	}
 	if w.secret.isKeyOnly() {
-		return fmt.Errorf("%w: %s custom path", ErrKeyOnlyWallet, symbol)
+		return fmt.Errorf("%w: %s custom path", ErrKeyOnlyWallet, chain)
 	}
 	if _, err := parsePath(path); err != nil {
-		return fmt.Errorf("hdwallet: %s: %w", symbol, err)
+		return fmt.Errorf("hdwallet: %s: %w", chain, err)
 	}
 	return w.deriveLeafSeedMode(coin, path, fn)
 }
@@ -625,33 +625,33 @@ func (w *HDWallet) withLeafPrivateKeyPath(symbol Symbol, path string, fn func(pr
 // withLeafPublicKey materialises the leaf private key (both modes), derives its
 // public key, and runs fn with the public key bytes and resolved coin. The
 // private key is wiped before fn runs (it is consumed inside withLeafPrivateKey).
-func (w *HDWallet) withLeafPublicKey(symbol Symbol, index uint32, fn func(pub []byte, coin Coin) error) error {
-	return w.withLeafPrivateKey(symbol, index, func(priv []byte, coin Coin) error {
+func (w *HDWallet) withLeafPublicKey(chain Chain, index uint32, fn func(pub []byte, coin Coin) error) error {
+	return w.withLeafPrivateKey(chain, index, func(priv []byte, coin Coin) error {
 		pub, err := publicKeyFromPriv(coin.Curve, priv)
 		if err != nil {
-			return fmt.Errorf("hdwallet: %s: %w", symbol, err)
+			return fmt.Errorf("hdwallet: %s: %w", chain, err)
 		}
 		return fn(pub, coin)
 	})
 }
 
 // withLeafPublicKeyPath is the custom-path counterpart of withLeafPublicKey.
-func (w *HDWallet) withLeafPublicKeyPath(symbol Symbol, path string, fn func(pub []byte, coin Coin) error) error {
-	return w.withLeafPrivateKeyPath(symbol, path, func(priv []byte, coin Coin) error {
+func (w *HDWallet) withLeafPublicKeyPath(chain Chain, path string, fn func(pub []byte, coin Coin) error) error {
+	return w.withLeafPrivateKeyPath(chain, path, func(priv []byte, coin Coin) error {
 		pub, err := publicKeyFromPriv(coin.Curve, priv)
 		if err != nil {
-			return fmt.Errorf("hdwallet: %s: %w", symbol, err)
+			return fmt.Errorf("hdwallet: %s: %w", chain, err)
 		}
 		return fn(pub, coin)
 	})
 }
 
-// Sign signs data with the key for symbol at address index 0. See SignIndex.
-func (w *HDWallet) Sign(symbol Symbol, data []byte) (*Signature, error) {
-	return w.SignIndex(symbol, 0, data)
+// Sign signs data with the key for chain at address index 0. See SignIndex.
+func (w *HDWallet) Sign(chain Chain, data []byte) (*Signature, error) {
+	return w.SignIndex(chain, 0, data)
 }
 
-// SignIndex signs data with the private key derived for symbol at the given
+// SignIndex signs data with the private key derived for chain at the given
 // address index and returns the signature.
 //
 // For the ECDSA chain (secp256k1 — e.g. BTC, ETH, ATOM) data must be the
@@ -662,15 +662,15 @@ func (w *HDWallet) Sign(symbol Symbol, data []byte) (*Signature, error) {
 //
 // The derived private key is wiped immediately after signing and never leaves
 // the package.
-func (w *HDWallet) SignIndex(symbol Symbol, index uint32, data []byte) (*Signature, error) {
+func (w *HDWallet) SignIndex(chain Chain, index uint32, data []byte) (*Signature, error) {
 	if data == nil {
 		return nil, fmt.Errorf("%w: nil data", ErrInvalidDigest)
 	}
 	var sig *Signature
-	err := w.withLeafPrivateKey(symbol, index, func(priv []byte, coin Coin) error {
+	err := w.withLeafPrivateKey(chain, index, func(priv []byte, coin Coin) error {
 		s, err := signDigest(coin.Curve, priv, data)
 		if err != nil {
-			return fmt.Errorf("hdwallet: %s: %w", symbol, err)
+			return fmt.Errorf("hdwallet: %s: %w", chain, err)
 		}
 		sig = s
 		return nil
@@ -681,18 +681,18 @@ func (w *HDWallet) SignIndex(symbol Symbol, index uint32, data []byte) (*Signatu
 	return sig, nil
 }
 
-// PublicKey returns the public key for symbol at address index 0. See
+// PublicKey returns the public key for chain at address index 0. See
 // PublicKeyIndex.
-func (w *HDWallet) PublicKey(symbol Symbol) ([]byte, error) {
-	return w.PublicKeyIndex(symbol, 0)
+func (w *HDWallet) PublicKey(chain Chain) ([]byte, error) {
+	return w.PublicKeyIndex(chain, 0)
 }
 
-// PublicKeyIndex returns the public key derived for symbol at the given address
+// PublicKeyIndex returns the public key derived for chain at the given address
 // index: the 33-byte compressed key for secp256k1/nist256p1, or the 32-byte key
 // for ed25519. Signing callers need this to build or verify transactions.
-func (w *HDWallet) PublicKeyIndex(symbol Symbol, index uint32) ([]byte, error) {
+func (w *HDWallet) PublicKeyIndex(chain Chain, index uint32) ([]byte, error) {
 	var pub []byte
-	err := w.withLeafPublicKey(symbol, index, func(p []byte, _ Coin) error {
+	err := w.withLeafPublicKey(chain, index, func(p []byte, _ Coin) error {
 		pub = append([]byte(nil), p...) // copy out before the lock is released
 		return nil
 	})
@@ -754,9 +754,9 @@ func (w *HDWallet) Destroy() {
 	}
 }
 
-// SupportedCoins lists the registered coin symbols in sorted order.
-func SupportedCoins() []Symbol {
-	out := make([]Symbol, 0, len(coins))
+// SupportedCoins lists the registered coin chains in sorted order.
+func SupportedCoins() []Chain {
+	out := make([]Chain, 0, len(coins))
 	for s := range coins {
 		out = append(out, s)
 	}
@@ -764,8 +764,8 @@ func SupportedCoins() []Symbol {
 	return out
 }
 
-// CoinInfo returns the static registry entry for a symbol.
-func CoinInfo(symbol Symbol) (Coin, bool) {
-	c, ok := coins[symbol]
+// CoinInfo returns the static registry entry for a chain.
+func CoinInfo(chain Chain) (Coin, bool) {
+	c, ok := coins[chain]
 	return c, ok
 }

@@ -40,7 +40,14 @@ type SigningInput struct {
 	// Amount in microAlgos.
 	Amount uint64 `protobuf:"varint,7,opt,name=amount,proto3" json:"amount,omitempty"`
 	// Fee in microAlgos.
-	Fee           uint64 `protobuf:"varint,8,opt,name=fee,proto3" json:"fee,omitempty"`
+	Fee uint64 `protobuf:"varint,8,opt,name=fee,proto3" json:"fee,omitempty"`
+	// Asset (ASA) transfer. When set, the flat pay fields `to`/`amount` above
+	// are ignored and the tx is encoded as msgpack type "axfer".
+	AssetTransfer *AssetTransfer `protobuf:"bytes,9,opt,name=asset_transfer,json=assetTransfer,proto3" json:"asset_transfer,omitempty"`
+	// Asset opt-in: a 0-amount axfer to self, required before an account can
+	// receive a given ASA. When set, the flat pay fields `to`/`amount` above
+	// are ignored.
+	AssetOptIn    *AssetOptIn `protobuf:"bytes,10,opt,name=asset_opt_in,json=assetOptIn,proto3" json:"asset_opt_in,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -131,6 +138,133 @@ func (x *SigningInput) GetFee() uint64 {
 	return 0
 }
 
+func (x *SigningInput) GetAssetTransfer() *AssetTransfer {
+	if x != nil {
+		return x.AssetTransfer
+	}
+	return nil
+}
+
+func (x *SigningInput) GetAssetOptIn() *AssetOptIn {
+	if x != nil {
+		return x.AssetOptIn
+	}
+	return nil
+}
+
+// AssetTransfer is an Algorand Standard Asset (ASA) transfer, msgpack type
+// "axfer".
+type AssetTransfer struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Asset ID ("xaid" field).
+	AssetId uint64 `protobuf:"varint,1,opt,name=asset_id,json=assetId,proto3" json:"asset_id,omitempty"`
+	// Amount in the asset's base unit ("aamt" field). Omitted from msgpack
+	// when 0.
+	Amount uint64 `protobuf:"varint,2,opt,name=amount,proto3" json:"amount,omitempty"`
+	// Recipient public key (32 raw bytes, not the base32 address; "arcv" field).
+	To            []byte `protobuf:"bytes,3,opt,name=to,proto3" json:"to,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AssetTransfer) Reset() {
+	*x = AssetTransfer{}
+	mi := &file_txproto_algorand_algorand_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AssetTransfer) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AssetTransfer) ProtoMessage() {}
+
+func (x *AssetTransfer) ProtoReflect() protoreflect.Message {
+	mi := &file_txproto_algorand_algorand_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AssetTransfer.ProtoReflect.Descriptor instead.
+func (*AssetTransfer) Descriptor() ([]byte, []int) {
+	return file_txproto_algorand_algorand_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *AssetTransfer) GetAssetId() uint64 {
+	if x != nil {
+		return x.AssetId
+	}
+	return 0
+}
+
+func (x *AssetTransfer) GetAmount() uint64 {
+	if x != nil {
+		return x.Amount
+	}
+	return 0
+}
+
+func (x *AssetTransfer) GetTo() []byte {
+	if x != nil {
+		return x.To
+	}
+	return nil
+}
+
+// AssetOptIn opts the sender in to receive a given ASA: a 0-amount axfer to
+// self ("arcv" == sender's own public key, no "aamt" field at all).
+type AssetOptIn struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Asset ID ("xaid" field).
+	AssetId       uint64 `protobuf:"varint,1,opt,name=asset_id,json=assetId,proto3" json:"asset_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AssetOptIn) Reset() {
+	*x = AssetOptIn{}
+	mi := &file_txproto_algorand_algorand_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AssetOptIn) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AssetOptIn) ProtoMessage() {}
+
+func (x *AssetOptIn) ProtoReflect() protoreflect.Message {
+	mi := &file_txproto_algorand_algorand_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AssetOptIn.ProtoReflect.Descriptor instead.
+func (*AssetOptIn) Descriptor() ([]byte, []int) {
+	return file_txproto_algorand_algorand_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *AssetOptIn) GetAssetId() uint64 {
+	if x != nil {
+		return x.AssetId
+	}
+	return 0
+}
+
 // SigningOutput mirrors a minimal subset of TW.Algorand.Proto.SigningOutput.
 type SigningOutput struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
@@ -146,7 +280,7 @@ type SigningOutput struct {
 
 func (x *SigningOutput) Reset() {
 	*x = SigningOutput{}
-	mi := &file_txproto_algorand_algorand_proto_msgTypes[1]
+	mi := &file_txproto_algorand_algorand_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -158,7 +292,7 @@ func (x *SigningOutput) String() string {
 func (*SigningOutput) ProtoMessage() {}
 
 func (x *SigningOutput) ProtoReflect() protoreflect.Message {
-	mi := &file_txproto_algorand_algorand_proto_msgTypes[1]
+	mi := &file_txproto_algorand_algorand_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -171,7 +305,7 @@ func (x *SigningOutput) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SigningOutput.ProtoReflect.Descriptor instead.
 func (*SigningOutput) Descriptor() ([]byte, []int) {
-	return file_txproto_algorand_algorand_proto_rawDescGZIP(), []int{1}
+	return file_txproto_algorand_algorand_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *SigningOutput) GetEncoded() []byte {
@@ -199,7 +333,7 @@ var File_txproto_algorand_algorand_proto protoreflect.FileDescriptor
 
 const file_txproto_algorand_algorand_proto_rawDesc = "" +
 	"\n" +
-	"\x1ftxproto/algorand/algorand.proto\x12\x17hdwallet.algorand.proto\"\xde\x01\n" +
+	"\x1ftxproto/algorand/algorand.proto\x12\x17hdwallet.algorand.proto\"\xf4\x02\n" +
 	"\fSigningInput\x12!\n" +
 	"\fgenesis_hash\x18\x01 \x01(\fR\vgenesisHash\x12\x1d\n" +
 	"\n" +
@@ -211,7 +345,18 @@ const file_txproto_algorand_algorand_proto_rawDesc = "" +
 	"\x04note\x18\x05 \x01(\fR\x04note\x12\x0e\n" +
 	"\x02to\x18\x06 \x01(\fR\x02to\x12\x16\n" +
 	"\x06amount\x18\a \x01(\x04R\x06amount\x12\x10\n" +
-	"\x03fee\x18\b \x01(\x04R\x03fee\"`\n" +
+	"\x03fee\x18\b \x01(\x04R\x03fee\x12M\n" +
+	"\x0easset_transfer\x18\t \x01(\v2&.hdwallet.algorand.proto.AssetTransferR\rassetTransfer\x12E\n" +
+	"\fasset_opt_in\x18\n" +
+	" \x01(\v2#.hdwallet.algorand.proto.AssetOptInR\n" +
+	"assetOptIn\"R\n" +
+	"\rAssetTransfer\x12\x19\n" +
+	"\basset_id\x18\x01 \x01(\x04R\aassetId\x12\x16\n" +
+	"\x06amount\x18\x02 \x01(\x04R\x06amount\x12\x0e\n" +
+	"\x02to\x18\x03 \x01(\fR\x02to\"'\n" +
+	"\n" +
+	"AssetOptIn\x12\x19\n" +
+	"\basset_id\x18\x01 \x01(\x04R\aassetId\"`\n" +
 	"\rSigningOutput\x12\x18\n" +
 	"\aencoded\x18\x01 \x01(\fR\aencoded\x12\x1f\n" +
 	"\vencoded_hex\x18\x02 \x01(\tR\n" +
@@ -230,17 +375,21 @@ func file_txproto_algorand_algorand_proto_rawDescGZIP() []byte {
 	return file_txproto_algorand_algorand_proto_rawDescData
 }
 
-var file_txproto_algorand_algorand_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_txproto_algorand_algorand_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
 var file_txproto_algorand_algorand_proto_goTypes = []any{
 	(*SigningInput)(nil),  // 0: hdwallet.algorand.proto.SigningInput
-	(*SigningOutput)(nil), // 1: hdwallet.algorand.proto.SigningOutput
+	(*AssetTransfer)(nil), // 1: hdwallet.algorand.proto.AssetTransfer
+	(*AssetOptIn)(nil),    // 2: hdwallet.algorand.proto.AssetOptIn
+	(*SigningOutput)(nil), // 3: hdwallet.algorand.proto.SigningOutput
 }
 var file_txproto_algorand_algorand_proto_depIdxs = []int32{
-	0, // [0:0] is the sub-list for method output_type
-	0, // [0:0] is the sub-list for method input_type
-	0, // [0:0] is the sub-list for extension type_name
-	0, // [0:0] is the sub-list for extension extendee
-	0, // [0:0] is the sub-list for field type_name
+	1, // 0: hdwallet.algorand.proto.SigningInput.asset_transfer:type_name -> hdwallet.algorand.proto.AssetTransfer
+	2, // 1: hdwallet.algorand.proto.SigningInput.asset_opt_in:type_name -> hdwallet.algorand.proto.AssetOptIn
+	2, // [2:2] is the sub-list for method output_type
+	2, // [2:2] is the sub-list for method input_type
+	2, // [2:2] is the sub-list for extension type_name
+	2, // [2:2] is the sub-list for extension extendee
+	0, // [0:2] is the sub-list for field type_name
 }
 
 func init() { file_txproto_algorand_algorand_proto_init() }
@@ -254,7 +403,7 @@ func file_txproto_algorand_algorand_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_txproto_algorand_algorand_proto_rawDesc), len(file_txproto_algorand_algorand_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   2,
+			NumMessages:   4,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

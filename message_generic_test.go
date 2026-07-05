@@ -96,9 +96,9 @@ func TestSignRawMessageRejectsNonDigestECDSA(t *testing.T) {
 	}
 }
 
-// TestSignRawMessageUnknownSymbol verifies that an unknown symbol returns
+// TestSignRawMessageUnknownChain verifies that an unknown chain returns
 // ErrUnsupportedCoin.
-func TestSignRawMessageUnknownSymbol(t *testing.T) {
+func TestSignRawMessageUnknownChain(t *testing.T) {
 	w, err := FromMnemonic(canonicalMnemonic)
 	if err != nil {
 		t.Fatal(err)
@@ -106,16 +106,16 @@ func TestSignRawMessageUnknownSymbol(t *testing.T) {
 	defer w.Destroy()
 
 	digest := make([]byte, 32)
-	_, err = w.SignRawMessage(Symbol("NOPE"), 0, digest)
+	_, err = w.SignRawMessage(Chain("NOPE"), 0, digest)
 	if !errors.Is(err, ErrUnsupportedCoin) {
 		t.Errorf("expected ErrUnsupportedCoin, got %v", err)
 	}
 }
 
-// TestVerifyRawMessageUnknownSymbol verifies that VerifyRawMessage returns
-// ErrUnsupportedCoin for an unknown symbol.
-func TestVerifyRawMessageUnknownSymbol(t *testing.T) {
-	_, err := VerifyRawMessage(Symbol("NOPE"), nil, make([]byte, 32), &Signature{Curve: Secp256k1})
+// TestVerifyRawMessageUnknownChain verifies that VerifyRawMessage returns
+// ErrUnsupportedCoin for an unknown chain.
+func TestVerifyRawMessageUnknownChain(t *testing.T) {
+	_, err := VerifyRawMessage(Chain("NOPE"), nil, make([]byte, 32), &Signature{Curve: Secp256k1})
 	if !errors.Is(err, ErrUnsupportedCoin) {
 		t.Errorf("expected ErrUnsupportedCoin, got %v", err)
 	}

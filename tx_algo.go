@@ -38,14 +38,11 @@ import (
 // algoTxPrefix is the 2-byte domain separation tag prepended before signing.
 var algoTxPrefix = []byte("TX")
 
-// signALGOTx signs an Algorand payment transaction and returns the canonical
-// msgpack-encoded signed transaction.
-func (w *HDWallet) signALGOTx(_ Symbol, index uint32, in *txalgo.SigningInput) (proto.Message, error) {
+// signALGOTx signs an Algorand payment or asset-transfer (axfer)/opt-in
+// transaction and returns the canonical msgpack-encoded signed transaction.
+func (w *HDWallet) signALGOTx(_ Chain, index uint32, in *txalgo.SigningInput) (proto.Message, error) {
 	if len(in.GenesisHash) != 32 {
 		return nil, fmt.Errorf("%w: ALGO: genesis_hash must be 32 bytes", ErrTxInput)
-	}
-	if len(in.To) != 32 {
-		return nil, fmt.Errorf("%w: ALGO: to must be 32 bytes (raw public key)", ErrTxInput)
 	}
 
 	// Derive the sender's 32-byte ed25519 public key.
@@ -54,8 +51,25 @@ func (w *HDWallet) signALGOTx(_ Symbol, index uint32, in *txalgo.SigningInput) (
 		return nil, fmt.Errorf("ALGO: derive public key: %w", err)
 	}
 
-	// Build the canonical msgpack transaction map (unsigned).
-	txMap := algoMakePaymentMap(snd, in)
+	// Build the canonical msgpack transaction map (unsigned). asset_transfer
+	// and asset_opt_in take priority over the flat pay fields (to/amount),
+	// which are ignored when either is set.
+	var txMap []algoMapEntry
+	switch {
+	case in.AssetOptIn != nil:
+		// Opt-in: 0-amount axfer to self (arcv == sender's own pubkey, no aamt key).
+		txMap = algoMakeAssetTransferMap(snd, snd, in.AssetOptIn.AssetId, 0, in)
+	case in.AssetTransfer != nil:
+		if len(in.AssetTransfer.To) != 32 {
+			return nil, fmt.Errorf("%w: ALGO: asset_transfer.to must be 32 bytes (raw public key)", ErrTxInput)
+		}
+		txMap = algoMakeAssetTransferMap(snd, in.AssetTransfer.To, in.AssetTransfer.AssetId, in.AssetTransfer.Amount, in)
+	default:
+		if len(in.To) != 32 {
+			return nil, fmt.Errorf("%w: ALGO: to must be 32 bytes (raw public key)", ErrTxInput)
+		}
+		txMap = algoMakePaymentMap(snd, in)
+	}
 	txMsgpack := algoEncodeMsgpackMap(txMap)
 
 	// preimage = "TX" || canonical_msgpack(tx). ed25519 signs the full preimage
@@ -94,15 +108,14 @@ type algoMapEntry struct {
 	val []byte // pre-encoded msgpack value
 }
 
-// algoMakePaymentMap builds the sorted list of map entries for a payment tx.
-// Zero-value fields (note, genesis_id) are omitted when empty.
-func algoMakePaymentMap(snd []byte, in *txalgo.SigningInput) []algoMapEntry {
-	entries := make([]algoMapEntry, 0, 10)
-
-	// "amt": amount in microAlgos
-	if in.Amount != 0 {
-		entries = append(entries, algoMapEntry{"amt", algoMsgpackUint(in.Amount)})
-	}
+// algoCommonEntries builds the map entries shared by every Algorand
+// transaction type (payment, asset transfer, asset opt-in): fee, fv, gen,
+// gh, lv, note. Zero-value fields (fee, fv, gen, lv, note) are omitted when
+// empty; "gh" is always present (validated non-empty by the caller).
+// Entries are returned unsorted — the caller appends type-specific entries
+// and sorts once.
+func algoCommonEntries(in *txalgo.SigningInput) []algoMapEntry {
+	entries := make([]algoMapEntry, 0, 6)
 
 	// "fee": fee in microAlgos
 	if in.Fee != 0 {
@@ -132,6 +145,20 @@ func algoMakePaymentMap(snd []byte, in *txalgo.SigningInput) []algoMapEntry {
 		entries = append(entries, algoMapEntry{"note", algoMsgpackBin(in.Note)})
 	}
 
+	return entries
+}
+
+// algoMakePaymentMap builds the sorted list of map entries for a payment tx
+// (msgpack type "pay"). Zero-value fields (note, genesis_id) are omitted
+// when empty.
+func algoMakePaymentMap(snd []byte, in *txalgo.SigningInput) []algoMapEntry {
+	entries := algoCommonEntries(in)
+
+	// "amt": amount in microAlgos
+	if in.Amount != 0 {
+		entries = append(entries, algoMapEntry{"amt", algoMsgpackUint(in.Amount)})
+	}
+
 	// "rcv": recipient 32-byte pubkey
 	entries = append(entries, algoMapEntry{"rcv", algoMsgpackBin(in.To)})
 
@@ -140,6 +167,37 @@ func algoMakePaymentMap(snd []byte, in *txalgo.SigningInput) []algoMapEntry {
 
 	// "type": "pay"
 	entries = append(entries, algoMapEntry{"type", algoMsgpackStr("pay")})
+
+	// Sort entries lexicographically by key (canonical msgpack requirement).
+	sort.Slice(entries, func(i, j int) bool { return entries[i].key < entries[j].key })
+
+	return entries
+}
+
+// algoMakeAssetTransferMap builds the sorted list of map entries for an
+// Algorand Standard Asset (ASA) transfer (msgpack type "axfer"), which also
+// covers the opt-in case (0-amount axfer to self: caller passes
+// arcv == snd and amount == 0). "aamt" is omitted entirely when amount is 0
+// (not encoded as zero) — this is exactly what makes an opt-in an opt-in.
+func algoMakeAssetTransferMap(snd, arcv []byte, assetID, amount uint64, in *txalgo.SigningInput) []algoMapEntry {
+	entries := algoCommonEntries(in)
+
+	// "aamt": asset amount (omitted when 0 — the opt-in case)
+	if amount != 0 {
+		entries = append(entries, algoMapEntry{"aamt", algoMsgpackUint(amount)})
+	}
+
+	// "arcv": asset recipient 32-byte pubkey
+	entries = append(entries, algoMapEntry{"arcv", algoMsgpackBin(arcv)})
+
+	// "snd": sender 32-byte pubkey
+	entries = append(entries, algoMapEntry{"snd", algoMsgpackBin(snd)})
+
+	// "type": "axfer"
+	entries = append(entries, algoMapEntry{"type", algoMsgpackStr("axfer")})
+
+	// "xaid": asset ID
+	entries = append(entries, algoMapEntry{"xaid", algoMsgpackUint(assetID)})
 
 	// Sort entries lexicographically by key (canonical msgpack requirement).
 	sort.Slice(entries, func(i, j int) bool { return entries[i].key < entries[j].key })

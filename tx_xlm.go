@@ -63,8 +63,26 @@ const xlmKeyTypeED25519 uint32 = 0
 // xlmMemoNone is the Memo discriminant MEMO_NONE = 0.
 const xlmMemoNone uint32 = 0
 
+// xlmMemoText is the Memo discriminant MEMO_TEXT = 1.
+const xlmMemoText uint32 = 1
+
+// xlmMemoID is the Memo discriminant MEMO_ID = 2.
+const xlmMemoID uint32 = 2
+
+// xlmMemoHash is the Memo discriminant MEMO_HASH = 3.
+const xlmMemoHash uint32 = 3
+
+// xlmMemoTextMaxLen is the maximum length in bytes of a MEMO_TEXT value.
+const xlmMemoTextMaxLen = 28
+
+// xlmMemoHashLen is the required length in bytes of a MEMO_HASH value.
+const xlmMemoHashLen = 32
+
 // xlmTimeBoundsAbsent is the XDR optional pointer for absent TimeBounds in V0 = 0.
 const xlmTimeBoundsAbsent uint32 = 0
+
+// xlmOpCreateAccount is the OperationBody discriminant CREATE_ACCOUNT = 0.
+const xlmOpCreateAccount uint32 = 0
 
 // xlmOpPayment is the OperationBody discriminant PAYMENT = 1.
 const xlmOpPayment uint32 = 1
@@ -75,7 +93,7 @@ const xlmAssetTypeNative uint32 = 0
 // signXLMTx signs a Stellar payment transaction and returns base64(XDR(TransactionEnvelope)).
 // The XLM key is ed25519; the preimage is SHA256(preimage) which is passed as the
 // raw message to ed25519.Sign (ed25519 hashes it internally with SHA-512).
-func (w *HDWallet) signXLMTx(_ Symbol, index uint32, in *txstellar.SigningInput) (proto.Message, error) {
+func (w *HDWallet) signXLMTx(_ Chain, index uint32, in *txstellar.SigningInput) (proto.Message, error) {
 	// Decode source account G-address → 32-byte ed25519 public key.
 	sourcePub, err := validators[XLM](in.Account)
 	if err != nil {
@@ -87,21 +105,20 @@ func (w *HDWallet) signXLMTx(_ Symbol, index uint32, in *txstellar.SigningInput)
 		return nil, fmt.Errorf("%w: XLM: fee must be positive (got %d)", ErrTxInput, in.Fee)
 	}
 
-	// Validate and decode the operation.
-	payment := in.GetPayment()
-	if payment == nil {
-		return nil, fmt.Errorf("%w: XLM: no payment operation provided", ErrTxInput)
-	}
-	if payment.Amount <= 0 {
-		return nil, fmt.Errorf("%w: XLM: payment amount must be positive (got %d stroops)", ErrTxInput, payment.Amount)
-	}
-	destPub, err := validators[XLM](payment.Destination)
+	// Validate and encode the operation (Payment or CreateAccount).
+	opXDR, err := xlmBuildOperationXDR(in)
 	if err != nil {
-		return nil, fmt.Errorf("%w: XLM: invalid destination %q: %v", ErrTxInput, payment.Destination, err)
+		return nil, err
+	}
+
+	// Build the XDR-encoded memo (defaults to MEMO_NONE if no memo oneof case is set).
+	memoXDR, err := xlmBuildMemoXDR(in)
+	if err != nil {
+		return nil, err
 	}
 
 	// Build the XDR-encoded Transaction body.
-	txXDR := xlmBuildTransactionXDR(sourcePub, uint32(in.Fee), in.Sequence, destPub, payment.Amount) // #nosec G115 -- fee is int32, validated positive above; safe narrowing to uint32
+	txXDR := xlmBuildTransactionXDR(sourcePub, uint32(in.Fee), in.Sequence, opXDR, memoXDR) // #nosec G115 -- fee is int32, validated positive above; safe narrowing to uint32
 
 	// Determine the network passphrase.
 	passphrase := in.Passphrase
@@ -149,11 +166,103 @@ func (w *HDWallet) signXLMTx(_ Symbol, index uint32, in *txstellar.SigningInput)
 	}, nil
 }
 
+// xlmBuildMemoXDR encodes the Stellar Memo union as XDR bytes, selected from
+// the SigningInput memo oneof. MEMO_NONE(0) is the default when no memo case
+// is set. Validates memo_text <=28 bytes and memo_hash ==32 bytes.
+func xlmBuildMemoXDR(in *txstellar.SigningInput) ([]byte, error) {
+	switch memo := in.GetMemo().(type) {
+	case *txstellar.SigningInput_MemoText:
+		text := memo.MemoText.GetText()
+		if len(text) > xlmMemoTextMaxLen {
+			return nil, fmt.Errorf("%w: XLM: memo_text must be <=%d bytes (got %d)", ErrTxInput, xlmMemoTextMaxLen, len(text))
+		}
+		var b []byte
+		b = xlmAppendUint32(b, xlmMemoText)
+		b = xlmAppendOpaqueString(b, text)
+		return b, nil
+
+	case *txstellar.SigningInput_MemoId:
+		var b []byte
+		b = xlmAppendUint32(b, xlmMemoID)
+		b = xlmAppendUint64(b, memo.MemoId.GetId())
+		return b, nil
+
+	case *txstellar.SigningInput_MemoHash:
+		hash := memo.MemoHash.GetHash()
+		if len(hash) != xlmMemoHashLen {
+			return nil, fmt.Errorf("%w: XLM: memo_hash must be exactly %d bytes (got %d)", ErrTxInput, xlmMemoHashLen, len(hash))
+		}
+		var b []byte
+		b = xlmAppendUint32(b, xlmMemoHash)
+		b = append(b, hash...) // opaque[32] — fixed size, no length prefix
+		return b, nil
+
+	default:
+		// MEMO_NONE(0): no payload.
+		return xlmAppendUint32(nil, xlmMemoNone), nil
+	}
+}
+
+// xlmBuildOperationXDR encodes the Operation.body (OperationBody discriminant
+// plus the operation-specific fields) selected from the SigningInput operation
+// oneof — either Payment (PAYMENT=1) or CreateAccount (CREATE_ACCOUNT=0).
+// CreateAccount funds a not-yet-existing account (Stellar rejects Payment to
+// unfunded accounts); unlike Payment it has no asset field, since it always
+// funds with native XLM.
+func xlmBuildOperationXDR(in *txstellar.SigningInput) ([]byte, error) {
+	switch {
+	case in.GetPayment() != nil:
+		payment := in.GetPayment()
+		if payment.Amount <= 0 {
+			return nil, fmt.Errorf("%w: XLM: payment amount must be positive (got %d stroops)", ErrTxInput, payment.Amount)
+		}
+		destPub, err := validators[XLM](payment.Destination)
+		if err != nil {
+			return nil, fmt.Errorf("%w: XLM: invalid destination %q: %v", ErrTxInput, payment.Destination, err)
+		}
+		var b []byte
+		// body: OperationBody { type=PAYMENT(1), PaymentOp }
+		b = xlmAppendUint32(b, xlmOpPayment)
+		// PaymentOp.destination: MuxedAccount
+		b = xlmAppendUint32(b, xlmKeyTypeED25519)
+		b = append(b, destPub...) // opaque[32]
+		// PaymentOp.asset: Asset { type=ASSET_TYPE_NATIVE(0) }
+		b = xlmAppendUint32(b, xlmAssetTypeNative)
+		// PaymentOp.amount: int64
+		b = xlmAppendInt64(b, payment.Amount)
+		return b, nil
+
+	case in.GetCreateAccount() != nil:
+		createAccount := in.GetCreateAccount()
+		if createAccount.StartingBalance <= 0 {
+			return nil, fmt.Errorf("%w: XLM: starting_balance must be positive (got %d stroops)", ErrTxInput, createAccount.StartingBalance)
+		}
+		destPub, err := validators[XLM](createAccount.Destination)
+		if err != nil {
+			return nil, fmt.Errorf("%w: XLM: invalid destination %q: %v", ErrTxInput, createAccount.Destination, err)
+		}
+		var b []byte
+		// body: OperationBody { type=CREATE_ACCOUNT(0), CreateAccountOp }
+		b = xlmAppendUint32(b, xlmOpCreateAccount)
+		// CreateAccountOp.destination: AccountID (MuxedAccount-style encoding, as used
+		// throughout this V0 preimage layout — see the file-level comment).
+		b = xlmAppendUint32(b, xlmKeyTypeED25519)
+		b = append(b, destPub...) // opaque[32]
+		// CreateAccountOp.startingBalance: int64 — no asset field (always native XLM).
+		b = xlmAppendInt64(b, createAccount.StartingBalance)
+		return b, nil
+
+	default:
+		return nil, fmt.Errorf("%w: XLM: no operation provided (payment or create_account)", ErrTxInput)
+	}
+}
+
 // xlmBuildTransactionXDR encodes a Stellar TransactionV0 body (without the
-// envelope wrapper) as XDR bytes. Only the PAYMENT operation and no memo are
-// supported. This is the V0 format: source account is a raw uint256 (32 bytes)
-// with no MuxedAccount discriminant prefix.
-func xlmBuildTransactionXDR(sourcePub []byte, fee uint32, seqNum int64, destPub []byte, amount int64) []byte {
+// envelope wrapper) as XDR bytes. This is the V0 format: source account is a
+// raw uint256 (32 bytes) with no MuxedAccount discriminant prefix. opXDR is
+// the pre-encoded Operation.body (see xlmBuildOperationXDR) and memoXDR is the
+// pre-encoded Memo union (see xlmBuildMemoXDR).
+func xlmBuildTransactionXDR(sourcePub []byte, fee uint32, seqNum int64, opXDR []byte, memoXDR []byte) []byte {
 	var b []byte
 
 	// sourceAccountEd25519: uint256 — V0 raw 32-byte key, NO MuxedAccount discriminant.
@@ -168,23 +277,16 @@ func xlmBuildTransactionXDR(sourcePub []byte, fee uint32, seqNum int64, destPub 
 	// timeBounds*: XDR optional — 0 = absent (no time bounds).
 	b = xlmAppendUint32(b, xlmTimeBoundsAbsent)
 
-	// memo: Memo { type=MEMO_NONE(0) }
-	b = xlmAppendUint32(b, xlmMemoNone)
+	// memo: Memo union (MEMO_NONE/MEMO_TEXT/MEMO_ID/MEMO_HASH)
+	b = append(b, memoXDR...)
 
 	// operations: array[1]
 	b = xlmAppendUint32(b, 1) // count
 	// Operation {
 	//   sourceAccount: absent (optional presence flag = 0)
 	b = xlmAppendUint32(b, 0) // present=0 (absent)
-	//   body: OperationBody { type=PAYMENT(1), PaymentOp }
-	b = xlmAppendUint32(b, xlmOpPayment)
-	// PaymentOp.destination: MuxedAccount
-	b = xlmAppendUint32(b, xlmKeyTypeED25519)
-	b = append(b, destPub...) // opaque[32]
-	// PaymentOp.asset: Asset { type=ASSET_TYPE_NATIVE(0) }
-	b = xlmAppendUint32(b, xlmAssetTypeNative)
-	// PaymentOp.amount: int64
-	b = xlmAppendInt64(b, amount)
+	//   body: OperationBody (pre-encoded — Payment or CreateAccount)
+	b = append(b, opXDR...)
 	// }
 
 	// ext: TransactionExt { v=0 }
@@ -229,4 +331,22 @@ func xlmAppendInt64(buf []byte, v int64) []byte {
 	var tmp [8]byte
 	binary.BigEndian.PutUint64(tmp[:], uint64(v)) // #nosec G115 -- exact int64→uint64 bit reinterpretation for big-endian XDR encoding
 	return append(buf, tmp[:]...)
+}
+
+// xlmAppendUint64 appends a big-endian uint64 to buf and returns the result.
+func xlmAppendUint64(buf []byte, v uint64) []byte {
+	var tmp [8]byte
+	binary.BigEndian.PutUint64(tmp[:], v)
+	return append(buf, tmp[:]...)
+}
+
+// xlmAppendOpaqueString appends an XDR variable-length opaque/string value:
+// uint32(len) || bytes, zero-padded to the next 4-byte boundary.
+func xlmAppendOpaqueString(buf []byte, s string) []byte {
+	buf = xlmAppendUint32(buf, uint32(len(s))) // #nosec G115 -- len(s) is bounded by xlmMemoTextMaxLen (28) at the only call site
+	buf = append(buf, s...)
+	if pad := (4 - len(s)%4) % 4; pad > 0 {
+		buf = append(buf, make([]byte, pad)...)
+	}
+	return buf
 }

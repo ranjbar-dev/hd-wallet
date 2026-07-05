@@ -37,7 +37,7 @@ func TestSignNil(t *testing.T) {
 // rather than causing index-out-of-range panics.
 func TestParseBounds(t *testing.T) {
 	cases := []struct {
-		sym  Symbol
+		sym  Chain
 		addr string
 	}{
 		{ETH, "0x000000000000000000000000000000000000000"}, // 41 chars, 1 short

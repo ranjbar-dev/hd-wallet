@@ -44,6 +44,33 @@ var solanaSystemProgramID = make([]byte, 32)
 // well-known program address, not a secret.
 const solanaTokenProgramID = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" // #nosec G101 -- public SPL Token program id, not a credential
 
+// solanaToken2022ProgramID is the SPL Token-2022 (Token Extensions) program
+// account, base58. It is a public well-known program address, not a
+// credential. Pinned via the two byte-exact TWC vectors in
+// tx_solana_token2022_test.go.
+const solanaToken2022ProgramID = "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb" // #nosec G101 -- public SPL Token-2022 program id, not a credential
+
+// SolanaTokenProgramClassic and SolanaTokenProgram2022 select which SPL token
+// program a TransferChecked/CreateAndTransferToken instruction targets, via
+// the SigningInput's token_program_id field.
+const (
+	SolanaTokenProgramClassic uint32 = 0
+	SolanaTokenProgram2022    uint32 = 1
+)
+
+// solanaTokenProgramAddress resolves a token_program_id selector to the
+// program's base58 address.
+func solanaTokenProgramAddress(id uint32) (string, error) {
+	switch id {
+	case SolanaTokenProgramClassic:
+		return solanaTokenProgramID, nil
+	case SolanaTokenProgram2022:
+		return solanaToken2022ProgramID, nil
+	default:
+		return "", fmt.Errorf("%w: solana: unsupported token_program_id %d", ErrTxInput, id)
+	}
+}
+
 // solanaTransferInstruction is the System Program instruction index for Transfer.
 const solanaTransferInstruction uint32 = 2
 
@@ -52,22 +79,22 @@ const solanaTransferInstruction uint32 = 2
 const solanaTokenTransferCheckedInstruction byte = 12
 
 // signSolanaTx dispatches on the SigningInput's transaction type.
-func (w *HDWallet) signSolanaTx(symbol Symbol, index uint32, in *txsolana.SigningInput) (*txsolana.SigningOutput, error) {
+func (w *HDWallet) signSolanaTx(chain Chain, index uint32, in *txsolana.SigningInput) (*txsolana.SigningOutput, error) {
 	switch {
 	case in.GetTransferTransaction() != nil:
-		return w.signSolanaSystemTransfer(symbol, index, in)
+		return w.signSolanaSystemTransfer(chain, index, in)
 	case in.GetTokenTransferTransaction() != nil:
-		return w.signSolanaTokenTransfer(symbol, index, in)
+		return w.signSolanaTokenTransfer(chain, index, in)
 	case in.GetCreateTokenAccountTransaction() != nil:
-		return w.signSolanaCreateTokenAccount(symbol, index, in)
+		return w.signSolanaCreateTokenAccount(chain, index, in)
 	case in.GetCreateAndTransferTokenTransaction() != nil:
-		return w.signSolanaCreateAndTransferToken(symbol, index, in)
+		return w.signSolanaCreateAndTransferToken(chain, index, in)
 	case in.GetCreateNonceAccount() != nil:
-		return w.signSolanaCreateNonceAccount(symbol, index, in)
+		return w.signSolanaCreateNonceAccount(chain, index, in)
 	case in.GetWithdrawNonceAccount() != nil:
-		return w.signSolanaWithdrawNonceAccount(symbol, index, in)
+		return w.signSolanaWithdrawNonceAccount(chain, index, in)
 	case in.GetAdvanceNonceAccount() != nil:
-		return w.signSolanaAdvanceNonceAccount(symbol, index, in)
+		return w.signSolanaAdvanceNonceAccount(chain, index, in)
 	default:
 		return nil, fmt.Errorf("%w: solana: no supported transaction set", ErrTxInput)
 	}
@@ -94,8 +121,8 @@ func solanaNonceParams(in *txsolana.SigningInput) (nonce, sysvarRBH []byte, err 
 
 // solanaFinishTx signs message with the wallet key (single required signature)
 // and assembles [compact-u16 1][signature][message].
-func (w *HDWallet) solanaFinishTx(symbol Symbol, index uint32, message []byte) (*txsolana.SigningOutput, error) {
-	sig, err := w.SignIndex(symbol, index, message)
+func (w *HDWallet) solanaFinishTx(chain Chain, index uint32, message []byte) (*txsolana.SigningOutput, error) {
+	sig, err := w.SignIndex(chain, index, message)
 	if err != nil {
 		return nil, err
 	}
@@ -117,10 +144,10 @@ func (w *HDWallet) solanaFinishTx(symbol Symbol, index uint32, message []byte) (
 
 // signSolanaSystemTransfer builds, signs and base58-encodes a Solana system
 // (native SOL) transfer.
-func (w *HDWallet) signSolanaSystemTransfer(symbol Symbol, index uint32, in *txsolana.SigningInput) (*txsolana.SigningOutput, error) {
+func (w *HDWallet) signSolanaSystemTransfer(chain Chain, index uint32, in *txsolana.SigningInput) (*txsolana.SigningOutput, error) {
 	transfer := in.GetTransferTransaction()
 
-	from, err := w.PublicKeyIndex(symbol, index)
+	from, err := w.PublicKeyIndex(chain, index)
 	if err != nil {
 		return nil, err
 	}
@@ -147,9 +174,19 @@ func (w *HDWallet) signSolanaSystemTransfer(symbol Symbol, index uint32, in *txs
 			solanaInstrSystemTransfer(from, to, transfer.GetValue()),
 		}, blockhash)
 	} else {
-		message = solanaTransferMessage(from, to, blockhash, transfer.GetValue())
+		// solanaCompileMessage (not the fixed-3-key solanaTransferMessage)
+		// so a self-transfer (from == to, e.g. the v0 vector below) dedupes
+		// to two account keys rather than three; byte-identical to
+		// solanaTransferMessage whenever from != to (both order
+		// from/to/system the same way).
+		message = solanaCompileMessage(from, []solanaInstruction{
+			solanaInstrSystemTransfer(from, to, transfer.GetValue()),
+		}, blockhash)
 	}
-	return w.solanaFinishTx(symbol, index, message)
+	if in.GetV0Msg() {
+		message = solanaWrapV0(message)
+	}
+	return w.solanaFinishTx(chain, index, message)
 }
 
 // signSolanaTokenTransfer builds, signs and base58-encodes an SPL token
@@ -157,10 +194,10 @@ func (w *HDWallet) signSolanaSystemTransfer(symbol Symbol, index uint32, in *txs
 // source/destination token accounts and the mint directly (no associated-token-
 // account derivation). The signer (owner of the source account) is also the fee
 // payer.
-func (w *HDWallet) signSolanaTokenTransfer(symbol Symbol, index uint32, in *txsolana.SigningInput) (*txsolana.SigningOutput, error) {
+func (w *HDWallet) signSolanaTokenTransfer(chain Chain, index uint32, in *txsolana.SigningInput) (*txsolana.SigningOutput, error) {
 	tt := in.GetTokenTransferTransaction()
 
-	owner, err := w.PublicKeyIndex(symbol, index)
+	owner, err := w.PublicKeyIndex(chain, index)
 	if err != nil {
 		return nil, err
 	}
@@ -187,7 +224,11 @@ func (w *HDWallet) signSolanaTokenTransfer(symbol Symbol, index uint32, in *txso
 	if err != nil {
 		return nil, fmt.Errorf("%w: solana: recent_blockhash: %v", ErrTxInput, err)
 	}
-	tokenProgram, err := base58DecodeFixed(solanaTokenProgramID, 32)
+	tokenProgramID, err := solanaTokenProgramAddress(tt.GetTokenProgramId())
+	if err != nil {
+		return nil, err
+	}
+	tokenProgram, err := base58DecodeFixed(tokenProgramID, 32)
 	if err != nil {
 		return nil, fmt.Errorf("%w: solana: token program id: %v", ErrTxInput, err)
 	}
@@ -206,7 +247,10 @@ func (w *HDWallet) signSolanaTokenTransfer(symbol Symbol, index uint32, in *txso
 	} else {
 		message = solanaTokenTransferMessage(owner, source, dest, mint, tokenProgram, blockhash, tt.GetAmount(), decimals)
 	}
-	return w.solanaFinishTx(symbol, index, message)
+	if in.GetV0Msg() {
+		message = solanaWrapV0(message)
+	}
+	return w.solanaFinishTx(chain, index, message)
 }
 
 // solanaTokenTransferMessage serializes the legacy message for an SPL
@@ -253,43 +297,6 @@ func solanaTokenTransferMessage(owner, source, dest, mint, tokenProgram, blockha
 	msg = append(msg, 4)                      // programIdIndex (token program)
 	msg = append(msg, solanaCompactU16(4)...) // account index count
 	msg = append(msg, 1, 3, 2, 0)             // [source, mint, dest, owner]
-	msg = append(msg, solanaCompactU16(len(data))...)
-	msg = append(msg, data...)
-
-	return msg
-}
-
-// solanaTransferMessage serializes the (legacy) transaction message for a system
-// transfer of value lamports from -> to.
-func solanaTransferMessage(from, to, blockhash []byte, value uint64) []byte {
-	// Account keys in canonical order: from(signer,writable), to(writable),
-	// system program(readonly). Indices: from=0, to=1, system=2.
-	keys := [][]byte{from, to, solanaSystemProgramID}
-
-	var msg []byte
-	// Header: numRequiredSignatures, numReadonlySignedAccounts,
-	// numReadonlyUnsignedAccounts.
-	msg = append(msg, 1, 0, 1)
-
-	// Account keys.
-	msg = append(msg, solanaCompactU16(len(keys))...)
-	for _, k := range keys {
-		msg = append(msg, k...)
-	}
-
-	// Recent blockhash.
-	msg = append(msg, blockhash...)
-
-	// Instruction data: LE-u32(Transfer) || LE-u64(lamports).
-	data := make([]byte, 12)
-	binary.LittleEndian.PutUint32(data[0:4], solanaTransferInstruction)
-	binary.LittleEndian.PutUint64(data[4:12], value)
-
-	// One instruction: program=system(idx 2), accounts=[from(0), to(1)].
-	msg = append(msg, solanaCompactU16(1)...) // instruction count
-	msg = append(msg, 2)                      // programIdIndex (system program)
-	msg = append(msg, solanaCompactU16(2)...) // account index count
-	msg = append(msg, 0, 1)                   // [from, to]
 	msg = append(msg, solanaCompactU16(len(data))...)
 	msg = append(msg, data...)
 

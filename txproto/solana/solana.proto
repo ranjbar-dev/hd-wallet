@@ -17,6 +17,7 @@ message TokenTransfer {
   string recipient_token_address = 3;  // base58 (the destination ATA)
   uint64 amount = 4;
   uint32 decimals = 5;
+  uint32 token_program_id = 6; // 0=classic SPL Token, 1=Token-2022
 }
 
 // Create the associated token account (ATA) for main_address+mint, funded by
@@ -38,6 +39,7 @@ message CreateAndTransferToken {
   string sender_token_address = 4;    // base58 source token account
   uint64 amount = 5;
   uint32 decimals = 6;
+  uint32 token_program_id = 7; // 0=classic SPL Token, 1=Token-2022
 }
 
 // Create and initialize a durable-nonce account. The new account must co-sign
@@ -75,6 +77,14 @@ message SigningInput {
   // create_and_transfer_token transactions (plus create/withdraw nonce
   // account); not supported for create_token_account.
   string nonce_account = 4;
+
+  // When true, compile a v0 (versioned) message instead of a legacy message:
+  // the same header/keys/blockhash/instructions body, prefixed with the 0x80
+  // version-prefix byte and suffixed with a compact-u16 address-table-lookup
+  // count (always 0 — this library never emits populated lookup tables).
+  // Supported for transfer, token_transfer and create_and_transfer_token
+  // transactions (including their durable-nonce combinations).
+  bool v0_msg = 10;
 
   oneof transaction_type {
     Transfer transfer_transaction = 2;

@@ -227,7 +227,7 @@ func TestParseFormatRoundTrip(t *testing.T) {
 func TestFormatAmount(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
-		symbol  Symbol
+		chain   Chain
 		raw     *big.Int
 		want    string
 		wantErr error
@@ -236,25 +236,25 @@ func TestFormatAmount(t *testing.T) {
 		{BTC, big.NewInt(100_000_000), "1", nil},
 		{ATOM, big.NewInt(1_000_000), "1", nil},
 		{ETH, big.NewInt(0), "0", nil},
-		// Unknown symbol
-		{Symbol("NOPE"), big.NewInt(1), "", ErrUnsupportedCoin},
+		// Unknown chain
+		{Chain("NOPE"), big.NewInt(1), "", ErrUnsupportedCoin},
 	}
 	for _, tc := range tests {
 		tc := tc
-		t.Run(string(tc.symbol), func(t *testing.T) {
+		t.Run(string(tc.chain), func(t *testing.T) {
 			t.Parallel()
-			got, err := FormatAmount(tc.symbol, tc.raw)
+			got, err := FormatAmount(tc.chain, tc.raw)
 			if tc.wantErr != nil {
 				if !errors.Is(err, tc.wantErr) {
-					t.Errorf("FormatAmount(%s) error = %v, want %v", tc.symbol, err, tc.wantErr)
+					t.Errorf("FormatAmount(%s) error = %v, want %v", tc.chain, err, tc.wantErr)
 				}
 				return
 			}
 			if err != nil {
-				t.Fatalf("FormatAmount(%s) unexpected error: %v", tc.symbol, err)
+				t.Fatalf("FormatAmount(%s) unexpected error: %v", tc.chain, err)
 			}
 			if got != tc.want {
-				t.Errorf("FormatAmount(%s, %v) = %q, want %q", tc.symbol, tc.raw, got, tc.want)
+				t.Errorf("FormatAmount(%s, %v) = %q, want %q", tc.chain, tc.raw, got, tc.want)
 			}
 		})
 	}
@@ -263,7 +263,7 @@ func TestFormatAmount(t *testing.T) {
 func TestParseAmount(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
-		symbol  Symbol
+		chain   Chain
 		human   string
 		want    *big.Int
 		wantErr error
@@ -272,8 +272,8 @@ func TestParseAmount(t *testing.T) {
 		{BTC, "0.5", big.NewInt(50_000_000), nil},
 		{ATOM, "1.5", big.NewInt(1_500_000), nil},
 		{ETH, "0", big.NewInt(0), nil},
-		// Unknown symbol
-		{Symbol("NOPE"), "1", nil, ErrUnsupportedCoin},
+		// Unknown chain
+		{Chain("NOPE"), "1", nil, ErrUnsupportedCoin},
 		// Negative (ErrNegativeAmount propagated)
 		{ETH, "-1", nil, ErrNegativeAmount},
 		// Malformed
@@ -283,23 +283,23 @@ func TestParseAmount(t *testing.T) {
 	}
 	for _, tc := range tests {
 		tc := tc
-		t.Run(string(tc.symbol)+"/"+tc.human, func(t *testing.T) {
+		t.Run(string(tc.chain)+"/"+tc.human, func(t *testing.T) {
 			t.Parallel()
-			got, err := ParseAmount(tc.symbol, tc.human)
+			got, err := ParseAmount(tc.chain, tc.human)
 			if tc.want == nil {
 				if err == nil {
-					t.Fatalf("ParseAmount(%s, %q) = %v, want error", tc.symbol, tc.human, got)
+					t.Fatalf("ParseAmount(%s, %q) = %v, want error", tc.chain, tc.human, got)
 				}
 				if tc.wantErr != nil && !errors.Is(err, tc.wantErr) {
-					t.Errorf("ParseAmount(%s, %q) error = %v, want wrapping %v", tc.symbol, tc.human, err, tc.wantErr)
+					t.Errorf("ParseAmount(%s, %q) error = %v, want wrapping %v", tc.chain, tc.human, err, tc.wantErr)
 				}
 				return
 			}
 			if err != nil {
-				t.Fatalf("ParseAmount(%s, %q) unexpected error: %v", tc.symbol, tc.human, err)
+				t.Fatalf("ParseAmount(%s, %q) unexpected error: %v", tc.chain, tc.human, err)
 			}
 			if got.Cmp(tc.want) != 0 {
-				t.Errorf("ParseAmount(%s, %q) = %v, want %v", tc.symbol, tc.human, got, tc.want)
+				t.Errorf("ParseAmount(%s, %q) = %v, want %v", tc.chain, tc.human, got, tc.want)
 			}
 		})
 	}
@@ -310,25 +310,25 @@ func TestParseAmount(t *testing.T) {
 func TestNativeDecimals(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
-		symbol Symbol
+		chain  Chain
 		want   uint8
 		wantOK bool
 	}{
 		{BTC, 8, true},
 		{ETH, 18, true},
 		{ATOM, 6, true},
-		{Symbol("NOPE"), 0, false}, // unknown
+		{Chain("NOPE"), 0, false}, // unknown
 	}
 	for _, tc := range tests {
 		tc := tc
-		t.Run(string(tc.symbol), func(t *testing.T) {
+		t.Run(string(tc.chain), func(t *testing.T) {
 			t.Parallel()
-			got, ok := NativeDecimals(tc.symbol)
+			got, ok := NativeDecimals(tc.chain)
 			if ok != tc.wantOK {
-				t.Errorf("NativeDecimals(%s) ok = %v, want %v", tc.symbol, ok, tc.wantOK)
+				t.Errorf("NativeDecimals(%s) ok = %v, want %v", tc.chain, ok, tc.wantOK)
 			}
 			if ok && got != tc.want {
-				t.Errorf("NativeDecimals(%s) = %d, want %d", tc.symbol, got, tc.want)
+				t.Errorf("NativeDecimals(%s) = %d, want %d", tc.chain, got, tc.want)
 			}
 		})
 	}

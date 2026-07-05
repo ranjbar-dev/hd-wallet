@@ -44,32 +44,32 @@ func cosmosADR36SignBytes(signer string, data []byte) []byte {
 	)
 }
 
-// SignCosmosADR36 signs data with the key for symbol at the given address index
+// SignCosmosADR36 signs data with the key for chain at the given address index
 // using the Cosmos ADR-36 arbitrary-message signing standard. signer must be
 // the bech32 address corresponding to that key (e.g. obtained via
-// w.AddressIndex(symbol, index) or w.Address(symbol) for index 0).
+// w.AddressIndex(chain, index) or w.Address(chain) for index 0).
 //
 // It returns a base64-encoded 65-byte recoverable secp256k1 signature (R‖S‖V,
-// V ∈ {0,1}) over sha256(amino_json). symbol must be a secp256k1 coin
+// V ∈ {0,1}) over sha256(amino_json). chain must be a secp256k1 coin
 // (e.g. ATOM, OSMO); other curves return ErrNotRecoverable. The derived
 // private key is wiped immediately after signing and never leaves the package.
-func (w *HDWallet) SignCosmosADR36(symbol Symbol, index uint32, signer string, data []byte) (string, error) {
+func (w *HDWallet) SignCosmosADR36(chain Chain, index uint32, signer string, data []byte) (string, error) {
 	// Reject a signer that is not a well-formed bech32 address before embedding it
 	// in the amino-JSON sign document. The bech32 charset (lower-case alphanumeric
 	// plus the "1" separator) contains no JSON metacharacters, so a successful
 	// decode guarantees signer cannot break out of or inject into the document.
 	if hrp, _, err := bech32.Decode(signer); err != nil || hrp == "" {
-		return "", fmt.Errorf("hdwallet: SignCosmosADR36 %s: signer must be a valid bech32 address", symbol)
+		return "", fmt.Errorf("hdwallet: SignCosmosADR36 %s: signer must be a valid bech32 address", chain)
 	}
 	signBytes := cosmosADR36SignBytes(signer, data)
 	h := sha256.Sum256(signBytes)
-	sig, err := w.SignIndex(symbol, index, h[:])
+	sig, err := w.SignIndex(chain, index, h[:])
 	if err != nil {
-		return "", fmt.Errorf("hdwallet: SignCosmosADR36 %s: %w", symbol, err)
+		return "", fmt.Errorf("hdwallet: SignCosmosADR36 %s: %w", chain, err)
 	}
 	rec := sig.Recoverable() // 65-byte R‖S‖V, V ∈ {0,1}
 	if rec == nil {
-		return "", fmt.Errorf("%w: %s", ErrNotRecoverable, symbol)
+		return "", fmt.Errorf("%w: %s", ErrNotRecoverable, chain)
 	}
 	return base64.StdEncoding.EncodeToString(rec), nil
 }

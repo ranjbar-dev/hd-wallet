@@ -8,7 +8,7 @@ import (
 )
 
 // CosmosMinGasPrices maps well-known Cosmos chains to their minimum gas price.
-var CosmosMinGasPrices = map[Symbol]struct {
+var CosmosMinGasPrices = map[Chain]struct {
 	Price float64
 	Denom string
 }{

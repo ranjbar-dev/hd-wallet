@@ -66,7 +66,7 @@ func TestSignTxBitcoinCashVector(t *testing.T) {
 func TestSignTxDogecoinOracle(t *testing.T) { utxoLegacyOracleTest(t, DOGE) }
 func TestSignTxDashOracle(t *testing.T)     { utxoLegacyOracleTest(t, DASH) }
 
-func utxoLegacyOracleTest(t *testing.T, symbol Symbol) {
+func utxoLegacyOracleTest(t *testing.T, chain Chain) {
 	t.Helper()
 	w, err := FromMnemonic(canonicalMnemonic)
 	if err != nil {
@@ -74,17 +74,17 @@ func utxoLegacyOracleTest(t *testing.T, symbol Symbol) {
 	}
 	defer w.Destroy()
 
-	pub, err := w.PublicKeyIndex(symbol, 0)
+	pub, err := w.PublicKeyIndex(chain, 0)
 	if err != nil {
 		t.Fatalf("PublicKeyIndex: %v", err)
 	}
 	utxoScript := p2pkhScript(hash160(pub))
 
-	to, err := w.AddressIndex(symbol, 1)
+	to, err := w.AddressIndex(chain, 1)
 	if err != nil {
 		t.Fatalf("AddressIndex(to): %v", err)
 	}
-	change, err := w.AddressIndex(symbol, 2)
+	change, err := w.AddressIndex(chain, 2)
 	if err != nil {
 		t.Fatalf("AddressIndex(change): %v", err)
 	}
@@ -104,7 +104,7 @@ func utxoLegacyOracleTest(t *testing.T, symbol Symbol) {
 		}},
 	}
 
-	outMsg, err := w.SignTransaction(symbol, 0, in)
+	outMsg, err := w.SignTransaction(chain, 0, in)
 	if err != nil {
 		t.Fatalf("SignTransaction: %v", err)
 	}
@@ -116,7 +116,7 @@ func utxoLegacyOracleTest(t *testing.T, symbol Symbol) {
 		t.Fatalf("wire deserialize: %v", err)
 	}
 	var priv *btcec.PrivateKey
-	if err := w.WithPrivateKey(symbol, 0, func(raw []byte) error {
+	if err := w.WithPrivateKey(chain, 0, func(raw []byte) error {
 		priv, _ = btcec.PrivKeyFromBytes(raw)
 		return nil
 	}); err != nil {
@@ -135,14 +135,14 @@ func utxoLegacyOracleTest(t *testing.T, symbol Symbol) {
 		t.Fatalf("oracle serialize: %v", err)
 	}
 	if want := hex.EncodeToString(buf.Bytes()); out.EncodedHex != want {
-		t.Fatalf("%s tx hex mismatch\n got: %s\nwant: %s", symbol, out.EncodedHex, want)
+		t.Fatalf("%s tx hex mismatch\n got: %s\nwant: %s", chain, out.EncodedHex, want)
 	}
 	if got := hex.EncodeToString(out.TransactionId); got != msg.TxHash().String() {
-		t.Fatalf("%s txid = %s, want %s", symbol, got, msg.TxHash().String())
+		t.Fatalf("%s txid = %s, want %s", chain, got, msg.TxHash().String())
 	}
 }
 
-// TestUtxoTxRouting is the routing-drift guard: every symbol in utxoTxChains must
+// TestUtxoTxRouting is the routing-drift guard: every chain in utxoTxChains must
 // be a registered coin and must route to familyBitcoin.
 func TestUtxoTxRouting(t *testing.T) {
 	for s := range utxoTxChains {
@@ -165,21 +165,21 @@ func TestUtxoOutputDecode(t *testing.T) {
 	}
 	defer w.Destroy()
 
-	for _, symbol := range []Symbol{BCH, DOGE, DASH, ZEC} {
-		pub, err := w.PublicKeyIndex(symbol, 0)
+	for _, chain := range []Chain{BCH, DOGE, DASH, ZEC} {
+		pub, err := w.PublicKeyIndex(chain, 0)
 		if err != nil {
-			t.Fatalf("PublicKeyIndex(%s): %v", symbol, err)
+			t.Fatalf("PublicKeyIndex(%s): %v", chain, err)
 		}
-		addr, err := w.AddressIndex(symbol, 0) // registry encoder (P2PKH / CashAddr)
+		addr, err := w.AddressIndex(chain, 0) // registry encoder (P2PKH / CashAddr)
 		if err != nil {
-			t.Fatalf("AddressIndex(%s): %v", symbol, err)
+			t.Fatalf("AddressIndex(%s): %v", chain, err)
 		}
-		got, err := bitcoinDecodeScript(symbol, addr)
+		got, err := bitcoinDecodeScript(chain, addr)
 		if err != nil {
-			t.Fatalf("bitcoinDecodeScript(%s, %q): %v", symbol, addr, err)
+			t.Fatalf("bitcoinDecodeScript(%s, %q): %v", chain, addr, err)
 		}
 		if want := p2pkhScript(hash160(pub)); !bytes.Equal(got, want) {
-			t.Fatalf("%s decode(%q) = %x, want %x", symbol, addr, got, want)
+			t.Fatalf("%s decode(%q) = %x, want %x", chain, addr, got, want)
 		}
 	}
 

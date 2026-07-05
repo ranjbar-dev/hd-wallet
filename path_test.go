@@ -146,7 +146,7 @@ func TestPathErrorCases(t *testing.T) {
 	if _, err := w.AddressAt(SOL, 0, 0, 0); !errors.Is(err, ErrPathArity) {
 		t.Fatalf("AddressAt(SOL) error = %v, want ErrPathArity", err)
 	}
-	// Unknown symbol.
+	// Unknown chain.
 	if _, err := w.AddressPath("NOPE", "m/44'/60'/0'/0/0"); !errors.Is(err, ErrUnsupportedCoin) {
 		t.Fatalf("AddressPath(NOPE) error = %v, want ErrUnsupportedCoin", err)
 	}

@@ -71,14 +71,14 @@ func TestCoinDecimals(t *testing.T) {
 	if d := CoinDecimals(ATOM); d != 6 {
 		t.Fatalf("CoinDecimals(ATOM) = %d, want 6", d)
 	}
-	if d := CoinDecimals(Symbol("NOPE")); d != 0 {
+	if d := CoinDecimals(Chain("NOPE")); d != 0 {
 		t.Fatalf("CoinDecimals(unknown) = %d, want 0", d)
 	}
 }
 
 func TestCoinFamily(t *testing.T) {
 	cases := []struct {
-		sym  Symbol
+		sym  Chain
 		want string
 	}{
 		{ETH, "evm"},
@@ -190,7 +190,7 @@ func TestValidateSigningInputEVM(t *testing.T) {
 }
 
 func TestValidateSigningInputUnsupported(t *testing.T) {
-	err := ValidateSigningInput(Symbol("NOPE"), &txeth.SigningInput{})
+	err := ValidateSigningInput(Chain("NOPE"), &txeth.SigningInput{})
 	if !errors.Is(err, ErrTxUnsupported) {
 		t.Fatalf("ValidateSigningInput(NOPE): want ErrTxUnsupported, got %v", err)
 	}
@@ -204,7 +204,7 @@ func TestErrTxUnsupportedWrapped(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer w.Destroy()
-	_, txErr := w.SignTransaction(Symbol("NOPE"), 0, &txeth.SigningInput{})
+	_, txErr := w.SignTransaction(Chain("NOPE"), 0, &txeth.SigningInput{})
 	if !errors.Is(txErr, ErrTxUnsupported) {
 		t.Fatalf("SignTransaction(NOPE): want errors.Is ErrTxUnsupported, got %v", txErr)
 	}
@@ -218,7 +218,7 @@ func TestSupportedTxCoins(t *testing.T) {
 		t.Fatal("SupportedTxCoins returned empty slice")
 	}
 	// Must be sorted
-	sorted := make([]Symbol, len(coins))
+	sorted := make([]Chain, len(coins))
 	copy(sorted, coins)
 	sort.Slice(sorted, func(i, j int) bool { return sorted[i] < sorted[j] })
 	for i, s := range coins {
@@ -227,7 +227,7 @@ func TestSupportedTxCoins(t *testing.T) {
 		}
 	}
 
-	inSet := func(sym Symbol) bool {
+	inSet := func(sym Chain) bool {
 		for _, s := range coins {
 			if s == sym {
 				return true
@@ -236,7 +236,7 @@ func TestSupportedTxCoins(t *testing.T) {
 		return false
 	}
 
-	for _, want := range []Symbol{ETH, BTC, SOL, TRX, XRP, ATOM} {
+	for _, want := range []Chain{ETH, BTC, SOL, TRX, XRP, ATOM} {
 		if !inSet(want) {
 			t.Errorf("SupportedTxCoins missing %s", want)
 		}

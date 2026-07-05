@@ -191,20 +191,20 @@ func cosmosMultisigSignBytes(in *txcosmos.SigningInput) ([]byte, error) {
 // SignCosmosMultisigPartial produces this wallet's partial signature (64-byte
 // r‖s over sha256 of the amino-JSON sign doc) for a multisig MsgSend.
 // in.Send.FromAddress must be the MULTISIG address and in.AccountNumber /
-// in.Sequence the multisig account's values. symbol must be a standard
+// in.Sequence the multisig account's values. chain must be a standard
 // (non-Ethermint) Cosmos chain. The derived key is wiped after signing.
-func (w *HDWallet) SignCosmosMultisigPartial(symbol Symbol, index uint32, in *txcosmos.SigningInput) ([]byte, error) {
-	if _, ethermint := ethermintTxChains[symbol]; ethermint {
-		return nil, fmt.Errorf("%w: %s (no authoritative Ethermint multisig vector)", ErrTxUnsupported, symbol)
+func (w *HDWallet) SignCosmosMultisigPartial(chain Chain, index uint32, in *txcosmos.SigningInput) ([]byte, error) {
+	if _, ethermint := ethermintTxChains[chain]; ethermint {
+		return nil, fmt.Errorf("%w: %s (no authoritative Ethermint multisig vector)", ErrTxUnsupported, chain)
 	}
-	if _, ok := cosmosTxChains[symbol]; !ok {
-		return nil, fmt.Errorf("%w: %s", ErrTxUnsupported, symbol)
+	if _, ok := cosmosTxChains[chain]; !ok {
+		return nil, fmt.Errorf("%w: %s", ErrTxUnsupported, chain)
 	}
 	signBytes, err := cosmosMultisigSignBytes(in)
 	if err != nil {
 		return nil, err
 	}
-	sig, err := w.SignIndex(symbol, index, sha256Sum(signBytes))
+	sig, err := w.SignIndex(chain, index, sha256Sum(signBytes))
 	if err != nil {
 		return nil, err
 	}

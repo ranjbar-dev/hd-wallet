@@ -45,9 +45,9 @@ const (
 // ethermintPubKeyTypeURLs maps each Ethermint-keyed (eth_secp256k1) Cosmos chain
 // to the public-key type URL it announces in AuthInfo. The URL enters the SIGNED
 // bytes, so it is chain-specific and must be exact — Evmos and Injective differ.
-// A symbol absent from this map is rejected by signCosmosEthermintTx (the routing
+// A chain absent from this map is rejected by signCosmosEthermintTx (the routing
 // set ethermintTxChains keeps these in lockstep).
-var ethermintPubKeyTypeURLs = map[Symbol]string{
+var ethermintPubKeyTypeURLs = map[Chain]string{
 	EVMOS: "/ethermint.crypto.v1.ethsecp256k1.PubKey",
 	INJ:   "/injective.crypto.v1beta1.ethsecp256k1.PubKey",
 }
@@ -57,14 +57,14 @@ var ethermintPubKeyTypeURLs = map[Symbol]string{
 // the usual 33-byte compressed form. This also enters the signed bytes, so it is
 // chain-specific: Injective uses the uncompressed encoding (pinned to TWC's
 // Injective vector); Evmos uses the compressed encoding (its default, absent here).
-var ethermintUncompressedPubKey = map[Symbol]struct{}{
+var ethermintUncompressedPubKey = map[Chain]struct{}{
 	INJ: {},
 }
 
 // signCosmosTx builds, signs and serializes a standard Cosmos direct-mode
 // transaction (secp256k1 key, sha256(SignDoc) digest, compressed pubkey).
-func (w *HDWallet) signCosmosTx(symbol Symbol, index uint32, in *txcosmos.SigningInput) (*txcosmos.SigningOutput, error) {
-	return w.signCosmosDirect(symbol, index, in, cosmosPubKeyTypeURL, sha256Sum, false)
+func (w *HDWallet) signCosmosTx(chain Chain, index uint32, in *txcosmos.SigningInput) (*txcosmos.SigningOutput, error) {
+	return w.signCosmosDirect(chain, index, in, cosmosPubKeyTypeURL, sha256Sum, false)
 }
 
 // signCosmosEthermintTx signs a Cosmos direct-mode tx for an Ethermint-keyed
@@ -76,14 +76,14 @@ func (w *HDWallet) signCosmosTx(symbol Symbol, index uint32, in *txcosmos.Signin
 // The recoverable secp256k1 signature (RFC-6979, canonical low-S) is the same
 // scheme. Verified byte-for-byte against Trust Wallet Core's Evmos and Injective
 // vectors (tx_cosmos_ethermint_test.go, tx_cosmos_injective_test.go). An unmapped
-// symbol returns ErrTxUnsupported rather than risk an on-chain-invalid signature.
-func (w *HDWallet) signCosmosEthermintTx(symbol Symbol, index uint32, in *txcosmos.SigningInput) (*txcosmos.SigningOutput, error) {
-	pubKeyTypeURL, ok := ethermintPubKeyTypeURLs[symbol]
+// chain returns ErrTxUnsupported rather than risk an on-chain-invalid signature.
+func (w *HDWallet) signCosmosEthermintTx(chain Chain, index uint32, in *txcosmos.SigningInput) (*txcosmos.SigningOutput, error) {
+	pubKeyTypeURL, ok := ethermintPubKeyTypeURLs[chain]
 	if !ok {
-		return nil, fmt.Errorf("%w: %s", ErrTxUnsupported, symbol)
+		return nil, fmt.Errorf("%w: %s", ErrTxUnsupported, chain)
 	}
-	_, uncompressed := ethermintUncompressedPubKey[symbol]
-	return w.signCosmosDirect(symbol, index, in, pubKeyTypeURL, keccak256, uncompressed)
+	_, uncompressed := ethermintUncompressedPubKey[chain]
+	return w.signCosmosDirect(chain, index, in, pubKeyTypeURL, keccak256, uncompressed)
 }
 
 // signCosmosDirect builds, signs and serializes a Cosmos direct-mode transaction
@@ -91,7 +91,7 @@ func (w *HDWallet) signCosmosEthermintTx(symbol Symbol, index uint32, in *txcosm
 // signer key type in AuthInfo, hash computes the SignDoc digest, and uncompressed
 // selects the public-key encoding placed in AuthInfo — these are the only points
 // where the standard and Ethermint variants diverge.
-func (w *HDWallet) signCosmosDirect(symbol Symbol, index uint32, in *txcosmos.SigningInput, pubKeyTypeURL string, hash func([]byte) []byte, uncompressed bool) (*txcosmos.SigningOutput, error) {
+func (w *HDWallet) signCosmosDirect(chain Chain, index uint32, in *txcosmos.SigningInput, pubKeyTypeURL string, hash func([]byte) []byte, uncompressed bool) (*txcosmos.SigningOutput, error) {
 	fee := in.GetFee()
 	if fee == nil {
 		return nil, fmt.Errorf("%w: cosmos: missing fee", ErrTxInput)
@@ -102,7 +102,7 @@ func (w *HDWallet) signCosmosDirect(symbol Symbol, index uint32, in *txcosmos.Si
 		return nil, err
 	}
 
-	pub, err := w.PublicKeyIndex(symbol, index)
+	pub, err := w.PublicKeyIndex(chain, index)
 	if err != nil {
 		return nil, err
 	}
@@ -125,7 +125,7 @@ func (w *HDWallet) signCosmosDirect(symbol Symbol, index uint32, in *txcosmos.Si
 	signDoc := cosmosSignDoc(bodyBytes, authInfoBytes, in.GetChainId(), in.GetAccountNumber())
 	digest := hash(signDoc)
 
-	sig, err := w.SignIndex(symbol, index, digest)
+	sig, err := w.SignIndex(chain, index, digest)
 	if err != nil {
 		return nil, err
 	}

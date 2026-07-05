@@ -6,7 +6,7 @@ import "testing"
 // against the values Trust Wallet Core's registry.json publishes. A wrong decimals
 // value mis-formats balances, so these anchors guard the bulk edit.
 func TestCoinDecimalsRepresentative(t *testing.T) {
-	want := map[Symbol]uint8{
+	want := map[Chain]uint8{
 		BTC:  8,
 		ETH:  18,
 		SOL:  9,
@@ -33,7 +33,7 @@ func TestCoinDecimalsRepresentative(t *testing.T) {
 // zero-valued (forgotten) Decimals field.
 func TestCoinDecimalsDocumented(t *testing.T) {
 	// Coins whose native unit legitimately has 0 fractional digits.
-	zeroDecimals := map[Symbol]bool{}
+	zeroDecimals := map[Chain]bool{}
 	for _, sym := range SupportedCoins() {
 		coin, _ := CoinInfo(sym)
 		if coin.Decimals == 0 && !zeroDecimals[sym] {
@@ -47,7 +47,7 @@ func TestCoinDecimalsDocumented(t *testing.T) {
 // VeChain is the one documented exception — it is EVM-keyed but does not use
 // EIP-155 chain ids, so its ChainID is intentionally 0.
 func TestChainIDMatchesEVMSet(t *testing.T) {
-	evmExceptions := map[Symbol]bool{
+	evmExceptions := map[Chain]bool{
 		VET: true, // EVM-keyed but no EIP-155 chain id (32-byte chainTag scheme)
 	}
 	for _, sym := range SupportedCoins() {
@@ -72,7 +72,7 @@ func TestChainIDMatchesEVMSet(t *testing.T) {
 
 // TestSLIP44 pins the SLIP-44 coin type derived from each coin's Path.
 func TestSLIP44(t *testing.T) {
-	want := map[Symbol]uint32{
+	want := map[Chain]uint32{
 		BTC:  0,
 		ETH:  60,
 		SOL:  501,

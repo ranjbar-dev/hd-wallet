@@ -41,24 +41,24 @@ func FromPrivateKeyBuffer(buf *memguard.LockedBuffer, curve Curve) (*HDWallet, e
 	return &HDWallet{secret: s}, nil
 }
 
-// WithPrivateKey runs fn with the raw leaf private key for symbol at the given
+// WithPrivateKey runs fn with the raw leaf private key for chain at the given
 // address index and wipes the key as soon as fn returns. This is the safe export
 // primitive — the key never escapes into a value the caller must remember to
 // clear (mirrors WithMnemonic). The slice passed to fn must not escape fn.
 //
-// It works for both wallet modes: seed wallets derive the key for symbol/index;
-// key-only wallets return their imported key (curve must match symbol's curve,
+// It works for both wallet modes: seed wallets derive the key for chain/index;
+// key-only wallets return their imported key (curve must match chain's curve,
 // and index must be 0). The key is the 32-byte scalar/seed for the coin's curve.
 //
 // For ECDSA chains this is the signing scalar; for ed25519 it is the 32-byte
 // seed (not the 64-byte expanded key).
-func (w *HDWallet) WithPrivateKey(symbol Symbol, index uint32, fn func(priv []byte) error) error {
-	return w.withLeafPrivateKey(symbol, index, func(priv []byte, _ Coin) error {
+func (w *HDWallet) WithPrivateKey(chain Chain, index uint32, fn func(priv []byte) error) error {
+	return w.withLeafPrivateKey(chain, index, func(priv []byte, _ Coin) error {
 		return fn(priv)
 	})
 }
 
-// PrivateKey returns the raw leaf private key for symbol at the given address
+// PrivateKey returns the raw leaf private key for chain at the given address
 // index in a page-locked, encrypted-at-rest memguard buffer. This is a
 // lower-level accessor: the caller MUST call Destroy on the returned buffer when
 // finished, or the decrypted key lingers in memory. Prefer WithPrivateKey, which
@@ -67,9 +67,9 @@ func (w *HDWallet) WithPrivateKey(symbol Symbol, index uint32, fn func(priv []by
 // The returned buffer holds a copy taken inside the wallet's protected
 // derivation window; the wallet's own working copy is wiped before this returns.
 // See WithPrivateKey for the seed/key-only semantics and the key encoding.
-func (w *HDWallet) PrivateKey(symbol Symbol, index uint32) (*memguard.LockedBuffer, error) {
+func (w *HDWallet) PrivateKey(chain Chain, index uint32) (*memguard.LockedBuffer, error) {
 	var out *memguard.LockedBuffer
-	err := w.withLeafPrivateKey(symbol, index, func(priv []byte, _ Coin) error {
+	err := w.withLeafPrivateKey(chain, index, func(priv []byte, _ Coin) error {
 		// Copy the raw key into a fresh locked buffer while it is live; the
 		// source slice is wiped by withLeafPrivateKey when this callback returns.
 		buf := memguard.NewBuffer(len(priv))

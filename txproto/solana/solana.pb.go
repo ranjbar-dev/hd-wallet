@@ -82,6 +82,7 @@ type TokenTransfer struct {
 	RecipientTokenAddress string                 `protobuf:"bytes,3,opt,name=recipient_token_address,json=recipientTokenAddress,proto3" json:"recipient_token_address,omitempty"` // base58 (the destination ATA)
 	Amount                uint64                 `protobuf:"varint,4,opt,name=amount,proto3" json:"amount,omitempty"`
 	Decimals              uint32                 `protobuf:"varint,5,opt,name=decimals,proto3" json:"decimals,omitempty"`
+	TokenProgramId        uint32                 `protobuf:"varint,6,opt,name=token_program_id,json=tokenProgramId,proto3" json:"token_program_id,omitempty"` // 0=classic SPL Token, 1=Token-2022
 	unknownFields         protoimpl.UnknownFields
 	sizeCache             protoimpl.SizeCache
 }
@@ -147,6 +148,13 @@ func (x *TokenTransfer) GetAmount() uint64 {
 func (x *TokenTransfer) GetDecimals() uint32 {
 	if x != nil {
 		return x.Decimals
+	}
+	return 0
+}
+
+func (x *TokenTransfer) GetTokenProgramId() uint32 {
+	if x != nil {
+		return x.TokenProgramId
 	}
 	return 0
 }
@@ -225,6 +233,7 @@ type CreateAndTransferToken struct {
 	SenderTokenAddress    string                 `protobuf:"bytes,4,opt,name=sender_token_address,json=senderTokenAddress,proto3" json:"sender_token_address,omitempty"`          // base58 source token account
 	Amount                uint64                 `protobuf:"varint,5,opt,name=amount,proto3" json:"amount,omitempty"`
 	Decimals              uint32                 `protobuf:"varint,6,opt,name=decimals,proto3" json:"decimals,omitempty"`
+	TokenProgramId        uint32                 `protobuf:"varint,7,opt,name=token_program_id,json=tokenProgramId,proto3" json:"token_program_id,omitempty"` // 0=classic SPL Token, 1=Token-2022
 	unknownFields         protoimpl.UnknownFields
 	sizeCache             protoimpl.SizeCache
 }
@@ -297,6 +306,13 @@ func (x *CreateAndTransferToken) GetAmount() uint64 {
 func (x *CreateAndTransferToken) GetDecimals() uint32 {
 	if x != nil {
 		return x.Decimals
+	}
+	return 0
+}
+
+func (x *CreateAndTransferToken) GetTokenProgramId() uint32 {
+	if x != nil {
+		return x.TokenProgramId
 	}
 	return 0
 }
@@ -477,6 +493,13 @@ type SigningInput struct {
 	// create_and_transfer_token transactions (plus create/withdraw nonce
 	// account); not supported for create_token_account.
 	NonceAccount string `protobuf:"bytes,4,opt,name=nonce_account,json=nonceAccount,proto3" json:"nonce_account,omitempty"`
+	// When true, compile a v0 (versioned) message instead of a legacy message:
+	// the same header/keys/blockhash/instructions body, prefixed with the 0x80
+	// version-prefix byte and suffixed with a compact-u16 address-table-lookup
+	// count (always 0 — this library never emits populated lookup tables).
+	// Supported for transfer, token_transfer and create_and_transfer_token
+	// transactions (including their durable-nonce combinations).
+	V0Msg bool `protobuf:"varint,10,opt,name=v0_msg,json=v0Msg,proto3" json:"v0_msg,omitempty"`
 	// Types that are valid to be assigned to TransactionType:
 	//
 	//	*SigningInput_TransferTransaction
@@ -533,6 +556,13 @@ func (x *SigningInput) GetNonceAccount() string {
 		return x.NonceAccount
 	}
 	return ""
+}
+
+func (x *SigningInput) GetV0Msg() bool {
+	if x != nil {
+		return x.V0Msg
+	}
+	return false
 }
 
 func (x *SigningInput) GetTransactionType() isSigningInput_TransactionType {
@@ -732,24 +762,26 @@ const file_txproto_solana_solana_proto_rawDesc = "" +
 	"\x1btxproto/solana/solana.proto\x12\x15hdwallet.solana.proto\">\n" +
 	"\bTransfer\x12\x1c\n" +
 	"\trecipient\x18\x01 \x01(\tR\trecipient\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\x04R\x05value\"\xdb\x01\n" +
+	"\x05value\x18\x02 \x01(\x04R\x05value\"\x85\x02\n" +
 	"\rTokenTransfer\x12,\n" +
 	"\x12token_mint_address\x18\x01 \x01(\tR\x10tokenMintAddress\x120\n" +
 	"\x14sender_token_address\x18\x02 \x01(\tR\x12senderTokenAddress\x126\n" +
 	"\x17recipient_token_address\x18\x03 \x01(\tR\x15recipientTokenAddress\x12\x16\n" +
 	"\x06amount\x18\x04 \x01(\x04R\x06amount\x12\x1a\n" +
-	"\bdecimals\x18\x05 \x01(\rR\bdecimals\"\x8a\x01\n" +
+	"\bdecimals\x18\x05 \x01(\rR\bdecimals\x12(\n" +
+	"\x10token_program_id\x18\x06 \x01(\rR\x0etokenProgramId\"\x8a\x01\n" +
 	"\x12CreateTokenAccount\x12!\n" +
 	"\fmain_address\x18\x01 \x01(\tR\vmainAddress\x12,\n" +
 	"\x12token_mint_address\x18\x02 \x01(\tR\x10tokenMintAddress\x12#\n" +
-	"\rtoken_address\x18\x03 \x01(\tR\ftokenAddress\"\x9a\x02\n" +
+	"\rtoken_address\x18\x03 \x01(\tR\ftokenAddress\"\xc4\x02\n" +
 	"\x16CreateAndTransferToken\x124\n" +
 	"\x16recipient_main_address\x18\x01 \x01(\tR\x14recipientMainAddress\x12,\n" +
 	"\x12token_mint_address\x18\x02 \x01(\tR\x10tokenMintAddress\x126\n" +
 	"\x17recipient_token_address\x18\x03 \x01(\tR\x15recipientTokenAddress\x120\n" +
 	"\x14sender_token_address\x18\x04 \x01(\tR\x12senderTokenAddress\x12\x16\n" +
 	"\x06amount\x18\x05 \x01(\x04R\x06amount\x12\x1a\n" +
-	"\bdecimals\x18\x06 \x01(\rR\bdecimals\"c\n" +
+	"\bdecimals\x18\x06 \x01(\rR\bdecimals\x12(\n" +
+	"\x10token_program_id\x18\a \x01(\rR\x0etokenProgramId\"c\n" +
 	"\x12CreateNonceAccount\x129\n" +
 	"\x19nonce_account_private_key\x18\x01 \x01(\fR\x16nonceAccountPrivateKey\x12\x12\n" +
 	"\x04rent\x18\x02 \x01(\x04R\x04rent\"o\n" +
@@ -758,10 +790,12 @@ const file_txproto_solana_solana_proto_rawDesc = "" +
 	"\trecipient\x18\x02 \x01(\tR\trecipient\x12\x14\n" +
 	"\x05value\x18\x03 \x01(\x04R\x05value\":\n" +
 	"\x13AdvanceNonceAccount\x12#\n" +
-	"\rnonce_account\x18\x01 \x01(\tR\fnonceAccount\"\xce\x06\n" +
+	"\rnonce_account\x18\x01 \x01(\tR\fnonceAccount\"\xe5\x06\n" +
 	"\fSigningInput\x12)\n" +
 	"\x10recent_blockhash\x18\x01 \x01(\tR\x0frecentBlockhash\x12#\n" +
-	"\rnonce_account\x18\x04 \x01(\tR\fnonceAccount\x12T\n" +
+	"\rnonce_account\x18\x04 \x01(\tR\fnonceAccount\x12\x15\n" +
+	"\x06v0_msg\x18\n" +
+	" \x01(\bR\x05v0Msg\x12T\n" +
 	"\x14transfer_transaction\x18\x02 \x01(\v2\x1f.hdwallet.solana.proto.TransferH\x00R\x13transferTransaction\x12d\n" +
 	"\x1atoken_transfer_transaction\x18\x03 \x01(\v2$.hdwallet.solana.proto.TokenTransferH\x00R\x18tokenTransferTransaction\x12t\n" +
 	" create_token_account_transaction\x18\x05 \x01(\v2).hdwallet.solana.proto.CreateTokenAccountH\x00R\x1dcreateTokenAccountTransaction\x12\x81\x01\n" +

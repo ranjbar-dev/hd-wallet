@@ -128,7 +128,7 @@ func TestSignDigestValidation(t *testing.T) {
 	w := signTestWallet(t)
 	defer w.Destroy()
 
-	for _, sym := range []Symbol{BTC, ETH} {
+	for _, sym := range []Chain{BTC, ETH} {
 		if _, err := w.Sign(sym, []byte("too short")); !errors.Is(err, ErrInvalidDigest) {
 			t.Errorf("%s: Sign(non-32-byte) error = %v, want ErrInvalidDigest", sym, err)
 		}
@@ -164,7 +164,7 @@ func TestPublicKeyMatchesAddress(t *testing.T) {
 	w := signTestWallet(t)
 	defer w.Destroy()
 
-	for _, sym := range []Symbol{BTC, ETH, SOL, ATOM} {
+	for _, sym := range []Chain{BTC, ETH, SOL, ATOM} {
 		pub, err := w.PublicKey(sym)
 		if err != nil {
 			t.Fatalf("%s: %v", sym, err)

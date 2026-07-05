@@ -46,7 +46,7 @@ type utxoOutParam struct {
 // version bytes differ — they never enter the signed bytes), so the btcd oracle
 // proves each one byte-for-byte (tx_utxo_altcoins_test.go). Version bytes are
 // from Trust Wallet Core's registry.json.
-var utxoOutParams = map[Symbol]utxoOutParam{
+var utxoOutParams = map[Chain]utxoOutParam{
 	DOGE: {p2pkhVer: []byte{0x1e}, p2shVer: []byte{0x16}},
 	DASH: {p2pkhVer: []byte{0x4c}, p2shVer: []byte{0x10}},
 	BCH:  {p2pkhVer: []byte{0x00}, p2shVer: []byte{0x05}, cashHRP: "bitcoincash"},
@@ -66,7 +66,7 @@ var utxoOutParams = map[Symbol]utxoOutParam{
 // Single-byte-version chains decode through btcd's base58.CheckDecode (which
 // returns version + 20-byte payload); two-byte-version chains (e.g. ZEC's
 // transparent t-addr) use the local multi-byte base58check decoder.
-func (p utxoOutParam) decodeScript(symbol Symbol, addr string) ([]byte, error) {
+func (p utxoOutParam) decodeScript(chain Chain, addr string) ([]byte, error) {
 	if p.cashHRP != "" {
 		if script, err := decodeCashAddrScript(p.cashHRP, addr); err == nil {
 			return script, nil
@@ -75,7 +75,7 @@ func (p utxoOutParam) decodeScript(symbol Symbol, addr string) ([]byte, error) {
 	}
 	body, err := decodeBase58CheckBody(addr)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %s: %v", ErrInvalidAddress, symbol, err)
+		return nil, fmt.Errorf("%w: %s: %v", ErrInvalidAddress, chain, err)
 	}
 	switch {
 	case len(body) == len(p.p2pkhVer)+20 && bytesEqual(body[:len(p.p2pkhVer)], p.p2pkhVer):
@@ -83,7 +83,7 @@ func (p utxoOutParam) decodeScript(symbol Symbol, addr string) ([]byte, error) {
 	case len(body) == len(p.p2shVer)+20 && bytesEqual(body[:len(p.p2shVer)], p.p2shVer):
 		return p2shScript(body[len(p.p2shVer):]), nil
 	default:
-		return nil, fmt.Errorf("%w: %s: unrecognized address version/length", ErrInvalidAddress, symbol)
+		return nil, fmt.Errorf("%w: %s: unrecognized address version/length", ErrInvalidAddress, chain)
 	}
 }
 
@@ -164,19 +164,19 @@ func decodeCashAddrScript(prefix, addr string) ([]byte, error) {
 }
 
 // bitcoinTxSupported reports whether the standard Bitcoin-wire signer
-// (signBitcoinTx) handles symbol. ZEC is excluded — it has its own Sapling
+// (signBitcoinTx) handles chain. ZEC is excluded — it has its own Sapling
 // builder (signZcashTx), dispatched ahead of this check.
 //
-// A symbol is supported when it is a native-SegWit chain (btcAddrParams: BTC,
+// A chain is supported when it is a native-SegWit chain (btcAddrParams: BTC,
 // LTC, DGB, SYS, VIA, STRAX) or one of the legacy/CashAddr chains that decode via
 // utxoOutParams (DOGE, DASH, BCH, QTUM, RVN, FIRO, MONA, PIVX). ZEC is also a
 // utxoOutParams entry but is intercepted by signZcashTx before this check, so
 // its membership here is never reached.
-func bitcoinTxSupported(symbol Symbol) bool {
-	if _, ok := btcAddrParams[symbol]; ok { // BTC, LTC, DGB, SYS, VIA, STRAX
+func bitcoinTxSupported(chain Chain) bool {
+	if _, ok := btcAddrParams[chain]; ok { // BTC, LTC, DGB, SYS, VIA, STRAX
 		return true
 	}
-	_, ok := utxoOutParams[symbol]
+	_, ok := utxoOutParams[chain]
 	return ok
 }
 
@@ -185,8 +185,8 @@ func bitcoinTxSupported(symbol Symbol) bool {
 // btcAddrParams) use version 2; the legacy non-SegWit chains (DOGE/DASH/BCH and
 // the base58-only altcoins) use version 1, matching the reference signers their
 // vectors come from.
-func btcTxVersion(symbol Symbol) uint32 {
-	if _, ok := btcAddrParams[symbol]; ok { // BTC, LTC, DGB, SYS, VIA, STRAX
+func btcTxVersion(chain Chain) uint32 {
+	if _, ok := btcAddrParams[chain]; ok { // BTC, LTC, DGB, SYS, VIA, STRAX
 		return 2
 	}
 	return 1
@@ -195,8 +195,8 @@ func btcTxVersion(symbol Symbol) uint32 {
 // bitcoinDefaultHashType returns the SIGHASH byte used when the input leaves
 // hash_type unset. Bitcoin Cash defaults to SIGHASH_ALL|FORKID (0x41); every
 // other chain uses SIGHASH_ALL (0x01).
-func bitcoinDefaultHashType(symbol Symbol) uint32 {
-	if symbol == BCH {
+func bitcoinDefaultHashType(chain Chain) uint32 {
+	if chain == BCH {
 		return 0x41
 	}
 	return 0x01

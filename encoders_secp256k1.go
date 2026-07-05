@@ -73,11 +73,11 @@ func encodeRonin(pub []byte) (string, error) {
 
 // roninValidator validates a Ronin address by stripping the "ronin:" prefix,
 // restoring the "0x" form, and delegating to the Ethereum validator.
-func roninValidator(symbol Symbol) addressValidator {
-	eth := ethValidator(symbol)
+func roninValidator(chain Chain) addressValidator {
+	eth := ethValidator(chain)
 	return func(addr string) ([]byte, error) {
 		if !strings.HasPrefix(addr, "ronin:") {
-			return nil, addrErr(symbol, "must start with ronin:")
+			return nil, addrErr(chain, "must start with ronin:")
 		}
 		return eth("0x" + strings.TrimPrefix(addr, "ronin:"))
 	}

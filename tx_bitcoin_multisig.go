@@ -88,24 +88,24 @@ func BuildMultisigRedeemScript(m int, pubkeys [][]byte) ([]byte, error) {
 
 // ---- address derivation ----
 
-// MultisigP2SHAddress returns the P2SH address for redeemScript on symbol.
+// MultisigP2SHAddress returns the P2SH address for redeemScript on chain.
 // Only chains in btcAddrParams (BTC, LTC, DGB, SYS, VIA, STRAX) are supported.
-func MultisigP2SHAddress(symbol Symbol, redeemScript []byte) (string, error) {
-	p, ok := btcAddrParams[symbol]
+func MultisigP2SHAddress(chain Chain, redeemScript []byte) (string, error) {
+	p, ok := btcAddrParams[chain]
 	if !ok {
-		return "", fmt.Errorf("%w: %s has no P2SH multisig address support", ErrUnsupportedCoin, symbol)
+		return "", fmt.Errorf("%w: %s has no P2SH multisig address support", ErrUnsupportedCoin, chain)
 	}
 	return base58.CheckEncode(hash160(redeemScript), p.p2shVer), nil
 }
 
 // MultisigP2WSHAddress returns the native-SegWit P2WSH bech32 address for
-// witnessScript on symbol (the same script as the redeemScript — just the name
+// witnessScript on chain (the same script as the redeemScript — just the name
 // changes to match BIP-141 terminology). Only chains in btcAddrParams are
 // supported.
-func MultisigP2WSHAddress(symbol Symbol, witnessScript []byte) (string, error) {
-	p, ok := btcAddrParams[symbol]
+func MultisigP2WSHAddress(chain Chain, witnessScript []byte) (string, error) {
+	p, ok := btcAddrParams[chain]
 	if !ok {
-		return "", fmt.Errorf("%w: %s has no P2WSH multisig address support", ErrUnsupportedCoin, symbol)
+		return "", fmt.Errorf("%w: %s has no P2WSH multisig address support", ErrUnsupportedCoin, chain)
 	}
 	h := sha256.Sum256(witnessScript)
 	conv, err := bech32.ConvertBits(h[:], 8, 5, true)
@@ -136,9 +136,9 @@ func MultisigP2WSHAddress(symbol Symbol, witnessScript []byte) (string, error) {
 // Only chains in btcAddrParams (BTC, LTC, and the native-SegWit altcoins) are
 // accepted. Legacy P2PKH inputs in in.Utxo are rejected (same reason as the
 // single-key PSBT path: no full prev-tx in the proto).
-func BuildMultisigPSBT(symbol Symbol, in *txbtc.SigningInput, redeemScript []byte) ([]byte, error) {
-	if _, ok := btcAddrParams[symbol]; !ok {
-		return nil, fmt.Errorf("%w: %s", ErrTxUnsupported, symbol)
+func BuildMultisigPSBT(chain Chain, in *txbtc.SigningInput, redeemScript []byte) ([]byte, error) {
+	if _, ok := btcAddrParams[chain]; !ok {
+		return nil, fmt.Errorf("%w: %s", ErrTxUnsupported, chain)
 	}
 	if len(in.GetUtxo()) == 0 {
 		return nil, fmt.Errorf("%w: bitcoin: multisig: no utxo provided", ErrTxInput)
@@ -150,11 +150,11 @@ func BuildMultisigPSBT(symbol Symbol, in *txbtc.SigningInput, redeemScript []byt
 		return nil, fmt.Errorf("%w: bitcoin: multisig: redeemScript is empty", ErrTxInput)
 	}
 
-	toScript, err := bitcoinDecodeScript(symbol, in.GetToAddress())
+	toScript, err := bitcoinDecodeScript(chain, in.GetToAddress())
 	if err != nil {
 		return nil, fmt.Errorf("%w: bitcoin: multisig: to_address: %v", ErrTxInput, err)
 	}
-	plan, err := planBitcoinTx(symbol, in, toScript)
+	plan, err := planBitcoinTx(chain, in, toScript)
 	if err != nil {
 		return nil, err
 	}
@@ -226,22 +226,22 @@ func BuildMultisigPSBT(symbol Symbol, in *txbtc.SigningInput, redeemScript []byt
 // ---- PSBT signing ----
 
 // SignMultisigPSBT signs every multisig input in psbtBytes that is controlled
-// by the (symbol, index) key and attaches the partial signature. If an input
+// by the (chain, index) key and attaches the partial signature. If an input
 // does not contain this wallet's pubkey in its redeemScript/witnessScript the
 // input is silently skipped (another co-signer owns it). The updated PSBT is
 // returned.
 //
 // The leaf private key is derived under the package's wiped-on-return
 // discipline; no raw key bytes leave the package.
-func (w *HDWallet) SignMultisigPSBT(symbol Symbol, index uint32, psbtBytes []byte) ([]byte, error) {
-	if _, ok := btcAddrParams[symbol]; !ok {
-		return nil, fmt.Errorf("%w: %s", ErrTxUnsupported, symbol)
+func (w *HDWallet) SignMultisigPSBT(chain Chain, index uint32, psbtBytes []byte) ([]byte, error) {
+	if _, ok := btcAddrParams[chain]; !ok {
+		return nil, fmt.Errorf("%w: %s", ErrTxUnsupported, chain)
 	}
 	packet, err := parsePacket(psbtBytes)
 	if err != nil {
 		return nil, err
 	}
-	pub, err := w.PublicKeyIndex(symbol, index)
+	pub, err := w.PublicKeyIndex(chain, index)
 	if err != nil {
 		return nil, err
 	}
@@ -300,7 +300,7 @@ func (w *HDWallet) SignMultisigPSBT(symbol Symbol, index uint32, psbtBytes []byt
 			if err != nil {
 				return nil, fmt.Errorf("hdwallet: bitcoin: multisig: input %d: p2wsh sighash: %w", i, err)
 			}
-			sig, err := w.btcDERSig(symbol, index, digest, hashType)
+			sig, err := w.btcDERSig(chain, index, digest, hashType)
 			if err != nil {
 				return nil, err
 			}
@@ -346,7 +346,7 @@ func (w *HDWallet) SignMultisigPSBT(symbol Symbol, index uint32, psbtBytes []byt
 			if err != nil {
 				return nil, fmt.Errorf("hdwallet: bitcoin: multisig: input %d: p2sh sighash: %w", i, err)
 			}
-			sig, err := w.btcDERSig(symbol, index, digest, hashType)
+			sig, err := w.btcDERSig(chain, index, digest, hashType)
 			if err != nil {
 				return nil, err
 			}

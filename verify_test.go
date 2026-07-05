@@ -7,7 +7,7 @@ import (
 )
 
 // TestVerifySignaturePerCurve signs with a derived key and checks the
-// Symbol-keyed VerifySignature wrapper accepts the genuine signature for one
+// Chain-keyed VerifySignature wrapper accepts the genuine signature for one
 // chain per registered curve.
 func TestVerifySignaturePerCurve(t *testing.T) {
 	w := signTestWallet(t)
@@ -17,7 +17,7 @@ func TestVerifySignaturePerCurve(t *testing.T) {
 	msg := []byte("an arbitrary-length ed25519 message, not a 32-byte digest")
 
 	cases := []struct {
-		sym  Symbol
+		sym  Chain
 		data []byte
 	}{
 		{BTC, digest[:]}, // secp256k1
@@ -79,10 +79,10 @@ func TestVerifySignatureRejectsWrongKeyAndTampered(t *testing.T) {
 }
 
 // TestVerifySignatureUnsupportedCoin returns a wrapped ErrUnsupportedCoin for a
-// symbol not in the registry.
+// chain not in the registry.
 func TestVerifySignatureUnsupportedCoin(t *testing.T) {
 	digest := sha256.Sum256([]byte("x"))
-	ok, err := VerifySignature(Symbol("NOPE"), make([]byte, 33), digest[:], &Signature{})
+	ok, err := VerifySignature(Chain("NOPE"), make([]byte, 33), digest[:], &Signature{})
 	if ok {
 		t.Error("VerifySignature(unknown coin) returned true")
 	}
@@ -98,7 +98,7 @@ func TestVerifySignatureInvalidDigest(t *testing.T) {
 	w := signTestWallet(t)
 	defer w.Destroy()
 
-	for _, sym := range []Symbol{BTC, ETH} {
+	for _, sym := range []Chain{BTC, ETH} {
 		pub, _ := w.PublicKeyIndex(sym, 0)
 		ok, err := VerifySignature(sym, pub, []byte("too short"), &Signature{})
 		if ok {

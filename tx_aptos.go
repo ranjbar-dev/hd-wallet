@@ -51,11 +51,53 @@ const aptosEntryFunctionVariant = 2
 // Ed25519 (= 0).
 const aptosEd25519AuthVariant = 0
 
+// aptosFrameworkAddr is the 32-byte Aptos framework address 0x0…01, used as
+// the module address for built-in modules such as aptos_account.
+var aptosFrameworkAddr = func() []byte {
+	addr := make([]byte, 32)
+	addr[31] = 0x01
+	return addr
+}()
+
+// aptosEntryFunctionFromTransfer synthesizes the EntryFunction equivalent to
+// 0x1::aptos_account::transfer(to, amount) from a structured TransferMessage.
+// The resulting EntryFunction is fed through the exact same BCS-encoding /
+// signing path as an explicit entry_function input, so the two are
+// byte-identical for the same recipient/amount.
+func aptosEntryFunctionFromTransfer(tm *txaptos.TransferMessage) (*txaptos.EntryFunction, error) {
+	toBytes, err := hexToBytes(tm.GetTo())
+	if err != nil {
+		return nil, fmt.Errorf("%w: Aptos: transfer.to: %v", ErrTxInput, err)
+	}
+	if len(toBytes) != 32 {
+		return nil, fmt.Errorf("%w: Aptos: transfer.to must be a 32-byte address, got %d bytes", ErrTxInput, len(toBytes))
+	}
+
+	return &txaptos.EntryFunction{
+		ModuleAddress: aptosFrameworkAddr,
+		ModuleName:    "aptos_account",
+		FunctionName:  "transfer",
+		TypeArgs:      nil,
+		Args:          [][]byte{toBytes, aptosAppendU64LE(nil, tm.GetAmount())},
+	}, nil
+}
+
 // signAptosTx builds and signs an Aptos SignedTransaction.
-func (w *HDWallet) signAptosTx(_ Symbol, index uint32, in *txaptos.SigningInput) (proto.Message, error) {
+func (w *HDWallet) signAptosTx(_ Chain, index uint32, in *txaptos.SigningInput) (proto.Message, error) {
+	if in.GetEntryFunction() != nil && in.GetTransfer() != nil {
+		return nil, fmt.Errorf("%w: Aptos: entry_function and transfer are mutually exclusive", ErrTxInput)
+	}
+
 	ef := in.GetEntryFunction()
+	if ef == nil && in.GetTransfer() != nil {
+		var err error
+		ef, err = aptosEntryFunctionFromTransfer(in.GetTransfer())
+		if err != nil {
+			return nil, err
+		}
+	}
 	if ef == nil {
-		return nil, fmt.Errorf("%w: Aptos: entry_function is required", ErrTxInput)
+		return nil, fmt.Errorf("%w: Aptos: entry_function or transfer is required", ErrTxInput)
 	}
 	if len(ef.ModuleAddress) != 32 {
 		return nil, fmt.Errorf("%w: Aptos: module_address must be 32 bytes", ErrTxInput)

@@ -75,7 +75,7 @@ func TestAddressRangeZeroCount(t *testing.T) {
 	}
 }
 
-// TestAddressRangeUnsupportedCoin wraps ErrUnsupportedCoin for an unknown symbol.
+// TestAddressRangeUnsupportedCoin wraps ErrUnsupportedCoin for an unknown chain.
 func TestAddressRangeUnsupportedCoin(t *testing.T) {
 	w, err := FromMnemonic(canonicalMnemonic)
 	if err != nil {
@@ -83,7 +83,7 @@ func TestAddressRangeUnsupportedCoin(t *testing.T) {
 	}
 	defer w.Destroy()
 
-	if _, err := w.AddressRange(Symbol("NOPE"), 0, 3); !errors.Is(err, ErrUnsupportedCoin) {
+	if _, err := w.AddressRange(Chain("NOPE"), 0, 3); !errors.Is(err, ErrUnsupportedCoin) {
 		t.Errorf("AddressRange(NOPE) err = %v, want ErrUnsupportedCoin", err)
 	}
 }

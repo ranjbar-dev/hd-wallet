@@ -64,13 +64,13 @@ const (
 )
 
 // signEthereumTx builds, signs and serializes an EVM transaction.
-func (w *HDWallet) signEthereumTx(symbol Symbol, index uint32, in *txeth.SigningInput) (*txeth.SigningOutput, error) {
+func (w *HDWallet) signEthereumTx(chain Chain, index uint32, in *txeth.SigningInput) (*txeth.SigningOutput, error) {
 	// UserOp modes are dispatched before ethDestination (they build callData differently).
 	switch in.GetTxMode() {
 	case EthTxModeUserOp:
-		return w.signEthereumUserOpV06(symbol, index, in)
+		return w.signEthereumUserOpV06(chain, index, in)
 	case EthTxModeUserOpV07:
-		return w.signEthereumUserOpV07(symbol, index, in)
+		return w.signEthereumUserOpV07(chain, index, in)
 	}
 	to, value, data, err := ethDestination(in)
 	if err != nil {
@@ -78,17 +78,17 @@ func (w *HDWallet) signEthereumTx(symbol Symbol, index uint32, in *txeth.Signing
 	}
 	switch in.GetTxMode() {
 	case EthTxModeLegacy:
-		return w.signEthereumLegacy(symbol, index, in, to, value, data)
+		return w.signEthereumLegacy(chain, index, in, to, value, data)
 	case EthTxModeEIP2930:
-		return w.signEthereumEIP2930(symbol, index, in, to, value, data)
+		return w.signEthereumEIP2930(chain, index, in, to, value, data)
 	case EthTxModeEIP1559:
-		return w.signEthereumEIP1559(symbol, index, in, to, value, data)
+		return w.signEthereumEIP1559(chain, index, in, to, value, data)
 	case EthTxModeEIP4844:
-		return w.signEthereumEIP4844(symbol, index, in, to, value, data)
+		return w.signEthereumEIP4844(chain, index, in, to, value, data)
 	case EthTxModeEIP7702:
-		return w.signEthereumEIP7702(symbol, index, in, to, value, data)
+		return w.signEthereumEIP7702(chain, index, in, to, value, data)
 	default:
-		return nil, fmt.Errorf("%w: %s unsupported tx_mode %d (want 0–4 EVM, 5 userop-v06, 6 userop-v07)", ErrTxInput, symbol, in.GetTxMode())
+		return nil, fmt.Errorf("%w: %s unsupported tx_mode %d (want 0–4 EVM, 5 userop-v06, 6 userop-v07)", ErrTxInput, chain, in.GetTxMode())
 	}
 }
 
@@ -97,18 +97,18 @@ func (w *HDWallet) signEthereumTx(symbol Symbol, index uint32, in *txeth.Signing
 // the Transaction payload, then wraps it in SimpleAccount's execute(address,uint256,bytes)
 // callData. The userOpHash is signed via EIP-191 personal_sign. The returned
 // SigningOutput.Encoded = 65-byte signature, TxId = "0x" + userOpHash hex.
-func (w *HDWallet) signEthereumUserOpV06(symbol Symbol, index uint32, in *txeth.SigningInput) (*txeth.SigningOutput, error) {
+func (w *HDWallet) signEthereumUserOpV06(chain Chain, index uint32, in *txeth.SigningInput) (*txeth.SigningOutput, error) {
 	meta := in.GetUserOperation()
 	if meta == nil {
-		return nil, fmt.Errorf("%w: %s: user_operation required for tx_mode 5 (UserOp v0.6)", ErrTxInput, symbol)
+		return nil, fmt.Errorf("%w: %s: user_operation required for tx_mode 5 (UserOp v0.6)", ErrTxInput, chain)
 	}
 	sender, err := hexToBytes(meta.GetSender())
 	if err != nil || len(sender) != 20 {
-		return nil, fmt.Errorf("%w: %s: bad user_operation.sender", ErrTxInput, symbol)
+		return nil, fmt.Errorf("%w: %s: bad user_operation.sender", ErrTxInput, chain)
 	}
 	entryPoint, err := hexToBytes(meta.GetEntryPoint())
 	if err != nil || len(entryPoint) != 20 {
-		return nil, fmt.Errorf("%w: %s: bad user_operation.entry_point", ErrTxInput, symbol)
+		return nil, fmt.Errorf("%w: %s: bad user_operation.entry_point", ErrTxInput, chain)
 	}
 	innerTo, innerValue, innerData, err := ethDestination(in)
 	if err != nil {
@@ -138,7 +138,7 @@ func (w *HDWallet) signEthereumUserOpV06(symbol Symbol, index uint32, in *txeth.
 	}
 	chainID := new(big.Int).SetBytes(in.GetChainId())
 	hash := UserOperationHash(op, entryPoint, chainID)
-	sig, err := w.SignMessage(symbol, index, hash)
+	sig, err := w.SignMessage(chain, index, hash)
 	if err != nil {
 		return nil, err
 	}
@@ -335,7 +335,7 @@ func ethDestination(in *txeth.SigningInput) (to, value, data []byte, err error) 
 }
 
 // signEthereumLegacy produces an EIP-155 legacy transaction.
-func (w *HDWallet) signEthereumLegacy(symbol Symbol, index uint32, in *txeth.SigningInput, to, value, data []byte) (*txeth.SigningOutput, error) {
+func (w *HDWallet) signEthereumLegacy(chain Chain, index uint32, in *txeth.SigningInput, to, value, data []byte) (*txeth.SigningOutput, error) {
 	chainID := new(big.Int).SetBytes(in.GetChainId())
 
 	// Preimage list: [nonce, gasPrice, gasLimit, to, value, data, chainId, 0, 0].
@@ -352,7 +352,7 @@ func (w *HDWallet) signEthereumLegacy(symbol Symbol, index uint32, in *txeth.Sig
 	)
 	digest := keccak256(EncodeRLP(preList))
 
-	r, s, recid, err := w.ethSign(symbol, index, digest)
+	r, s, recid, err := w.ethSign(chain, index, digest)
 	if err != nil {
 		return nil, err
 	}
@@ -380,7 +380,7 @@ func (w *HDWallet) signEthereumLegacy(symbol Symbol, index uint32, in *txeth.Sig
 // is a legacy-shaped tx (gasPrice, not the 1559 fee market) wrapped in the typed
 // 0x01 envelope, with the access list carried in the signed bytes and v as the
 // bare recovery id.
-func (w *HDWallet) signEthereumEIP2930(symbol Symbol, index uint32, in *txeth.SigningInput, to, value, data []byte) (*txeth.SigningOutput, error) {
+func (w *HDWallet) signEthereumEIP2930(chain Chain, index uint32, in *txeth.SigningInput, to, value, data []byte) (*txeth.SigningOutput, error) {
 	accessList, err := ethAccessList(in.GetAccessList())
 	if err != nil {
 		return nil, err
@@ -403,7 +403,7 @@ func (w *HDWallet) signEthereumEIP2930(symbol Symbol, index uint32, in *txeth.Si
 	preimage := append([]byte{0x01}, EncodeRLP(fields())...)
 	digest := keccak256(preimage)
 
-	r, s, recid, err := w.ethSign(symbol, index, digest)
+	r, s, recid, err := w.ethSign(chain, index, digest)
 	if err != nil {
 		return nil, err
 	}
@@ -414,7 +414,7 @@ func (w *HDWallet) signEthereumEIP2930(symbol Symbol, index uint32, in *txeth.Si
 }
 
 // signEthereumEIP1559 produces a type-2 (EIP-1559) transaction.
-func (w *HDWallet) signEthereumEIP1559(symbol Symbol, index uint32, in *txeth.SigningInput, to, value, data []byte) (*txeth.SigningOutput, error) {
+func (w *HDWallet) signEthereumEIP1559(chain Chain, index uint32, in *txeth.SigningInput, to, value, data []byte) (*txeth.SigningOutput, error) {
 	accessList, err := ethAccessList(in.GetAccessList())
 	if err != nil {
 		return nil, err
@@ -438,7 +438,7 @@ func (w *HDWallet) signEthereumEIP1559(symbol Symbol, index uint32, in *txeth.Si
 	preimage := append([]byte{0x02}, EncodeRLP(fields())...)
 	digest := keccak256(preimage)
 
-	r, s, recid, err := w.ethSign(symbol, index, digest)
+	r, s, recid, err := w.ethSign(chain, index, digest)
 	if err != nil {
 		return nil, err
 	}
@@ -452,14 +452,14 @@ func (w *HDWallet) signEthereumEIP1559(symbol Symbol, index uint32, in *txeth.Si
 
 // ethSign signs a 32-byte digest and returns the canonical R, S (32-byte each)
 // and the recovery id (0/1).
-func (w *HDWallet) ethSign(symbol Symbol, index uint32, digest []byte) (r, s []byte, recid byte, err error) {
-	sig, err := w.SignIndex(symbol, index, digest)
+func (w *HDWallet) ethSign(chain Chain, index uint32, digest []byte) (r, s []byte, recid byte, err error) {
+	sig, err := w.SignIndex(chain, index, digest)
 	if err != nil {
 		return nil, nil, 0, err
 	}
 	rec := sig.Recoverable()
 	if rec == nil {
-		return nil, nil, 0, fmt.Errorf("%w: %s is not a secp256k1 coin", ErrTxInput, symbol)
+		return nil, nil, 0, fmt.Errorf("%w: %s is not a secp256k1 coin", ErrTxInput, chain)
 	}
 	return append([]byte(nil), rec[:32]...), append([]byte(nil), rec[32:64]...), rec[64], nil
 }
@@ -501,18 +501,18 @@ func ethOutput(encoded, r, s, v []byte) *txeth.SigningOutput {
 // Layout: 0x03 || rlp([chainId, nonce, maxPriority, maxFee, gasLimit, to,
 //
 //	value, data, accessList, maxFeePerBlobGas, blobVersionedHashes, v, r, s])
-func (w *HDWallet) signEthereumEIP4844(symbol Symbol, index uint32, in *txeth.SigningInput, to, value, data []byte) (*txeth.SigningOutput, error) {
+func (w *HDWallet) signEthereumEIP4844(chain Chain, index uint32, in *txeth.SigningInput, to, value, data []byte) (*txeth.SigningOutput, error) {
 	blobHashes := in.GetBlobVersionedHashes()
 	if len(blobHashes) == 0 {
-		return nil, fmt.Errorf("%w: %s eip-4844: at least one blob_versioned_hash is required", ErrTxInput, symbol)
+		return nil, fmt.Errorf("%w: %s eip-4844: at least one blob_versioned_hash is required", ErrTxInput, chain)
 	}
 	for i, h := range blobHashes {
 		if len(h) != 32 {
-			return nil, fmt.Errorf("%w: %s eip-4844: blob_versioned_hash[%d] must be 32 bytes, got %d", ErrTxInput, symbol, i, len(h))
+			return nil, fmt.Errorf("%w: %s eip-4844: blob_versioned_hash[%d] must be 32 bytes, got %d", ErrTxInput, chain, i, len(h))
 		}
 	}
 	if len(in.GetMaxFeePerBlobGas()) == 0 {
-		return nil, fmt.Errorf("%w: %s eip-4844: max_fee_per_blob_gas is required", ErrTxInput, symbol)
+		return nil, fmt.Errorf("%w: %s eip-4844: max_fee_per_blob_gas is required", ErrTxInput, chain)
 	}
 
 	accessList, err := ethAccessList(in.GetAccessList())
@@ -549,7 +549,7 @@ func (w *HDWallet) signEthereumEIP4844(symbol Symbol, index uint32, in *txeth.Si
 	preimage := append([]byte{0x03}, EncodeRLP(fields())...)
 	digest := keccak256(preimage)
 
-	r, s, recid, err := w.ethSign(symbol, index, digest)
+	r, s, recid, err := w.ethSign(chain, index, digest)
 	if err != nil {
 		return nil, err
 	}
@@ -573,10 +573,10 @@ func (w *HDWallet) signEthereumEIP4844(symbol Symbol, index uint32, in *txeth.Si
 // Layout: 0x04 || rlp([chainId, nonce, maxPriority, maxFee, gasLimit, to,
 //
 //	value, data, accessList, authorizationList, v, r, s])
-func (w *HDWallet) signEthereumEIP7702(symbol Symbol, index uint32, in *txeth.SigningInput, to, value, data []byte) (*txeth.SigningOutput, error) {
+func (w *HDWallet) signEthereumEIP7702(chain Chain, index uint32, in *txeth.SigningInput, to, value, data []byte) (*txeth.SigningOutput, error) {
 	authList := in.GetAuthorizationList()
 	if len(authList) == 0 {
-		return nil, fmt.Errorf("%w: %s eip-7702: authorization_list must not be empty", ErrTxInput, symbol)
+		return nil, fmt.Errorf("%w: %s eip-7702: authorization_list must not be empty", ErrTxInput, chain)
 	}
 
 	accessList, err := ethAccessList(in.GetAccessList())
@@ -584,7 +584,7 @@ func (w *HDWallet) signEthereumEIP7702(symbol Symbol, index uint32, in *txeth.Si
 		return nil, err
 	}
 
-	authorizationList, err := ethAuthorizationList(authList, symbol)
+	authorizationList, err := ethAuthorizationList(authList, chain)
 	if err != nil {
 		return nil, err
 	}
@@ -610,7 +610,7 @@ func (w *HDWallet) signEthereumEIP7702(symbol Symbol, index uint32, in *txeth.Si
 	preimage := append([]byte{0x04}, EncodeRLP(fields())...)
 	digest := keccak256(preimage)
 
-	r, s, recid, err := w.ethSign(symbol, index, digest)
+	r, s, recid, err := w.ethSign(chain, index, digest)
 	if err != nil {
 		return nil, err
 	}
@@ -630,12 +630,12 @@ func (w *HDWallet) signEthereumEIP7702(symbol Symbol, index uint32, in *txeth.Si
 // nonce is a uint64 quantity. The y_parity is 0 or 1 as a quantity. The r and
 // s components are big-endian scalars (quantity-minimized, matching go-ethereum
 // *big.Int RLP encoding).
-func ethAuthorizationList(auths []*txeth.EthAuthorization, symbol Symbol) (RLPItem, error) {
+func ethAuthorizationList(auths []*txeth.EthAuthorization, chain Chain) (RLPItem, error) {
 	entries := make([]RLPItem, 0, len(auths))
 	for i, a := range auths {
 		addr, err := hexToBytes(a.GetAddress())
 		if err != nil || len(addr) != 20 {
-			return RLPItem{}, fmt.Errorf("%w: %s eip-7702: authorization[%d]: bad address %q", ErrTxInput, symbol, i, a.GetAddress())
+			return RLPItem{}, fmt.Errorf("%w: %s eip-7702: authorization[%d]: bad address %q", ErrTxInput, chain, i, a.GetAddress())
 		}
 		// nonce: uint64 → big-endian bytes → quantity (strip leading zeros).
 		nonceBytes := new(big.Int).SetUint64(a.GetNonce()).Bytes()

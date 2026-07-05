@@ -23,13 +23,13 @@ const solanaNonceAccountSpace = 80
 
 // signSolanaCreateNonceAccount funds and initializes a new durable-nonce
 // account. The signing wallet pays rent and becomes the nonce authority.
-func (w *HDWallet) signSolanaCreateNonceAccount(symbol Symbol, index uint32, in *txsolana.SigningInput) (*txsolana.SigningOutput, error) {
+func (w *HDWallet) signSolanaCreateNonceAccount(chain Chain, index uint32, in *txsolana.SigningInput) (*txsolana.SigningOutput, error) {
 	cn := in.GetCreateNonceAccount()
 	seed := cn.GetNonceAccountPrivateKey()
 	if len(seed) != ed25519.SeedSize {
 		return nil, fmt.Errorf("%w: solana: nonce_account_private_key must be 32 bytes", ErrTxInput)
 	}
-	payer, err := w.PublicKeyIndex(symbol, index)
+	payer, err := w.PublicKeyIndex(chain, index)
 	if err != nil {
 		return nil, err
 	}
@@ -69,7 +69,7 @@ func (w *HDWallet) signSolanaCreateNonceAccount(symbol Symbol, index uint32, in 
 	message := solanaCompileMessage(payer, instrs, blockhash)
 
 	// Two required signatures, in key order: payer (wallet), then nonce account.
-	sig, err := w.SignIndex(symbol, index, message)
+	sig, err := w.SignIndex(chain, index, message)
 	if err != nil {
 		return nil, err
 	}
@@ -94,9 +94,9 @@ func (w *HDWallet) signSolanaCreateNonceAccount(symbol Symbol, index uint32, in 
 
 // signSolanaWithdrawNonceAccount withdraws lamports from a nonce account the
 // wallet key is authority over; supports an optional durable nonce.
-func (w *HDWallet) signSolanaWithdrawNonceAccount(symbol Symbol, index uint32, in *txsolana.SigningInput) (*txsolana.SigningOutput, error) {
+func (w *HDWallet) signSolanaWithdrawNonceAccount(chain Chain, index uint32, in *txsolana.SigningInput) (*txsolana.SigningOutput, error) {
 	wn := in.GetWithdrawNonceAccount()
-	authority, err := w.PublicKeyIndex(symbol, index)
+	authority, err := w.PublicKeyIndex(chain, index)
 	if err != nil {
 		return nil, err
 	}
@@ -134,17 +134,17 @@ func (w *HDWallet) signSolanaWithdrawNonceAccount(symbol Symbol, index uint32, i
 	}
 	instrs = append(instrs, solanaInstrWithdrawNonce(withdrawFrom, recipient, sysvarRBH, rentSysvar, authority, wn.GetValue()))
 	message := solanaCompileMessage(authority, instrs, blockhash)
-	return w.solanaFinishTx(symbol, index, message)
+	return w.solanaFinishTx(chain, index, message)
 }
 
 // signSolanaAdvanceNonceAccount advances a durable nonce with no other
 // operation (periodic refresh / invalidating a previously signed tx).
-func (w *HDWallet) signSolanaAdvanceNonceAccount(symbol Symbol, index uint32, in *txsolana.SigningInput) (*txsolana.SigningOutput, error) {
+func (w *HDWallet) signSolanaAdvanceNonceAccount(chain Chain, index uint32, in *txsolana.SigningInput) (*txsolana.SigningOutput, error) {
 	an := in.GetAdvanceNonceAccount()
 	if in.GetNonceAccount() != "" {
 		return nil, fmt.Errorf("%w: solana: nonce_account input is not supported for a standalone AdvanceNonceAccount", ErrTxInput)
 	}
-	authority, err := w.PublicKeyIndex(symbol, index)
+	authority, err := w.PublicKeyIndex(chain, index)
 	if err != nil {
 		return nil, err
 	}
@@ -166,5 +166,5 @@ func (w *HDWallet) signSolanaAdvanceNonceAccount(symbol Symbol, index uint32, in
 	message := solanaCompileMessage(authority, []solanaInstruction{
 		solanaInstrAdvanceNonce(nonceAcct, authority, sysvarRBH),
 	}, blockhash)
-	return w.solanaFinishTx(symbol, index, message)
+	return w.solanaFinishTx(chain, index, message)
 }

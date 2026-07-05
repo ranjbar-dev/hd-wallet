@@ -2,7 +2,7 @@ package hdwallet
 
 // Transaction-family membership.
 //
-// txFamilyOf routes a symbol to its transaction builder. EVM chains share one
+// txFamilyOf routes a chain to its transaction builder. EVM chains share one
 // builder (the chain id is supplied in the SigningInput, so the bytes are
 // identical across chains for the same key and input), as do the standard
 // Cosmos SDK chains (the bech32 HRP lives only in the address strings the caller
@@ -17,7 +17,7 @@ package hdwallet
 
 // evmTxChains is every chain whose transaction is a standard Ethereum RLP tx
 // (the encodeETH / encodeRonin registry rows).
-var evmTxChains = symbolSet(
+var evmTxChains = chainSet(
 	// base EVM
 	ETH, BNB, MATIC, AVAX, ARB, OP, FTM, BASE, CRO, GNO, CELO,
 	// additional EVM (Ethereum address format)
@@ -30,7 +30,7 @@ var evmTxChains = symbolSet(
 // cosmosTxChains is every standard Cosmos SDK chain (the cosmosEncoder rows,
 // secp256k1 / "/cosmos.crypto.secp256k1.PubKey"). Ethermint-keyed Cosmos chains
 // are intentionally excluded (see the package note above).
-var cosmosTxChains = symbolSet(
+var cosmosTxChains = chainSet(
 	// base Cosmos
 	ATOM, OSMO, JUNO, TIA,
 	// additional Cosmos (hash160 bech32, per-chain HRP)
@@ -57,7 +57,7 @@ var cosmosTxChains = symbolSet(
 // wire format.
 //
 // See the per-coin notes in address_types.go / tx_utxo.go.
-var utxoTxChains = symbolSet(
+var utxoTxChains = chainSet(
 	DOGE, DASH, BCH, ZEC,
 	DGB, SYS, VIA, STRAX,
 	QTUM, RVN, FIRO, MONA, PIVX,
@@ -72,12 +72,12 @@ var utxoTxChains = symbolSet(
 // (tx_cosmos_ethermint_test.go); INJ uses
 // "/injective.crypto.v1beta1.ethsecp256k1.PubKey" with an UNCOMPRESSED key
 // (tx_cosmos_injective_test.go).
-var ethermintTxChains = symbolSet(EVMOS, INJ)
+var ethermintTxChains = chainSet(EVMOS, INJ)
 
-// symbolSet builds a set from a list of symbols.
-func symbolSet(symbols ...Symbol) map[Symbol]struct{} {
-	m := make(map[Symbol]struct{}, len(symbols))
-	for _, s := range symbols {
+// chainSet builds a set from a list of chains.
+func chainSet(chains ...Chain) map[Chain]struct{} {
+	m := make(map[Chain]struct{}, len(chains))
+	for _, s := range chains {
 		m[s] = struct{}{}
 	}
 	return m

@@ -3,7 +3,7 @@ package hdwallet
 import "fmt"
 
 // SignRawMessage is the chain-neutral signing primitive. It routes to the
-// correct curve for the given symbol and returns the raw Signature.
+// correct curve for the given chain and returns the raw Signature.
 //
 // For the ECDSA chain (secp256k1 — e.g. ETH, BTC, ATOM) message must be the
 // 32-byte digest the caller has pre-hashed with the chain's own hash function
@@ -17,8 +17,8 @@ import "fmt"
 // envelope prefixes use SignBitcoinMessage, SignSolanaMessage,
 // SignCosmosADR36, or SignTronMessage instead. The derived private key is
 // wiped immediately after signing and never leaves the package.
-func (w *HDWallet) SignRawMessage(symbol Symbol, index uint32, message []byte) (*Signature, error) {
-	sig, err := w.SignIndex(symbol, index, message)
+func (w *HDWallet) SignRawMessage(chain Chain, index uint32, message []byte) (*Signature, error) {
+	sig, err := w.SignIndex(chain, index, message)
 	if err != nil {
 		return nil, fmt.Errorf("hdwallet: SignRawMessage: %w", err)
 	}
@@ -26,13 +26,13 @@ func (w *HDWallet) SignRawMessage(symbol Symbol, index uint32, message []byte) (
 }
 
 // VerifyRawMessage reports whether sig is a valid raw signature of message
-// by the public key pub for the coin symbol. It is the Symbol-keyed
+// by the public key pub for the coin chain. It is the Chain-keyed
 // counterpart to SignRawMessage and wraps VerifySignature.
 //
 // As with SignRawMessage, message is the 32-byte digest for ECDSA chains and
-// the raw message for ed25519 chains. An unknown symbol returns a wrapped
+// the raw message for ed25519 chains. An unknown chain returns a wrapped
 // ErrUnsupportedCoin; a non-32-byte input for an ECDSA chain returns a
 // wrapped ErrInvalidDigest. It needs no secret and is a free function.
-func VerifyRawMessage(symbol Symbol, pub, message []byte, sig *Signature) (bool, error) {
-	return VerifySignature(symbol, pub, message, sig)
+func VerifyRawMessage(chain Chain, pub, message []byte, sig *Signature) (bool, error) {
+	return VerifySignature(chain, pub, message, sig)
 }

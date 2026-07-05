@@ -32,8 +32,8 @@ func TestAddressIndexBIP84Vectors(t *testing.T) {
 	}
 }
 
-// TestAddressIndexZeroMatchesAddress checks that AddressIndex(symbol, 0) is
-// identical to the original Address(symbol) across every supported curve.
+// TestAddressIndexZeroMatchesAddress checks that AddressIndex(chain, 0) is
+// identical to the original Address(chain) across every supported curve.
 func TestAddressIndexZeroMatchesAddress(t *testing.T) {
 	w, err := FromMnemonic(canonicalMnemonic)
 	if err != nil {
@@ -43,17 +43,17 @@ func TestAddressIndexZeroMatchesAddress(t *testing.T) {
 
 	// BTC/ETH: secp256k1; SOL: ed25519 (final hardened); ATOM: cosmos
 	// secp256k1.
-	for _, symbol := range []Symbol{BTC, ETH, SOL, ATOM} {
-		want, err := w.Address(symbol)
+	for _, chain := range []Chain{BTC, ETH, SOL, ATOM} {
+		want, err := w.Address(chain)
 		if err != nil {
-			t.Fatalf("Address(%s): %v", symbol, err)
+			t.Fatalf("Address(%s): %v", chain, err)
 		}
-		got, err := w.AddressIndex(symbol, 0)
+		got, err := w.AddressIndex(chain, 0)
 		if err != nil {
-			t.Fatalf("AddressIndex(%s, 0): %v", symbol, err)
+			t.Fatalf("AddressIndex(%s, 0): %v", chain, err)
 		}
 		if got != want {
-			t.Errorf("AddressIndex(%s, 0) = %q, want Address = %q", symbol, got, want)
+			t.Errorf("AddressIndex(%s, 0) = %q, want Address = %q", chain, got, want)
 		}
 	}
 }
@@ -68,17 +68,17 @@ func TestAddressIndexDistinctIndices(t *testing.T) {
 	}
 	defer w.Destroy()
 
-	for _, symbol := range []Symbol{BTC, SOL} {
-		a0, err := w.AddressIndex(symbol, 0)
+	for _, chain := range []Chain{BTC, SOL} {
+		a0, err := w.AddressIndex(chain, 0)
 		if err != nil {
-			t.Fatalf("AddressIndex(%s, 0): %v", symbol, err)
+			t.Fatalf("AddressIndex(%s, 0): %v", chain, err)
 		}
-		a1, err := w.AddressIndex(symbol, 1)
+		a1, err := w.AddressIndex(chain, 1)
 		if err != nil {
-			t.Fatalf("AddressIndex(%s, 1): %v", symbol, err)
+			t.Fatalf("AddressIndex(%s, 1): %v", chain, err)
 		}
 		if a0 == a1 {
-			t.Errorf("AddressIndex(%s, 0) == AddressIndex(%s, 1) = %q; expected distinct", symbol, symbol, a0)
+			t.Errorf("AddressIndex(%s, 0) == AddressIndex(%s, 1) = %q; expected distinct", chain, chain, a0)
 		}
 	}
 }
@@ -99,7 +99,7 @@ func TestAddressIndexOutOfRange(t *testing.T) {
 }
 
 // TestAddressIndexUnsupportedCoin returns an ErrUnsupportedCoin-wrapped error
-// for an unknown symbol.
+// for an unknown chain.
 func TestAddressIndexUnsupportedCoin(t *testing.T) {
 	w, err := FromMnemonic(canonicalMnemonic)
 	if err != nil {

@@ -62,14 +62,14 @@ func decodeWIF(wif []byte) ([]byte, error) {
 	return key, nil
 }
 
-// WithWIF runs fn with the leaf private key for symbol at the given address index
+// WithWIF runs fn with the leaf private key for chain at the given address index
 // encoded as a Bitcoin mainnet compressed WIF, then wipes the WIF bytes (mirrors
-// WithPrivateKey). symbol must be a secp256k1 coin. The slice passed to fn must
+// WithPrivateKey). chain must be a secp256k1 coin. The slice passed to fn must
 // not escape fn.
-func (w *HDWallet) WithWIF(symbol Symbol, index uint32, fn func(wif []byte) error) error {
-	return w.withLeafPrivateKey(symbol, index, func(priv []byte, coin Coin) error {
+func (w *HDWallet) WithWIF(chain Chain, index uint32, fn func(wif []byte) error) error {
+	return w.withLeafPrivateKey(chain, index, func(priv []byte, coin Coin) error {
 		if coin.Curve != Secp256k1 {
-			return fmt.Errorf("%w: %s is not a secp256k1 coin", ErrInvalidWIF, symbol)
+			return fmt.Errorf("%w: %s is not a secp256k1 coin", ErrInvalidWIF, chain)
 		}
 		wif := encodeWIFCompressed(priv)
 		defer wipe(wif)
@@ -77,12 +77,12 @@ func (w *HDWallet) WithWIF(symbol Symbol, index uint32, fn func(wif []byte) erro
 	})
 }
 
-// WIF returns the leaf key for symbol at the given address index as a Bitcoin
+// WIF returns the leaf key for chain at the given address index as a Bitcoin
 // mainnet compressed WIF in a page-locked memguard buffer; the caller MUST
 // Destroy it. Prefer WithWIF, which wipes automatically.
-func (w *HDWallet) WIF(symbol Symbol, index uint32) (*memguard.LockedBuffer, error) {
+func (w *HDWallet) WIF(chain Chain, index uint32) (*memguard.LockedBuffer, error) {
 	var out *memguard.LockedBuffer
-	err := w.WithWIF(symbol, index, func(wif []byte) error {
+	err := w.WithWIF(chain, index, func(wif []byte) error {
 		buf := memguard.NewBuffer(len(wif))
 		buf.Copy(wif)
 		out = buf

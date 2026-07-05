@@ -12,6 +12,7 @@ import (
 	txeth "github.com/ranjbar-dev/hd-wallet/txproto/ethereum"
 	txripple "github.com/ranjbar-dev/hd-wallet/txproto/ripple"
 	txsolana "github.com/ranjbar-dev/hd-wallet/txproto/solana"
+	txton "github.com/ranjbar-dev/hd-wallet/txproto/ton"
 	txtron "github.com/ranjbar-dev/hd-wallet/txproto/tron"
 )
 
@@ -73,6 +74,9 @@ func TransactionID(out proto.Message) (string, error) {
 			return "", ErrNoTxID
 		}
 		return id, nil
+	case *txton.SigningOutput:
+		// hex repr-hash of the external message cell (the toncenter poll key).
+		return normalizeHexTxID(o.GetHash())
 	default:
 		return "", ErrNoTxID
 	}

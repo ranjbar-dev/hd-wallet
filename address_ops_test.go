@@ -43,9 +43,9 @@ func TestDetectBitcoinAddressKind(t *testing.T) {
 	defer w.Destroy()
 
 	cases := []struct {
-		symbol Symbol
-		typ    BitcoinAddressType
-		want   BitcoinAddressKind
+		chain Chain
+		typ   BitcoinAddressType
+		want  BitcoinAddressKind
 	}{
 		{BTC, P2PKH, BitcoinAddressKindP2PKH},
 		{BTC, P2SHP2WPKH, BitcoinAddressKindP2SHP2WPKH},
@@ -57,16 +57,16 @@ func TestDetectBitcoinAddressKind(t *testing.T) {
 		{LTC, P2TR, BitcoinAddressKindP2TR},
 	}
 	for _, tc := range cases {
-		addr, err := w.BitcoinAddress(tc.symbol, tc.typ, 0, 0, 0)
+		addr, err := w.BitcoinAddress(tc.chain, tc.typ, 0, 0, 0)
 		if err != nil {
-			t.Fatalf("BitcoinAddress(%s, %s): %v", tc.symbol, tc.typ, err)
+			t.Fatalf("BitcoinAddress(%s, %s): %v", tc.chain, tc.typ, err)
 		}
-		got := DetectBitcoinAddressKind(tc.symbol, addr)
+		got := DetectBitcoinAddressKind(tc.chain, addr)
 		if got != tc.want {
-			t.Errorf("DetectBitcoinAddressKind(%s, %q) = %v, want %v", tc.symbol, addr, got, tc.want)
+			t.Errorf("DetectBitcoinAddressKind(%s, %q) = %v, want %v", tc.chain, addr, got, tc.want)
 		}
 	}
-	// Symbols not in btcAddrParams.
+	// Chains not in btcAddrParams.
 	if got := DetectBitcoinAddressKind(ETH, "0xfoo"); got != BitcoinAddressKindUnknown {
 		t.Errorf("DetectBitcoinAddressKind(ETH, ...) = %v, want Unknown", got)
 	}
@@ -76,11 +76,11 @@ func TestDetectBitcoinAddressKind(t *testing.T) {
 	}
 }
 
-// TestDetectSymbols checks that the EVM vector matches many chains and that a
+// TestDetectChains checks that the EVM vector matches many chains and that a
 // BTC native-SegWit address uniquely matches BTC.
-func TestDetectSymbols(t *testing.T) {
+func TestDetectChains(t *testing.T) {
 	// EVM address should match all registered EVM validators.
-	evm := DetectSymbols("0x9d8A62f656a8d1615C1294fd71e9CFb3E4855A4F")
+	evm := DetectChains("0x9d8A62f656a8d1615C1294fd71e9CFb3E4855A4F")
 	foundETH, foundBNB, foundMATIC := false, false, false
 	for _, s := range evm {
 		switch s {
@@ -93,18 +93,18 @@ func TestDetectSymbols(t *testing.T) {
 		}
 	}
 	if !foundETH || !foundBNB || !foundMATIC {
-		t.Errorf("DetectSymbols(EVM addr) missing ETH/BNB/MATIC; got %v", evm)
+		t.Errorf("DetectChains(EVM addr) missing ETH/BNB/MATIC; got %v", evm)
 	}
 	// Verify the slice is sorted alphabetically.
 	for i := 1; i < len(evm); i++ {
 		if string(evm[i]) < string(evm[i-1]) {
-			t.Errorf("DetectSymbols result not sorted at index %d: %v", i, evm)
+			t.Errorf("DetectChains result not sorted at index %d: %v", i, evm)
 			break
 		}
 	}
 
 	// BTC native-SegWit address (from encoders_test canonical vector) — only BTC has "bc1" HRP.
-	btcMatches := DetectSymbols("bc1qhkfq3zahaqkkzx5mjnamwjsfpq2jk7z00ppggv")
+	btcMatches := DetectChains("bc1qhkfq3zahaqkkzx5mjnamwjsfpq2jk7z00ppggv")
 	foundBTC := false
 	for _, s := range btcMatches {
 		if s == BTC {
@@ -112,12 +112,12 @@ func TestDetectSymbols(t *testing.T) {
 		}
 	}
 	if !foundBTC {
-		t.Errorf("DetectSymbols(BTC P2WPKH) missing BTC; got %v", btcMatches)
+		t.Errorf("DetectChains(BTC P2WPKH) missing BTC; got %v", btcMatches)
 	}
 
 	// Garbage returns nil.
-	if got := DetectSymbols("zzz-garbage"); got != nil {
-		t.Errorf("DetectSymbols(garbage) = %v, want nil", got)
+	if got := DetectChains("zzz-garbage"); got != nil {
+		t.Errorf("DetectChains(garbage) = %v, want nil", got)
 	}
 }
 
@@ -136,8 +136,8 @@ func TestAddressFromPayload(t *testing.T) {
 	}
 
 	cases := []struct {
-		symbol Symbol
-		addr   string
+		chain Chain
+		addr  string
 	}{
 		{ETH, "0x9d8A62f656a8d1615C1294fd71e9CFb3E4855A4F"},
 		{BTC, btcP2PKH}, // P2PKH — AddressFromPayload always re-encodes as P2PKH
@@ -145,19 +145,19 @@ func TestAddressFromPayload(t *testing.T) {
 		{ATOM, "cosmos1hkfq3zahaqkkzx5mjnamwjsfpq2jk7z0emlrvp"},
 	}
 	for _, tc := range cases {
-		payload, err := ParseAddress(tc.symbol, tc.addr)
+		payload, err := ParseAddress(tc.chain, tc.addr)
 		if err != nil {
-			t.Fatalf("ParseAddress(%s, %q): %v", tc.symbol, tc.addr, err)
+			t.Fatalf("ParseAddress(%s, %q): %v", tc.chain, tc.addr, err)
 		}
-		got, err := AddressFromPayload(tc.symbol, payload)
+		got, err := AddressFromPayload(tc.chain, payload)
 		if err != nil {
-			t.Fatalf("AddressFromPayload(%s, ...): %v", tc.symbol, err)
+			t.Fatalf("AddressFromPayload(%s, ...): %v", tc.chain, err)
 		}
 		if got != tc.addr {
-			t.Errorf("AddressFromPayload(%s) round-trip: got %q, want %q", tc.symbol, got, tc.addr)
+			t.Errorf("AddressFromPayload(%s) round-trip: got %q, want %q", tc.chain, got, tc.addr)
 		}
 	}
-	// Unknown symbol.
+	// Unknown chain.
 	if _, err := AddressFromPayload("UNKNOWN_XYZ", nil); err == nil {
 		t.Error("AddressFromPayload(unknown) expected error")
 	}

@@ -21,16 +21,16 @@ import (
 // validated before any derivation, and the derived key is wiped on return — it
 // never leaves the package, exactly as with the index-based methods.
 
-// AddressPath returns the address for symbol derived at the given absolute BIP-32
+// AddressPath returns the address for chain derived at the given absolute BIP-32
 // path (e.g. "m/44'/60'/1'/0/5"). The path's curve scheme is the coin's; only the
-// child indices are taken from path. An invalid path or unknown symbol returns an
+// child indices are taken from path. An invalid path or unknown chain returns an
 // error; a key-only wallet returns ErrKeyOnlyWallet.
-func (w *HDWallet) AddressPath(symbol Symbol, path string) (string, error) {
+func (w *HDWallet) AddressPath(chain Chain, path string) (string, error) {
 	var addr string
-	err := w.withLeafPublicKeyPath(symbol, path, func(pub []byte, coin Coin) error {
+	err := w.withLeafPublicKeyPath(chain, path, func(pub []byte, coin Coin) error {
 		a, err := coin.Encode(pub)
 		if err != nil {
-			return fmt.Errorf("hdwallet: %s: %w", symbol, err)
+			return fmt.Errorf("hdwallet: %s: %w", chain, err)
 		}
 		addr = a
 		return nil
@@ -41,12 +41,12 @@ func (w *HDWallet) AddressPath(symbol Symbol, path string) (string, error) {
 	return addr, nil
 }
 
-// PublicKeyPath returns the public key for symbol derived at the given absolute
+// PublicKeyPath returns the public key for chain derived at the given absolute
 // BIP-32 path: the 33-byte compressed key for secp256k1/nist256p1, or the 32-byte
 // key for ed25519-family curves.
-func (w *HDWallet) PublicKeyPath(symbol Symbol, path string) ([]byte, error) {
+func (w *HDWallet) PublicKeyPath(chain Chain, path string) ([]byte, error) {
 	var pub []byte
-	err := w.withLeafPublicKeyPath(symbol, path, func(p []byte, _ Coin) error {
+	err := w.withLeafPublicKeyPath(chain, path, func(p []byte, _ Coin) error {
 		pub = append([]byte(nil), p...) // copy out before the lock is released
 		return nil
 	})
@@ -56,15 +56,15 @@ func (w *HDWallet) PublicKeyPath(symbol Symbol, path string) ([]byte, error) {
 	return pub, nil
 }
 
-// SignPath signs data with the key for symbol derived at the given absolute
+// SignPath signs data with the key for chain derived at the given absolute
 // BIP-32 path. The ECDSA-vs-ed25519 input rule is identical to SignIndex (ECDSA
 // curves want the 32-byte digest; ed25519 wants the message).
-func (w *HDWallet) SignPath(symbol Symbol, path string, data []byte) (*Signature, error) {
+func (w *HDWallet) SignPath(chain Chain, path string, data []byte) (*Signature, error) {
 	var sig *Signature
-	err := w.withLeafPrivateKeyPath(symbol, path, func(priv []byte, coin Coin) error {
+	err := w.withLeafPrivateKeyPath(chain, path, func(priv []byte, coin Coin) error {
 		s, err := signDigest(coin.Curve, priv, data)
 		if err != nil {
-			return fmt.Errorf("hdwallet: %s: %w", symbol, err)
+			return fmt.Errorf("hdwallet: %s: %w", chain, err)
 		}
 		sig = s
 		return nil
@@ -75,21 +75,21 @@ func (w *HDWallet) SignPath(symbol Symbol, path string, data []byte) (*Signature
 	return sig, nil
 }
 
-// WithPrivateKeyPath runs fn with the raw leaf private key for symbol derived at
+// WithPrivateKeyPath runs fn with the raw leaf private key for chain derived at
 // the given absolute BIP-32 path and wipes the key as soon as fn returns (mirrors
 // WithPrivateKey). The slice passed to fn must not escape fn.
-func (w *HDWallet) WithPrivateKeyPath(symbol Symbol, path string, fn func(priv []byte) error) error {
-	return w.withLeafPrivateKeyPath(symbol, path, func(priv []byte, _ Coin) error {
+func (w *HDWallet) WithPrivateKeyPath(chain Chain, path string, fn func(priv []byte) error) error {
+	return w.withLeafPrivateKeyPath(chain, path, func(priv []byte, _ Coin) error {
 		return fn(priv)
 	})
 }
 
-// PrivateKeyPath returns the raw leaf private key for symbol derived at the given
+// PrivateKeyPath returns the raw leaf private key for chain derived at the given
 // absolute BIP-32 path in a page-locked memguard buffer; the caller MUST Destroy
 // it (mirrors PrivateKey). Prefer WithPrivateKeyPath, which wipes automatically.
-func (w *HDWallet) PrivateKeyPath(symbol Symbol, path string) (*memguard.LockedBuffer, error) {
+func (w *HDWallet) PrivateKeyPath(chain Chain, path string) (*memguard.LockedBuffer, error) {
 	var out *memguard.LockedBuffer
-	err := w.withLeafPrivateKeyPath(symbol, path, func(priv []byte, _ Coin) error {
+	err := w.withLeafPrivateKeyPath(chain, path, func(priv []byte, _ Coin) error {
 		buf := memguard.NewBuffer(len(priv))
 		buf.Copy(priv)
 		out = buf
@@ -104,53 +104,53 @@ func (w *HDWallet) PrivateKeyPath(symbol Symbol, path string) (*memguard.LockedB
 	return out, nil
 }
 
-// AddressAt returns the address for symbol at the given BIP-44 account, change
+// AddressAt returns the address for chain at the given BIP-44 account, change
 // branch, and address index, building the path "m/purpose'/coin'/account'/change/
 // index" from the coin's template. It requires a standard 5-element path; coins
 // whose template has a different shape (e.g. SOL's "m/44'/501'/0'") return
 // ErrPathArity — use AddressPath for those.
-func (w *HDWallet) AddressAt(symbol Symbol, account, change, index uint32) (string, error) {
-	path, err := w.accountPath(symbol, account, change, index)
+func (w *HDWallet) AddressAt(chain Chain, account, change, index uint32) (string, error) {
+	path, err := w.accountPath(chain, account, change, index)
 	if err != nil {
 		return "", err
 	}
-	return w.AddressPath(symbol, path)
+	return w.AddressPath(chain, path)
 }
 
 // PublicKeyAt is the account/change/index counterpart of PublicKeyPath.
-func (w *HDWallet) PublicKeyAt(symbol Symbol, account, change, index uint32) ([]byte, error) {
-	path, err := w.accountPath(symbol, account, change, index)
+func (w *HDWallet) PublicKeyAt(chain Chain, account, change, index uint32) ([]byte, error) {
+	path, err := w.accountPath(chain, account, change, index)
 	if err != nil {
 		return nil, err
 	}
-	return w.PublicKeyPath(symbol, path)
+	return w.PublicKeyPath(chain, path)
 }
 
 // SignAt is the account/change/index counterpart of SignPath.
-func (w *HDWallet) SignAt(symbol Symbol, account, change, index uint32, data []byte) (*Signature, error) {
-	path, err := w.accountPath(symbol, account, change, index)
+func (w *HDWallet) SignAt(chain Chain, account, change, index uint32, data []byte) (*Signature, error) {
+	path, err := w.accountPath(chain, account, change, index)
 	if err != nil {
 		return nil, err
 	}
-	return w.SignPath(symbol, path, data)
+	return w.SignPath(chain, path, data)
 }
 
 // accountPath builds a 5-element BIP-44/84 path from the coin's template by
 // replacing the account (hardened), change, and index elements. It returns
-// ErrUnsupportedCoin for an unknown symbol and ErrPathArity when the template is
+// ErrUnsupportedCoin for an unknown chain and ErrPathArity when the template is
 // not a 5-element path. account/change/index must each be below 2^31.
-func (w *HDWallet) accountPath(symbol Symbol, account, change, index uint32) (string, error) {
-	coin, ok := coins[symbol]
+func (w *HDWallet) accountPath(chain Chain, account, change, index uint32) (string, error) {
+	coin, ok := coins[chain]
 	if !ok {
-		return "", fmt.Errorf("%w: %s", ErrUnsupportedCoin, symbol)
+		return "", fmt.Errorf("%w: %s", ErrUnsupportedCoin, chain)
 	}
 	// parts: ["m", purpose', coin', account', change, index] — 6 entries.
 	parts := strings.Split(coin.Path, "/")
 	if len(parts) != 6 || parts[0] != "m" {
-		return "", fmt.Errorf("%w: %s (%s)", ErrPathArity, symbol, coin.Path)
+		return "", fmt.Errorf("%w: %s (%s)", ErrPathArity, chain, coin.Path)
 	}
 	if account >= hardenedOffset || change >= hardenedOffset || index >= hardenedOffset {
-		return "", fmt.Errorf("hdwallet: %s: account/change/index must each be < %d", symbol, hardenedOffset)
+		return "", fmt.Errorf("hdwallet: %s: account/change/index must each be < %d", chain, hardenedOffset)
 	}
 	parts[3] = strconv.FormatUint(uint64(account), 10) + "'" // account is hardened
 	parts[4] = strconv.FormatUint(uint64(change), 10)

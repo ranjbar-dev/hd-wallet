@@ -48,14 +48,14 @@ func main() {
 		log.Fatal(err)
 	}
 
-	symbols := make([]hdwallet.Symbol, 0, len(addrs))
+	chains := make([]hdwallet.Chain, 0, len(addrs))
 	for s := range addrs {
-		symbols = append(symbols, s)
+		chains = append(chains, s)
 	}
-	slices.Sort(symbols)
+	slices.Sort(chains)
 
 	fmt.Println("Addresses:")
-	for _, s := range symbols {
+	for _, s := range chains {
 		fmt.Printf("  %-6s %s\n", s, addrs[s])
 	}
 }
