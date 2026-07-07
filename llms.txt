@@ -15,6 +15,7 @@
 - Private keys are derived, used, and **wiped inside the package** per operation (`withPrivateKey` in `derive.go` is the single materialization point). Export paths (`WithPrivateKey`, `PrivateKey`, `WithMnemonic`, `Mnemonic`, `WIF`, `WithAccountXPrv`) hand out only wiped-on-return callbacks or memguard `LockedBuffer`s.
 - ECDSA signing is RFC 6979 deterministic with canonical low-S; recoverable (65-byte R‖S‖V) available on secp256k1.
 - Mnemonic entry security ladder: `FromMnemonicBuffer(*memguard.LockedBuffer)` (strongest, zero-copy) > `FromMnemonicBytes([]byte)` (wiped inside) > `FromMnemonic(string)` (weakest — strings can't be wiped; avoid for real funds).
+- `*HDWallet` is concurrency-safe: all methods share a `sync.RWMutex` — reads (`Address`, `Sign`, `SignTransaction`, etc.) take `RLock` and run in parallel across goroutines, `Destroy()` takes `Lock`. Don't call `Destroy()` while other goroutines still have calls in flight on the same wallet.
 
 ## Core API (package `hdwallet`)
 

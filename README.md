@@ -634,6 +634,16 @@ go run ./cmd/hdwallet -show-mnemonic        # demo only; printing defeats isolat
 Found a vulnerability? Please open a private security advisory rather than a
 public issue.
 
+### Concurrency
+
+`*HDWallet` is safe for concurrent use: all read methods (`Address`, `Sign`,
+`PublicKey`, `AllAddresses`, `SignTransaction`, …) take a shared `sync.RWMutex`
+read-lock and may run in parallel across goroutines; `Destroy()` takes the
+exclusive write-lock. Each call opens its own short-lived decrypted buffer from
+the `memguard` enclave and wipes it on return, so concurrent callers never share
+mutable key material. Don't call `Destroy()` concurrently with in-flight calls
+on the same wallet — it invalidates the secret out from under them.
+
 ---
 
 ## Publishing & releasing
