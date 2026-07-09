@@ -86,6 +86,7 @@ var validators = map[Chain]addressValidator{
 	ALGO:  algoValidator(ALGO),
 	APTOS: hexHashValidator(APTOS),
 	TON:   tonValidator(TON),
+	DOT:   ss58Validator(0, DOT),
 }
 
 // IsValidAddress reports whether addr is a syntactically and checksum-valid
@@ -451,6 +452,30 @@ func strkeyValidator(version byte, chain Chain) addressValidator {
 		var want [2]byte
 		binary.LittleEndian.PutUint16(want[:], crc16XModem(body))
 		if raw[33] != want[0] || raw[34] != want[1] {
+			return nil, addrErr(chain, "bad checksum")
+		}
+		return raw[1 : 1+32], nil
+	}
+}
+
+// ss58Validator validates a Polkadot SS58 address, the reverse of ss58Encoder:
+// base58(prefix || 32-byte key || BLAKE2b-512 checksum[:2]). Returns the
+// 32-byte public key.
+func ss58Validator(prefix byte, chain Chain) addressValidator {
+	return func(addr string) ([]byte, error) {
+		raw, err := base58Decode(base58BTC, addr)
+		if err != nil {
+			return nil, addrErr(chain, err.Error())
+		}
+		if len(raw) != 1+32+2 {
+			return nil, addrErr(chain, fmt.Sprintf("length %d (want 35)", len(raw)))
+		}
+		if raw[0] != prefix {
+			return nil, addrErr(chain, fmt.Sprintf("wrong network prefix %d (want %d)", raw[0], prefix))
+		}
+		data := raw[:1+32]
+		checksum := blake2bPersonal(64, nil, append([]byte("SS58PRE"), data...))
+		if raw[33] != checksum[0] || raw[34] != checksum[1] {
 			return nil, addrErr(chain, "bad checksum")
 		}
 		return raw[1 : 1+32], nil

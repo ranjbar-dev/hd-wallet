@@ -76,6 +76,27 @@ type RecentBlockhashProvider interface {
 	RecentBlockhash() (string, error)
 }
 
+// SubstrateContextProvider supplies the chain/runtime context a mortal
+// Substrate extrinsic (DOT) needs beyond the account nonce (which comes from
+// NonceProvider / the system_accountNextIndex RPC). Callers map the returned
+// values onto polkadot.SigningInput as follows:
+//
+//   - RuntimeVersion → spec_version and transaction_version, from the
+//     state_getRuntimeVersion RPC (fields specVersion / transactionVersion).
+//     Both enter the signing preimage, so a stale value invalidates the
+//     signature at the node — refresh around runtime upgrades.
+//   - GenesisHash → genesis_hash, from chain_getBlockHash(0). Constant per
+//     chain; safe to cache forever.
+//   - MortalityCheckpoint → block_hash and Era.block_number, from a recent
+//     finalized block (chain_getFinalizedHead + chain_getHeader). Pick
+//     Era.period (e.g. 64) for the validity window. For an immortal
+//     extrinsic omit Era and leave block_hash unset (genesis is used).
+type SubstrateContextProvider interface {
+	RuntimeVersion(chain Chain) (specVersion, transactionVersion uint32, err error)
+	GenesisHash(chain Chain) ([]byte, error)
+	MortalityCheckpoint(chain Chain) (blockNumber uint64, blockHash []byte, err error)
+}
+
 // Broadcaster is a client-implemented sink that submits a signed, serialized
 // raw transaction to the network. The library produces signed bytes in
 // SigningOutput.Encoded and never broadcasts itself.

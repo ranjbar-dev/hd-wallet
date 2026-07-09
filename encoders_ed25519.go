@@ -38,6 +38,22 @@ func encodeALGO(pub []byte) (string, error) {
 	return base32NoPad.EncodeToString(data), nil
 }
 
+// ---------- Polkadot: SS58 base58(prefix || pubkey || blake2b-512[:2]) ----------
+
+// ss58Encoder builds an SS58 address encoder for the given network prefix
+// (0 = Polkadot). The checksum is the first two bytes of
+// BLAKE2b-512("SS58PRE" || prefix || pubkey).
+func ss58Encoder(prefix byte) func([]byte) (string, error) {
+	return func(pub []byte) (string, error) {
+		data := make([]byte, 0, 1+32+2)
+		data = append(data, prefix)
+		data = append(data, pub...)
+		checksum := blake2bPersonal(64, nil, append([]byte("SS58PRE"), data...))
+		data = append(data, checksum[0], checksum[1])
+		return base58Encode(base58BTC, data), nil
+	}
+}
+
 // ---------- Aptos: 0x || hex(SHA3-256(pubkey || scheme 0x00)) ----------
 
 func encodeAPTOS(pub []byte) (string, error) {

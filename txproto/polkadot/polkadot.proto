@@ -1,0 +1,72 @@
+syntax = "proto3";
+
+package hdwallet.polkadot.proto;
+
+option go_package = "github.com/ranjbar-dev/hd-wallet/txproto/polkadot";
+
+// Era describes extrinsic mortality: the transaction is valid for `period`
+// blocks starting from the checkpoint block whose hash is
+// SigningInput.block_hash. Omit era entirely for an immortal extrinsic (then
+// block_hash must equal genesis_hash).
+message Era {
+  uint64 block_number = 1; // number of the checkpoint block (block_hash's block)
+  uint64 period = 2;       // validity window in blocks; rounded up to a power of two, clamped to 4..65536
+}
+
+// CallIndices overrides the (pallet, call) index pair of the encoded call.
+// The defaults below target the current Polkadot relay-chain / Asset Hub
+// runtimes; other Substrate chains (or a future runtime upgrade) may renumber
+// pallets, in which case the caller supplies the indices from the chain's
+// runtime metadata.
+message CallIndices {
+  uint32 module_index = 1; // pallet index
+  uint32 method_index = 2; // call index within the pallet
+}
+
+// Balances.transfer_keep_alive — native DOT transfer that cannot reap the
+// sender below the existential deposit. Default call indices (5, 3); override
+// with call_indices for e.g. transfer_allow_death (5, 0).
+message BalanceTransfer {
+  string to_address = 1;        // SS58 recipient address
+  bytes value = 2;              // amount in planck, big-endian (u128)
+  CallIndices call_indices = 3; // optional (pallet, call) override
+}
+
+// Assets.transfer_keep_alive — pallet-assets token transfer on Polkadot Asset
+// Hub (USDT: asset_id 1984, USDC: asset_id 1337). Default call indices
+// (50, 9). Asset Hub uses MultiAddress encoding: set multi_address = true.
+message AssetTransfer {
+  string to_address = 1;        // SS58 recipient address
+  bytes value = 2;              // token amount, big-endian (u128)
+  uint32 asset_id = 3;          // pallet-assets numeric asset id (compact-encoded)
+  CallIndices call_indices = 4; // optional (pallet, call) override
+}
+
+// SigningInput carries everything a mortal Substrate extrinsic needs. The
+// runtime context (spec_version, transaction_version, genesis_hash and the
+// mortality checkpoint) comes from the caller — see SubstrateContextProvider
+// in providers.go for the RPC mapping.
+message SigningInput {
+  bytes genesis_hash = 1;        // 32-byte chain genesis hash
+  bytes block_hash = 2;          // 32-byte mortality checkpoint hash; ignored (genesis is used) when era is absent
+  uint64 nonce = 3;              // account nonce
+  uint32 spec_version = 4;       // runtime spec version (state_getRuntimeVersion)
+  uint32 transaction_version = 5; // runtime transaction version
+  bytes tip = 6;                 // optional tip in planck, big-endian (u128); empty = 0
+  Era era = 7;                   // omit for an immortal extrinsic
+  uint32 network = 8;            // SS58 network prefix of to_address (0 = Polkadot)
+  // multi_address selects the MultiAddress account encoding (0x00 ‖ AccountId)
+  // used by the Polkadot relay chain since spec_version 28 and by Asset Hub.
+  // false = raw AccountId (matches the pinned TWC vector, spec_version 26).
+  bool multi_address = 9;
+
+  oneof message_oneof {
+    BalanceTransfer balance_transfer = 10;
+    AssetTransfer asset_transfer = 11;
+  }
+}
+
+message SigningOutput {
+  bytes encoded = 1;      // SCALE-encoded signed extrinsic (UncheckedExtrinsic v4)
+  string encoded_hex = 2; // "0x"-prefixed hex — the author_submitExtrinsic parameter
+}

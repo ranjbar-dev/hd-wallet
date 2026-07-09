@@ -12,7 +12,7 @@ type Curve int
 const (
 	// Secp256k1 covers Bitcoin-style, Ethereum/EVM, Cosmos, XRP and Tron.
 	Secp256k1 Curve = iota
-	// Ed25519 covers Solana, Stellar, Algorand, Aptos.
+	// Ed25519 covers Solana, Stellar, Algorand, Aptos, TON and Polkadot.
 	Ed25519
 )
 
@@ -160,6 +160,7 @@ const (
 	ALGO  Chain = "ALGO"
 	APTOS Chain = "APTOS"
 	TON   Chain = "TON"
+	DOT   Chain = "DOT"
 
 	// Roadmap — Trust Wallet Core networks intentionally NOT registered yet (each
 	// needs more than a vector-verified encoder over the standard seed path, so
@@ -169,8 +170,8 @@ const (
 	//     expected vector; omitted until vector-verified.
 	//
 	// Unsupported — see the "Unsupported chains" section in README.md/CLAUDE.md
-	// for the 36 chains removed from this library entirely (ADA, AE, BCD, BTG,
-	// CANTO, CKB, DOT, EGLD, EOS, FIL, FIO, FLUX, GRS, HBAR, ICX, IOST, KIN, KMD,
+	// for the 35 chains removed from this library entirely (ADA, AE, BCD, BTG,
+	// CANTO, CKB, EGLD, EOS, FIL, FIO, FLUX, GRS, HBAR, ICX, IOST, KIN, KMD,
 	// KSM, NEAR, NEBL, NEO, ONE, ONT, ROSE, STRK, SUI, WAVES, WAX, XEC, XNO, XTZ,
 	// XVG, ZEN, ZETA, ZIL). A PR re-adding any of them must follow the
 	// test-vector rule below.
@@ -346,6 +347,7 @@ var coins = map[Chain]Coin{
 	"ALGO":  {"Algorand", "ALGO", Ed25519, "m/44'/283'/0'/0'/0'", encodeALGO, 6, 0},
 	"APTOS": {"Aptos", "APTOS", Ed25519, "m/44'/637'/0'/0'/0'", encodeAPTOS, 8, 0},
 	"TON":   {"TON", "TON", Ed25519, "m/44'/607'/0'", encodeTONAddress, 9, 0},
+	"DOT":   {"Polkadot", "DOT", Ed25519, "m/44'/354'/0'/0'/0'", ss58Encoder(0), 10, 0},
 }
 
 // init registers address validators for the networks added beyond the original

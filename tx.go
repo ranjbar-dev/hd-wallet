@@ -32,6 +32,7 @@ import (
 	txbtc "github.com/ranjbar-dev/hd-wallet/txproto/bitcoin"
 	txcosmos "github.com/ranjbar-dev/hd-wallet/txproto/cosmos"
 	txeth "github.com/ranjbar-dev/hd-wallet/txproto/ethereum"
+	txdot "github.com/ranjbar-dev/hd-wallet/txproto/polkadot"
 	txripple "github.com/ranjbar-dev/hd-wallet/txproto/ripple"
 	txsolana "github.com/ranjbar-dev/hd-wallet/txproto/solana"
 	txstellar "github.com/ranjbar-dev/hd-wallet/txproto/stellar"
@@ -62,9 +63,10 @@ const (
 	familySolana
 	familyBitcoin
 	familyAlgorand
-	familyAptos   // APTOS: BCS + SHA3-256("APTOS::RawTransaction")||bcs
-	familyStellar // XLM: XDR TransactionV0 + SHA256(networkId||ENVELOPE_TYPE_TX||xdr)
-	familyTON     // TON: wallet-v4r2 BoC cell tree, ed25519 over the unsigned-body repr hash
+	familyAptos    // APTOS: BCS + SHA3-256("APTOS::RawTransaction")||bcs
+	familyStellar  // XLM: XDR TransactionV0 + SHA256(networkId||ENVELOPE_TYPE_TX||xdr)
+	familyTON      // TON: wallet-v4r2 BoC cell tree, ed25519 over the unsigned-body repr hash
+	familyPolkadot // DOT: SCALE v4 extrinsic, ed25519 MultiSignature over call‖extra‖additional
 )
 
 // txFamilyOf maps a chain to its transaction-building family. EVM and standard
@@ -101,6 +103,8 @@ func txFamilyOf(chain Chain) txFamily {
 		return familyStellar
 	case TON:
 		return familyTON
+	case DOT:
+		return familyPolkadot
 	default:
 		return familyNone
 	}
@@ -186,6 +190,12 @@ func (w *HDWallet) SignTransaction(chain Chain, index uint32, input proto.Messag
 			return nil, fmt.Errorf("%w: %s expects *ton.SigningInput", ErrTxInput, chain)
 		}
 		return w.signTONTx(chain, index, in)
+	case familyPolkadot:
+		in, ok := input.(*txdot.SigningInput)
+		if !ok {
+			return nil, fmt.Errorf("%w: %s expects *polkadot.SigningInput", ErrTxInput, chain)
+		}
+		return w.signPolkadotTx(chain, index, in)
 	default:
 		return nil, fmt.Errorf("%w: %s", ErrTxUnsupported, chain)
 	}
@@ -303,6 +313,20 @@ func ValidateSigningInput(chain Chain, input proto.Message) error {
 		}
 		if in.GetPayment() == nil {
 			return fmt.Errorf("%w: %s: payment operation is required", ErrTxInput, chain)
+		}
+	case familyPolkadot:
+		in, ok := input.(*txdot.SigningInput)
+		if !ok {
+			return fmt.Errorf("%w: %s expects *polkadot.SigningInput", ErrTxInput, chain)
+		}
+		if len(in.GenesisHash) != 32 {
+			return fmt.Errorf("%w: %s: genesis_hash must be 32 bytes", ErrTxInput, chain)
+		}
+		if in.SpecVersion == 0 {
+			return fmt.Errorf("%w: %s: spec_version is required", ErrTxInput, chain)
+		}
+		if in.GetBalanceTransfer() == nil && in.GetAssetTransfer() == nil {
+			return fmt.Errorf("%w: %s: balance_transfer or asset_transfer is required", ErrTxInput, chain)
 		}
 	default:
 		return fmt.Errorf("%w: %s", ErrTxUnsupported, chain)

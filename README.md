@@ -7,9 +7,9 @@
 
 A **Trust Wallet–compatible**, security-focused **hierarchical-deterministic (HD) wallet** library for Go.
 
-Generate a BIP-39 mnemonic (or import one) and derive receive addresses for **99 networks** using the same derivation paths and address formats Trust Wallet uses by default — so seeds are interchangeable between the two. Beyond derivation it adds **EVM tooling** (RLP, ABI, EIP-191, EIP-712), **protobuf transaction signing** for many families (EVM, Tron, XRP, Cosmos, Solana, Bitcoin/UTXO, Stellar, Algorand, Aptos, TON — no broadcast), **secure private-key import/export**, and **address validation/parsing**.
+Generate a BIP-39 mnemonic (or import one) and derive receive addresses for **100 networks** using the same derivation paths and address formats Trust Wallet uses by default — so seeds are interchangeable between the two. Beyond derivation it adds **EVM tooling** (RLP, ABI, EIP-191, EIP-712), **protobuf transaction signing** for many families (EVM, Tron, XRP, Cosmos, Solana, Bitcoin/UTXO, Stellar, Algorand, Aptos, TON, Polkadot — no broadcast), **secure private-key import/export**, and **address validation/parsing**.
 
-> **36 chains are explicitly not supported** by this library (no address derivation, no validation, nothing). See [Unsupported chains](#unsupported-chains).
+> **35 chains are explicitly not supported** by this library (no address derivation, no validation, nothing). See [Unsupported chains](#unsupported-chains).
 
 > 🤖 **Using an LLM / AI coding assistant?** Point it at [`llms.txt`](llms.txt) — a self-contained context file summarizing the project scope, full API surface, workflows, and troubleshooting notes.
 
@@ -21,8 +21,8 @@ Sensitive material (the mnemonic and derived seed) is **never** held as a plain 
 
 - 🔐 **Secrets isolated in RAM.** Encrypted enclaves, memory locked against swap (`mlock`/`VirtualLock`), guard pages, and automatic wiping. No mnemonic-as-`string`, no exported secret fields. Private-key import/export goes through the same memguard pattern — there is still no raw key getter.
 - ✅ **Provably Trust Wallet–compatible.** Every address encoder is tested against Trust Wallet Core's own vectors; key derivation is tested against the SLIP-0010 specification; transaction signers reproduce Trust Wallet Core's `AnySigner` vectors byte-for-byte. See [Verification](#verification).
-- 🌐 **99 networks across 2 curves.** secp256k1 (Bitcoin-style, 50+ EVM chains, ~30 Cosmos chains, XRP, Tron) and ed25519 (Solana, Stellar, Algorand, Aptos, TON).
-- ✍️ **Signing at every level.** Raw ECDSA/EdDSA signing for every network, EVM message signing (EIP-191/EIP-712), and full **protobuf transaction signing** (EVM, Tron, XRP, Cosmos, Solana, Bitcoin/UTXO, Stellar, Algorand, Aptos, TON) that returns broadcast-ready raw transactions. Derived keys are wiped after each use.
+- 🌐 **100 networks across 2 curves.** secp256k1 (Bitcoin-style, 50+ EVM chains, ~30 Cosmos chains, XRP, Tron) and ed25519 (Solana, Stellar, Algorand, Aptos, TON, Polkadot).
+- ✍️ **Signing at every level.** Raw ECDSA/EdDSA signing for every network, EVM message signing (EIP-191/EIP-712), and full **protobuf transaction signing** (EVM, Tron, XRP, Cosmos, Solana, Bitcoin/UTXO, Stellar, Algorand, Aptos, TON, Polkadot) that returns broadcast-ready raw transactions. Derived keys are wiped after each use.
 - 🧩 **Extensible.** Add a network with a single registry row.
 - 📦 **Focused dependency surface.** btcd (secp256k1/bech32/base58), go-bip39, x/crypto, memguard, protobuf.
 
@@ -170,7 +170,7 @@ non-zero address indices. ECDSA inputs that are not 32 bytes return
 transaction** from a protobuf `SigningInput`, mirroring Trust Wallet Core's
 `AnySigner`. It returns the signed bytes/hex — it does **not** broadcast.
 
-> **Coverage note:** address derivation/validation spans **all 99 networks**,
+> **Coverage note:** address derivation/validation spans **all 100 networks**,
 > but transaction building covers only the families in the table below. For any
 > other chain you can derive and validate addresses but must assemble and sign
 > the transaction yourself (use the raw `Sign`/`SignIndex` primitive on the
@@ -196,6 +196,7 @@ Verified against authoritative signing vectors for:
 | **Algorand (ALGO)** | Payment (canonical msgpack, `"TX"`-prefixed ed25519) plus ASA transfers (`axfer`) and opt-in (0-amount self-`axfer`). Pinned to the TWC Algorand vector. |
 | **Aptos (APTOS)** | Entry-function transfer (BCS + `APTOS::RawTransaction` prehash), plus a structured `Transfer` convenience input synthesized into `aptos_account::transfer`. Pinned to the TWC Aptos vector. |
 | **TON** | Native transfer (wallet v4r2), deploy-on-first-send (seqno==0), UTF-8 comments, and TEP-74 jetton transfers. Pinned to the TWC `test_ton_sign_transfer_ordinary` vector. |
+| **Polkadot (DOT)** | `Balances.transfer_keep_alive` (native DOT) and `Assets.transfer_keep_alive` (Asset Hub tokens, e.g. USDT = 1984 / USDC = 1337) as SCALE-encoded v4 extrinsics with mortal/immortal eras, `MultiAddress` or raw `AccountId` encoding, and overridable call indices. Pinned to the TWC `SignTransfer_9fd062` vector. |
 
 ```go
 import ethpb "github.com/ranjbar-dev/hd-wallet/txproto/ethereum"
@@ -428,7 +429,7 @@ for i := range raw {                     // wipe any trimmed remainder
 
 ## Supported networks
 
-**99 networks** across 2 curves. `SupportedCoins()` returns the live,
+**100 networks** across 2 curves. `SupportedCoins()` returns the live,
 authoritative list; `CoinInfo(chain)` gives each coin's curve and path. Every
 chain below is verified against a Trust Wallet Core address vector.
 
@@ -442,7 +443,7 @@ chain below is verified against a Trust Wallet Core address vector.
 | XRP Ledger | XRP | `m/44'/144'/0'/0/0` |
 | Cosmos SDK (bech32, per-chain HRP) | ATOM, OSMO, JUNO, TIA, LUNA, KAVA, SCRT, BAND, RUNE, STARS, AXL, STRD, BLD, CRE, KUJI, CMDX, NTRN, SOMM, FET, MARS, UMEE, COREUM, QSR, XPRT, AKT, NOBLE, SEI, DYDX, BLZ, CRYPTOORG | `m/44'/118'/0'/0/0` (some differ) |
 
-#### ed25519 (5)
+#### ed25519 (6)
 
 | Chain | Network | Path |
 |---|---|---|
@@ -451,17 +452,18 @@ chain below is verified against a Trust Wallet Core address vector.
 | ALGO | Algorand | `m/44'/283'/0'/0'/0'` |
 | APTOS | Aptos | `m/44'/637'/0'/0'/0'` |
 | TON | TON | `m/44'/607'/0'` |
+| DOT | Polkadot | `m/44'/354'/0'/0'/0'` |
 
 All paths derive receive address index 0 and an empty BIP-39 passphrase
 (Trust Wallet's default).
 
 ### Unsupported chains
 
-This library does **not** support the following 36 chains at all — no address
+This library does **not** support the following 35 chains at all — no address
 derivation, no validation, no registry rows, nothing:
 
 `ADA` (Cardano), `AE` (Aeternity), `BCD` (Bitcoin Diamond), `BTG` (Bitcoin Gold),
-`CANTO` (Canto), `CKB` (Nervos), `DOT` (Polkadot), `EGLD` (MultiversX),
+`CANTO` (Canto), `CKB` (Nervos), `EGLD` (MultiversX),
 `EOS` (EOS), `FIL` (Filecoin), `FIO` (FIO), `FLUX` (Flux), `GRS` (Groestlcoin),
 `HBAR` (Hedera), `ICX` (ICON), `IOST` (IOST), `KIN` (Kin), `KMD` (Komodo),
 `KSM` (Kusama), `NEAR` (NEAR), `NEBL` (Neblio), `NEO` (NEO), `ONE` (Harmony),
@@ -548,7 +550,7 @@ go test -race -cover ./...
 
 | Function / method | Purpose |
 |---|---|
-| `(*HDWallet) SignTransaction(chain, index, proto.Message) (proto.Message, error)` | Build+sign a raw tx (EVM/Tron/XRP/Cosmos/Solana/Bitcoin-UTXO/Stellar/Algorand/Aptos/TON; no broadcast). |
+| `(*HDWallet) SignTransaction(chain, index, proto.Message) (proto.Message, error)` | Build+sign a raw tx (EVM/Tron/XRP/Cosmos/Solana/Bitcoin-UTXO/Stellar/Algorand/Aptos/TON/Polkadot; no broadcast). |
 | `BroadcastPayload(chain, proto.Message) (string, error)` | Convert a `SignTransaction` output to the exact string each chain's RPC endpoint expects: `"0x"+hex` for EVM, bare hex for Bitcoin/UTXO, base64 for Solana and Cosmos, a TronGrid JSON object for Tron, uppercase hex for XRP. |
 | `TransactionID(proto.Message) (string, error)` | Extract the canonical transaction id from any `SignTransaction` output, normalised to lower-case hex (or base58 for Solana). |
 | `(*HDWallet) SignMessage(chain, index, []byte) ([]byte, error)` | EIP-191 `personal_sign` → 65-byte r‖s‖v. |

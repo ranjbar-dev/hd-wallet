@@ -109,6 +109,21 @@
 //	amount               Caller knows                        —
 //	use_max_amount       Caller decision (send-all)          —
 //
+// ## Polkadot — polkadot.SigningInput (DOT, Asset Hub assets)
+//
+//	Field                Source                              Provider
+//	────────────────────────────────────────────────────────────────────
+//	nonce                system_accountNextIndex             NonceProvider
+//	spec_version         state_getRuntimeVersion → specVersion        SubstrateContextProvider
+//	transaction_version  state_getRuntimeVersion → transactionVersion SubstrateContextProvider
+//	genesis_hash         chain_getBlockHash(0)               SubstrateContextProvider
+//	block_hash + era     Recent finalized block (mortality)  SubstrateContextProvider
+//	tip                  Caller decision (usually 0)         —
+//	balance_transfer / asset_transfer fields   Caller knows  —
+//
+// Omit era (and block_hash) for an immortal extrinsic. The transaction fee is
+// weight-based and deducted automatically; it does not appear in SigningInput.
+//
 // # Broadcasting
 //
 // SignTransaction returns a signed SigningOutput. The library never submits to
@@ -131,7 +146,7 @@
 // sufficient to derive all addresses, enabling a fully offline watch-only
 // wallet on a key-less machine.
 //
-// Ed25519 chains (SOL, XLM, ALGO, APTOS, TON) use SLIP-0010 hardened-only
+// Ed25519 chains (SOL, XLM, ALGO, APTOS, TON, DOT) use SLIP-0010 hardened-only
 // derivation — no public-key derivation path exists in the standard. As a
 // result, the machine minting deposit addresses must hold the seed. To isolate
 // signing from address generation, use an isolated signer service: the seed
