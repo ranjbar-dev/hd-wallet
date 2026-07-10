@@ -10,6 +10,7 @@ import (
 	txbtc "github.com/ranjbar-dev/hd-wallet/txproto/bitcoin"
 	txcosmos "github.com/ranjbar-dev/hd-wallet/txproto/cosmos"
 	txeth "github.com/ranjbar-dev/hd-wallet/txproto/ethereum"
+	txdot "github.com/ranjbar-dev/hd-wallet/txproto/polkadot"
 	txripple "github.com/ranjbar-dev/hd-wallet/txproto/ripple"
 	txsolana "github.com/ranjbar-dev/hd-wallet/txproto/solana"
 	txton "github.com/ranjbar-dev/hd-wallet/txproto/ton"
@@ -17,8 +18,8 @@ import (
 )
 
 // ErrNoTxID is returned by TransactionID when a SigningOutput carries no
-// transaction id (an empty id field) or when the argument is not one of the six
-// recognised per-family *…SigningOutput types (including a nil proto.Message).
+// transaction id (an empty id field) or when the argument is not one of the
+// eight recognised per-family *…SigningOutput types (including a nil proto.Message).
 var ErrNoTxID = errors.New("hdwallet: signing output has no transaction id")
 
 // TransactionID returns one canonical transaction id for any SigningOutput
@@ -26,7 +27,7 @@ var ErrNoTxID = errors.New("hdwallet: signing output has no transaction id")
 // field name, byte order and text encoding behind a single accessor so callers
 // need not special-case each chain.
 //
-// out must be one of the six per-family SigningOutput messages. The id source,
+// out must be one of the eight per-family SigningOutput messages. The id source,
 // by family, is:
 //
 //   - Bitcoin (and the UTXO altcoins BTC/LTC/DOGE/DASH/BCH/ZEC) — the
@@ -39,6 +40,9 @@ var ErrNoTxID = errors.New("hdwallet: signing output has no transaction id")
 //     the signer stores as upper-case hex.
 //   - Ripple / XRP — sha512Half(signed tx) (SHA-512(tx)[:32]); from the string
 //     field TxId, which the signer stores as upper-case hex.
+//   - Polkadot — BLAKE2b-256(Encoded), Substrate's standard extrinsic hash
+//     (matches the on-chain/Subscan "extrinsic hash"); computed from the bytes
+//     field Encoded.
 //
 // For these five hash-based families the result is normalised to LOWER-CASE hex
 // with NO "0x" prefix, irrespective of how the underlying field stores it. The
@@ -50,7 +54,7 @@ var ErrNoTxID = errors.New("hdwallet: signing output has no transaction id")
 // first signature). It is returned exactly as the signer produced it — base58,
 // unchanged — and must not be interpreted as hex.
 //
-// An empty id, or any message that is not one of the six recognised
+// An empty id, or any message that is not one of the eight recognised
 // SigningOutput types (including a nil proto.Message), returns ErrNoTxID. The
 // helper reads only the public output and touches no secret material.
 func TransactionID(out proto.Message) (string, error) {
@@ -77,6 +81,13 @@ func TransactionID(out proto.Message) (string, error) {
 	case *txton.SigningOutput:
 		// hex repr-hash of the external message cell (the toncenter poll key).
 		return normalizeHexTxID(o.GetHash())
+	case *txdot.SigningOutput:
+		// Substrate's standard extrinsic hash: BLAKE2b-256 of the encoded bytes.
+		encoded := o.GetEncoded()
+		if len(encoded) == 0 {
+			return "", ErrNoTxID
+		}
+		return hex.EncodeToString(blake2bPersonal(32, nil, encoded)), nil
 	default:
 		return "", ErrNoTxID
 	}

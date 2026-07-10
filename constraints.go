@@ -53,6 +53,16 @@ var solRentExemptZeroDataLamports = big.NewInt(890_880)
 // 2026-07-04.
 var trxNewAccountFeeSun = big.NewInt(1_100_000)
 
+// dotExistentialDepositPlanck is the Polkadot **relay chain**'s
+// `balances.existentialDeposit` runtime constant: 1 DOT = 10^10 planck (DOT
+// has 10 decimals). Below this, an account is reaped and its balance donated
+// to treasury. Polkadot **Asset Hub** uses a different, smaller existential
+// deposit (0.01 DOT) for the same native token — this constant is the
+// relay-chain value only. Source:
+// https://support.polkadot.network/support/solutions/articles/65000168651-what-is-the-existential-deposit-
+// As of 2026-07-10.
+var dotExistentialDepositPlanck = big.NewInt(10_000_000_000)
+
 // MinimumBalance returns the minimum native balance (in base units) an account
 // must retain to exist on-chain, and whether the chain has such a constraint.
 // Values are protocol parameters as of 2026-07-04 (sources in the package-level
@@ -66,6 +76,8 @@ func MinimumBalance(chain Chain) (*big.Int, bool) {
 		return new(big.Int).Set(xlmMinimumReserveStroops), true
 	case SOL:
 		return new(big.Int).Set(solRentExemptZeroDataLamports), true
+	case DOT:
+		return new(big.Int).Set(dotExistentialDepositPlanck), true
 	default:
 		return nil, false
 	}

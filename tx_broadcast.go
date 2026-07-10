@@ -22,6 +22,7 @@ import (
 	txbtc "github.com/ranjbar-dev/hd-wallet/txproto/bitcoin"
 	txcosmos "github.com/ranjbar-dev/hd-wallet/txproto/cosmos"
 	txeth "github.com/ranjbar-dev/hd-wallet/txproto/ethereum"
+	txdot "github.com/ranjbar-dev/hd-wallet/txproto/polkadot"
 	txripple "github.com/ranjbar-dev/hd-wallet/txproto/ripple"
 	txsolana "github.com/ranjbar-dev/hd-wallet/txproto/solana"
 	txton "github.com/ranjbar-dev/hd-wallet/txproto/ton"
@@ -59,6 +60,10 @@ import (
 //   - XRP/Ripple (XRP)
 //     Uppercase hex of the signed transaction (the tx_blob parameter of the
 //     rippled submit command).
+//
+//   - Polkadot (DOT)
+//     "0x"-prefixed lowercase hex of the signed extrinsic, the exact form
+//     accepted by the author_submitExtrinsic RPC method.
 //
 // Pure formatting over existing output fields — no re-signing, no network I/O.
 // A nil or unrecognised out type returns ErrTxInput.
@@ -143,6 +148,17 @@ func BroadcastPayload(chain Chain, out proto.Message) (string, error) {
 		}
 		// toncenter sendBocReturnHash accepts the base64 BoC in the "boc" field.
 		return encoded, nil
+
+	case *txdot.SigningOutput:
+		if family != familyPolkadot {
+			return "", fmt.Errorf("%w: %s does not produce *polkadot.SigningOutput", ErrTxInput, chain)
+		}
+		encodedHex := o.GetEncodedHex()
+		if encodedHex == "" {
+			return "", fmt.Errorf("%w: polkadot SigningOutput: missing encoded_hex", ErrTxInput)
+		}
+		// author_submitExtrinsic accepts the "0x"-prefixed hex extrinsic as-is.
+		return encodedHex, nil
 
 	default:
 		return "", fmt.Errorf("%w: unrecognised SigningOutput type for %s", ErrTxInput, chain)

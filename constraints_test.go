@@ -15,6 +15,7 @@ func TestMinimumBalancePresence(t *testing.T) {
 		{XRP, big.NewInt(1_000_000)},
 		{XLM, big.NewInt(10_000_000)},
 		{SOL, big.NewInt(890_880)},
+		{DOT, big.NewInt(10_000_000_000)},
 	}
 	for _, c := range cases {
 		got, ok := MinimumBalance(c.chain)
@@ -144,7 +145,7 @@ func TestActivationCostAbsentElsewhere(t *testing.T) {
 // only ActivationCost — no chain answers more than one of these three.
 func TestConstraintFunctionsAreDisjointByRole(t *testing.T) {
 	all := []Chain{BTC, LTC, DOGE, DASH, BCH, ZEC, DGB, SYS, VIA, STRAX,
-		QTUM, RVN, FIRO, MONA, PIVX, XRP, XLM, SOL, TRX, ETH, ATOM}
+		QTUM, RVN, FIRO, MONA, PIVX, XRP, XLM, SOL, DOT, TRX, ETH, ATOM}
 
 	for _, chain := range all {
 		_, minBal := MinimumBalance(chain)

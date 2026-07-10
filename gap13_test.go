@@ -93,6 +93,7 @@ func TestCoinFamily(t *testing.T) {
 		{TRX, "tron"},
 		{XRP, "ripple"},
 		{XLM, "stellar"},
+		{DOT, "polkadot"},
 	}
 	for _, c := range cases {
 		if got := CoinFamily(c.sym); got != c.want {
@@ -236,7 +237,7 @@ func TestSupportedTxCoins(t *testing.T) {
 		return false
 	}
 
-	for _, want := range []Chain{ETH, BTC, SOL, TRX, XRP, ATOM} {
+	for _, want := range []Chain{ETH, BTC, SOL, TRX, XRP, ATOM, XLM, ALGO, APTOS, TON, DOT} {
 		if !inSet(want) {
 			t.Errorf("SupportedTxCoins missing %s", want)
 		}

@@ -13,6 +13,7 @@ import (
 	txbtc "github.com/ranjbar-dev/hd-wallet/txproto/bitcoin"
 	txcosmos "github.com/ranjbar-dev/hd-wallet/txproto/cosmos"
 	txeth "github.com/ranjbar-dev/hd-wallet/txproto/ethereum"
+	txdot "github.com/ranjbar-dev/hd-wallet/txproto/polkadot"
 	txripple "github.com/ranjbar-dev/hd-wallet/txproto/ripple"
 	txsolana "github.com/ranjbar-dev/hd-wallet/txproto/solana"
 	txtron "github.com/ranjbar-dev/hd-wallet/txproto/tron"
@@ -356,6 +357,30 @@ func TestBroadcastPayload(t *testing.T) {
 			t.Fatalf("BNB payload missing 0x prefix: %s", got)
 		}
 	})
+
+	t.Run("polkadot", func(t *testing.T) {
+		w, err := FromPrivateKeyBytes(dotTestPrivKey(), Ed25519)
+		if err != nil {
+			t.Fatalf("FromPrivateKeyBytes: %v", err)
+		}
+		defer w.Destroy()
+
+		out, err := w.SignTransaction(DOT, 0, dotVectorInput())
+		if err != nil {
+			t.Fatalf("SignTransaction: %v", err)
+		}
+		do := out.(*txdot.SigningOutput)
+		got, err := BroadcastPayload(DOT, out)
+		if err != nil {
+			t.Fatalf("BroadcastPayload(DOT): %v", err)
+		}
+		if got != do.EncodedHex {
+			t.Fatalf("DOT payload = %s, want %s", got, do.EncodedHex)
+		}
+		if !strings.HasPrefix(got, "0x") {
+			t.Fatalf("DOT payload missing 0x prefix: %s", got)
+		}
+	})
 }
 
 // TestBroadcastPayloadErrors verifies that BroadcastPayload returns ErrTxInput
@@ -420,6 +445,12 @@ func TestBroadcastPayloadErrors(t *testing.T) {
 	t.Run("empty_ripple_encoded", func(t *testing.T) {
 		if _, err := BroadcastPayload(XRP, &txripple.SigningOutput{}); !errors.Is(err, ErrTxInput) {
 			t.Fatalf("empty XRP encoded: want ErrTxInput, got %v", err)
+		}
+	})
+
+	t.Run("empty_polkadot_encoded_hex", func(t *testing.T) {
+		if _, err := BroadcastPayload(DOT, &txdot.SigningOutput{}); !errors.Is(err, ErrTxInput) {
+			t.Fatalf("empty DOT encoded_hex: want ErrTxInput, got %v", err)
 		}
 	})
 

@@ -399,7 +399,7 @@ func init() {
 
 // CoinFamily returns a string identifying the chain family for routing purposes.
 // Values: "evm", "cosmos", "bitcoin-utxo", "solana", "tron", "ripple", "stellar",
-// or "unknown".
+// "polkadot", or "unknown".
 func CoinFamily(chain Chain) string {
 	if _, ok := evmTxChains[chain]; ok {
 		return "evm"
@@ -422,6 +422,8 @@ func CoinFamily(chain Chain) string {
 		return "solana"
 	case XLM:
 		return "stellar"
+	case DOT:
+		return "polkadot"
 	default:
 		return "unknown"
 	}
@@ -471,7 +473,7 @@ func SupportedTxCoins() []Chain {
 	for s := range utxoTxChains {
 		set[s] = struct{}{}
 	}
-	for _, s := range []Chain{BTC, LTC, TRX, XRP, SOL} {
+	for _, s := range []Chain{BTC, LTC, TRX, XRP, SOL, XLM, ALGO, APTOS, TON, DOT} {
 		set[s] = struct{}{}
 	}
 	out := make([]Chain, 0, len(set))

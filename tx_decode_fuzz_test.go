@@ -22,6 +22,7 @@ import (
 	"github.com/btcsuite/btcd/wire"
 
 	txcosmos "github.com/ranjbar-dev/hd-wallet/txproto/cosmos"
+	txdot "github.com/ranjbar-dev/hd-wallet/txproto/polkadot"
 	txtron "github.com/ranjbar-dev/hd-wallet/txproto/tron"
 )
 
@@ -189,6 +190,22 @@ func fuzzSeedRippleTx() []byte {
 	return mustHexBytes("12000022000000002401ec5fd8201b01ec5fed61400000000000000a68400000000000000a732103d13e1152965a51a4a9fd9a8b4ea3dd82a4eba6b25fcad5f460a2342bb650333f74463044022037d32835c9394f39b2cfd4eaf5b0a80e0db397ace06630fa2b099ff73e425dbc02205288f780330b7a88a1980fa83c647b5908502ad7de9a44500c08f0750b0d9e8481144c55f5a78067206507580be7bb2686c8460adff983148132e4e20aecf29090ac428a9c43f230a829220d")
 }
 
+// fuzzSeedPolkadotTx signs the same TWC-pinned SignTransfer_9fd062 vector
+// used in TestSignTxDOT (tx_polkadot_test.go) with the real signer.
+func fuzzSeedPolkadotTx() []byte {
+	w, err := FromPrivateKeyBytes(dotTestPrivKey(), Ed25519)
+	if err != nil {
+		return nil
+	}
+	defer w.Destroy()
+
+	out, err := w.SignTransaction(DOT, 0, dotVectorInput())
+	if err != nil {
+		return nil
+	}
+	return out.(*txdot.SigningOutput).GetEncoded()
+}
+
 // fuzzApproveJSONABI and fuzzApproveCalldata are the ERC-20 approve vector
 // pinned in TestDecodeContractCall_Approve (eth_contractcall_test.go).
 const fuzzApproveJSONABI = `[{"name":"approve","type":"function","inputs":[{"name":"_spender","type":"address"},{"name":"_value","type":"uint256"}]}]`
@@ -267,6 +284,18 @@ func FuzzDecodeRippleTx(f *testing.F) {
 			return
 		}
 		_, _ = DecodeRippleTx(data)
+	})
+}
+
+func FuzzDecodePolkadotTx(f *testing.F) {
+	if seed := fuzzSeedPolkadotTx(); seed != nil {
+		f.Add(seed)
+	}
+	f.Fuzz(func(_ *testing.T, data []byte) {
+		if len(data) > fuzzMaxInput {
+			return
+		}
+		_, _ = DecodePolkadotTx(data, 0)
 	})
 }
 

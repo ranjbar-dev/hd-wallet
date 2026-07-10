@@ -12,6 +12,7 @@ import (
 	txbtc "github.com/ranjbar-dev/hd-wallet/txproto/bitcoin"
 	txcosmos "github.com/ranjbar-dev/hd-wallet/txproto/cosmos"
 	txeth "github.com/ranjbar-dev/hd-wallet/txproto/ethereum"
+	txdot "github.com/ranjbar-dev/hd-wallet/txproto/polkadot"
 	txripple "github.com/ranjbar-dev/hd-wallet/txproto/ripple"
 	txsolana "github.com/ranjbar-dev/hd-wallet/txproto/solana"
 	txtron "github.com/ranjbar-dev/hd-wallet/txproto/tron"
@@ -245,6 +246,28 @@ func TestTransactionID(t *testing.T) {
 		assertTxID(t, out, want)
 	})
 
+	t.Run("polkadot", func(t *testing.T) {
+		w, err := FromPrivateKeyBytes(dotTestPrivKey(), Ed25519)
+		if err != nil {
+			t.Fatalf("FromPrivateKeyBytes: %v", err)
+		}
+		defer w.Destroy()
+
+		out, err := w.SignTransaction(DOT, 0, dotVectorInput())
+		if err != nil {
+			t.Fatalf("SignTransaction: %v", err)
+		}
+		do := out.(*txdot.SigningOutput)
+		// Substrate extrinsic hash = BLAKE2b-256(Encoded). Authoritative pin:
+		// the on-chain extrinsic hash for this exact (TWC-pinned) extrinsic,
+		// per https://polkadot.subscan.io/extrinsic/0x9fd06208a6023e489147d8d93f0182b0cb7e45a40165247319b87278e08362d8
+		const wantSubscanHash = "9fd06208a6023e489147d8d93f0182b0cb7e45a40165247319b87278e08362d8"
+		if recomputed := hex.EncodeToString(blake2bPersonal(32, nil, do.GetEncoded())); recomputed != wantSubscanHash {
+			t.Fatalf("polkadot id recompute mismatch:\n got  %s\n want %s", recomputed, wantSubscanHash)
+		}
+		assertTxID(t, out, wantSubscanHash)
+	})
+
 	t.Run("errors", func(t *testing.T) {
 		// A nil proto.Message is an unknown type.
 		if _, err := TransactionID(nil); !errors.Is(err, ErrNoTxID) {
@@ -263,6 +286,9 @@ func TestTransactionID(t *testing.T) {
 		}
 		if _, err := TransactionID(&txsolana.SigningOutput{}); !errors.Is(err, ErrNoTxID) {
 			t.Fatalf("empty solana id error = %v, want ErrNoTxID", err)
+		}
+		if _, err := TransactionID(&txdot.SigningOutput{}); !errors.Is(err, ErrNoTxID) {
+			t.Fatalf("empty polkadot id error = %v, want ErrNoTxID", err)
 		}
 	})
 }

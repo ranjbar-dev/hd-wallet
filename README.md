@@ -551,8 +551,9 @@ go test -race -cover ./...
 | Function / method | Purpose |
 |---|---|
 | `(*HDWallet) SignTransaction(chain, index, proto.Message) (proto.Message, error)` | Build+sign a raw tx (EVM/Tron/XRP/Cosmos/Solana/Bitcoin-UTXO/Stellar/Algorand/Aptos/TON/Polkadot; no broadcast). |
-| `BroadcastPayload(chain, proto.Message) (string, error)` | Convert a `SignTransaction` output to the exact string each chain's RPC endpoint expects: `"0x"+hex` for EVM, bare hex for Bitcoin/UTXO, base64 for Solana and Cosmos, a TronGrid JSON object for Tron, uppercase hex for XRP. |
-| `TransactionID(proto.Message) (string, error)` | Extract the canonical transaction id from any `SignTransaction` output, normalised to lower-case hex (or base58 for Solana). |
+| `BroadcastPayload(chain, proto.Message) (string, error)` | Convert a `SignTransaction` output to the exact string each chain's RPC endpoint expects: `"0x"+hex` for EVM, bare hex for Bitcoin/UTXO, base64 for Solana and Cosmos, a TronGrid JSON object for Tron, uppercase hex for XRP, `"0x"+hex` for Polkadot (`author_submitExtrinsic`). |
+| `TransactionID(proto.Message) (string, error)` | Extract the canonical transaction id from any `SignTransaction` output, normalised to lower-case hex (or base58 for Solana). Polkadot's is Substrate's extrinsic hash, `BLAKE2b-256(Encoded)`. |
+| `DecodePolkadotTx(raw []byte, network byte) (*PolkadotTxFields, error)` | Decode a signed Polkadot v4 extrinsic back into display fields (signer/dest SS58, era, nonce, tip, call, value, asset id) — the reverse of `SignTransaction(DOT, …)`. |
 | `(*HDWallet) SignMessage(chain, index, []byte) ([]byte, error)` | EIP-191 `personal_sign` → 65-byte r‖s‖v. |
 | `(*HDWallet) SignTypedData(chain, index, []byte) ([]byte, error)` | EIP-712 typed-data signature. |
 | `(*HDWallet) SignBitcoinMessage(chain, index, []byte) (string, error)` | Bitcoin `signmessage` → base64. With `VerifyBitcoinMessage`. |
@@ -568,7 +569,7 @@ go test -race -cover ./...
 
 | Function | Purpose |
 |---|---|
-| `MinimumBalance(chain) (*big.Int, bool)` | Minimum on-chain reserve/rent floor (XRP/XLM/SOL). |
+| `MinimumBalance(chain) (*big.Int, bool)` | Minimum on-chain reserve/rent floor (XRP/XLM/SOL/DOT — DOT is the relay-chain existential deposit; Asset Hub's differs). |
 | `DustThreshold(chain) (*big.Int, bool)` | Standard-relay dust limit in sats (every UTXO chain). |
 | `ActivationCost(chain) (*big.Int, bool)` | One-off account-activation fee (TRX). |
 
